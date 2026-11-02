@@ -5,6 +5,7 @@ import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.os.ParcelUuid
 import com.example.BleBridgeService
+import com.example.cuktech.cloud.XiaomiCloudClient
 import com.example.cuktech.db.CuktechPersistence
 import com.example.cuktech.db.PowerChartPoint
 import com.example.cuktech.energy.AdaptiveEnergyIntegrator

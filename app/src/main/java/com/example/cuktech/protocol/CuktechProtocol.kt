@@ -445,4 +445,9 @@ object CuktechProtocol {
         base[4] = if (scp) 1 else 0
         return base
     }
+
+    fun bytesToHex(bytes: ByteArray): String {
+        return bytes.joinToString("") { "%02X".format(it) }
+    }
 }
+

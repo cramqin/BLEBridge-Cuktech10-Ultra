@@ -509,6 +509,81 @@ class CuktechBleManager(
     // 3. EXACT PORT OF `controller.py::authenticate` (PHASE A + B + PHASE 6)
     // =========================================================================
 
+    private suspend fun recvAuthResponse(label: String): ByteArray? {
+        val svc = BleBridgeService.getInstance() ?: return null
+        val data = withTimeoutOrNull(4000L) { authDataQueue.receive() }
+        if (data == null || data.size < 4) {
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL1,
+                "[Cuktech] Timeout or invalid data for $label (size=${data?.size ?: 0})"
+            )
+            return null
+        }
+
+        // Inline format: 00 00 02 XX [data]
+        if (data[2] == 0x02.toByte()) {
+            val payload = data.copyOfRange(4, data.size)
+            // Send ACK: 00 00 03 00
+            svc.enqueueBleWrite(
+                CuktechProtocol.MI_SERVICE_UUID,
+                CuktechProtocol.CHAR_AUTH_DATA,
+                byteArrayOf(0x00, 0x00, 0x03, 0x00),
+                withResponse = false
+            )
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Received inline $label (${payload.size}B)"
+            )
+            return payload
+        } else if (data[2] == 0x00.toByte() && data.size >= 6) {
+            // Multi-frame header: 00 00 00 XX count_lo count_hi
+            val frameCount = minOf((data[4].toInt() and 0xFF) or ((data[5].toInt() and 0xFF) shl 8), 100)
+            val dataId = data[3].toInt() and 0xFF
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Multi-frame $label: $frameCount frames, ID=0x%02X".format(dataId)
+            )
+
+            // Send RCV_RDY: 00 00 01 01
+            svc.enqueueBleWrite(
+                CuktechProtocol.MI_SERVICE_UUID,
+                CuktechProtocol.CHAR_AUTH_DATA,
+                CuktechProtocol.RCV_RDY,
+                withResponse = false
+            )
+
+            var received = ByteArray(0)
+            for (i in 0 until frameCount) {
+                val frame = withTimeoutOrNull(3000L) { authDataQueue.receive() }
+                if (frame == null) {
+                    BleBridgeService.addLogMessage(
+                        BleBridgeService.Companion.LogLevel.LEVEL1,
+                        "[Cuktech] Frame ${i + 1}/$frameCount timeout for $label"
+                    )
+                    break
+                }
+                if (frame.size > 2) {
+                    received += frame.copyOfRange(2, frame.size)
+                }
+            }
+
+            // Send RCV_OK: 00 00 01 00
+            svc.enqueueBleWrite(
+                CuktechProtocol.MI_SERVICE_UUID,
+                CuktechProtocol.CHAR_AUTH_DATA,
+                CuktechProtocol.RCV_OK,
+                withResponse = false
+            )
+            return received
+        } else {
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL1,
+                "[Cuktech] Unknown auth response format for $label: byte[2]=0x%02X, size=${data.size}".format(data[2])
+            )
+            return null
+        }
+    }
+
     private suspend fun runAuthenticationHandshake(tokenBytes: ByteArray): Boolean {
         val svc = BleBridgeService.getInstance() ?: return false
         try {
@@ -518,6 +593,10 @@ class CuktechBleManager(
             // Step 1: Subscribe to CMD_RECV (0x001b), CMD_SEND (0x001a), DEVICE_INFO (0x001c), AUTH_DATA (0x0019)
             _authState.value = CuktechAuthState.PHASE_A_INIT_A4
             _statusMessage.value = "Subscribing to MiOT characteristics..."
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Subscribing to MiOT characteristics..."
+            )
 
             svc.enqueueBleNotify(CuktechProtocol.MI_SERVICE_UUID, CuktechProtocol.CHAR_CMD_RECV, true)
             svc.enqueueBleNotify(CuktechProtocol.MI_SERVICE_UUID, CuktechProtocol.CHAR_CMD_SEND, true)
@@ -525,19 +604,19 @@ class CuktechBleManager(
             val subAuthDataOk = svc.enqueueBleNotify(CuktechProtocol.MI_SERVICE_UUID, CuktechProtocol.CHAR_AUTH_DATA, true)
             if (!subAuthDataOk) {
                 _statusMessage.value = "Failed to subscribe to CHAR_AUTH_DATA (0x0019)"
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Failed to subscribe to CHAR_AUTH_DATA (0x0019)"
+                )
                 return false
-            }
-
-            // Optional read of CHAR_DEVICE_INFO (0x001c)
-            svc.enqueueBleRead(CuktechProtocol.MI_SERVICE_UUID, CuktechProtocol.CHAR_DEVICE_INFO)?.let { infoBytes ->
-                val str = PortTelemetryDecoder.decodeAsciiInfo(infoBytes)
-                if (str.isNotBlank()) {
-                    _deviceInfo.value = _deviceInfo.value.copy(serialNumber = str)
-                }
             }
 
             // Step 2: Phase A (0xA4 Pre-Handshake Initialization)
             _statusMessage.value = "Phase A: Sending 0xA4 initialization command..."
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Phase A: Sending 0xA4 initialization command..."
+            )
             drainChannel(authDataQueue)
             val a4WriteOk = svc.enqueueBleWrite(
                 CuktechProtocol.MI_SERVICE_UUID,
@@ -547,61 +626,128 @@ class CuktechBleManager(
             )
             if (!a4WriteOk) {
                 _statusMessage.value = "Failed to write 0xA4 to CHAR_AUTH_CTRL"
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Failed to write 0xA4 to CHAR_AUTH_CTRL"
+                )
                 return false
             }
 
             val initResp = withTimeoutOrNull(3000L) { authDataQueue.receive() }
-            if (initResp != null && initResp.size >= 4) {
-                val ack = initResp.copyOfRange(0, 4)
-                ack[2] = ((ack[2].toInt() + 1) and 0xFF).toByte()
-                svc.enqueueBleWrite(
-                    CuktechProtocol.MI_SERVICE_UUID,
-                    CuktechProtocol.CHAR_AUTH_DATA,
-                    ack,
-                    withResponse = false
+            if (initResp == null) {
+                _statusMessage.value = "Phase A: No 0xA4 initialization response received"
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Phase A: No 0xA4 initialization response received from charger"
                 )
+                return false
+            }
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Phase A: Init response: ${CuktechProtocol.bytesToHex(initResp)}"
+            )
 
-                val keyData = withTimeoutOrNull(5000L) { authDataQueue.receive() }
-                if (keyData != null) {
-                    if (keyData.size < 20) {
-                        // Stale frame desync recovery
-                        delay(500L)
-                        drainChannel(authDataQueue)
-                    } else {
-                        val f2Reply = ByteArray(keyData.size)
-                        f2Reply[0] = 0x00
-                        f2Reply[1] = 0x00
-                        f2Reply[2] = 0x05
-                        f2Reply[3] = 0x01
-                        for (i in 4 until f2Reply.size) {
-                            f2Reply[i] = 0xF2.toByte()
-                        }
-                        svc.enqueueBleWrite(
-                            CuktechProtocol.MI_SERVICE_UUID,
-                            CuktechProtocol.CHAR_AUTH_DATA,
-                            f2Reply,
-                            withResponse = false
-                        )
-                        delay(300L)
-                        drainChannel(authDataQueue)
-                        delay(300L)
-                        drainChannel(authDataQueue)
-                    }
-                }
-            } else {
-                // Device already initialized from prior session; drain any leftover bytes
-                delay(200L)
-                drainChannel(authDataQueue)
+            // Protocol negotiation response: byte[2] += 1 (04 -> 05)
+            val ack = initResp.copyOf()
+            if (ack.size >= 3) {
+                ack[2] = ((ack[2].toInt() + 1) and 0xFF).toByte()
+            }
+            svc.enqueueBleWrite(
+                CuktechProtocol.MI_SERVICE_UUID,
+                CuktechProtocol.CHAR_AUTH_DATA,
+                ack,
+                withResponse = false
+            )
+
+            // Receive key exchange data (device sends placeholder frame)
+            var keyData = withTimeoutOrNull(5000L) { authDataQueue.receive() }
+            if (keyData != null) {
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL2,
+                    "[Cuktech] Phase A: Received key exchange data: ${keyData.size} bytes"
+                )
             }
 
-            // Step 3: Phase B (0x24 MiOT Token Handshake)
-            _authState.value = CuktechAuthState.PHASE_B_HANDSHAKE
-            _statusMessage.value = "Phase B: Sending CMD_LOGIN (0x24) for key negotiation..."
+            // Desync check: byte[2] == 0x04 && size < 20 (duplicate init response instead of key exchange)
+            val isDesync = (keyData != null && keyData.size in 3..19 && keyData[2] == 0x04.toByte())
+            if (isDesync) {
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL2,
+                    "[Cuktech] Phase A: Device state desync detected (${keyData!!.size}B), waiting for recovery..."
+                )
+                val deadline = System.currentTimeMillis() + 12000L
+                for (retry in 0 until 3) {
+                    val remaining = deadline - System.currentTimeMillis()
+                    if (remaining <= 0) break
+                    val extra = withTimeoutOrNull(minOf(remaining, 4000L)) { authDataQueue.receive() }
+                    if (extra != null && extra.size >= 20 && extra[2] == 0x04.toByte()) {
+                        keyData = extra
+                        BleBridgeService.addLogMessage(
+                            BleBridgeService.Companion.LogLevel.LEVEL2,
+                            "[Cuktech] Phase A: Received recovered key exchange data: ${extra.size} bytes"
+                        )
+                        break
+                    }
+                }
+            }
 
-            svc.enqueueBleNotify(CuktechProtocol.MI_SERVICE_UUID, CuktechProtocol.CHAR_AUTH_CTRL, true)
-            drainChannel(authCtrlQueue)
+            if (keyData == null) {
+                _statusMessage.value = "Phase A: Did not receive key exchange data"
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Phase A: Failed to receive key exchange data"
+                )
+                return false
+            }
+
+            // Send placeholder frame with matching length (0x00 0x00 0x05 0x01 + 0xF2 padding)
+            val padLen = maxOf(0, keyData.size - 4)
+            val placeholder = ByteArray(4 + padLen)
+            placeholder[0] = 0x00
+            placeholder[1] = 0x00
+            placeholder[2] = 0x05
+            placeholder[3] = 0x01
+            for (i in 0 until padLen) {
+                placeholder[4 + i] = 0xF2.toByte()
+            }
+            svc.enqueueBleWrite(
+                CuktechProtocol.MI_SERVICE_UUID,
+                CuktechProtocol.CHAR_AUTH_DATA,
+                placeholder,
+                withResponse = false
+            )
+
+            // Drain leftover notifications
+            delay(300L)
+            drainChannel(authDataQueue)
+            delay(300L)
             drainChannel(authDataQueue)
 
+            // Step 3: Phase B (CMD_LOGIN = 0x24)
+            _authState.value = CuktechAuthState.PHASE_B_HANDSHAKE
+            _statusMessage.value = "Phase B: Sending CMD_LOGIN (0x24) for key negotiation..."
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Phase B: Subscribing to CHAR_AUTH_CTRL..."
+            )
+
+            // Subscribe to CHAR_AUTH_CTRL (aligned with Mi Home timing)
+            try {
+                svc.enqueueBleNotify(CuktechProtocol.MI_SERVICE_UUID, CuktechProtocol.CHAR_AUTH_CTRL, true)
+            } catch (e: Exception) {
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL2,
+                    "[Cuktech] Phase B: auth_ctrl subscribe: ${e.message}"
+                )
+            }
+            drainChannel(authCtrlQueue)
+            drainChannel(authDataQueue)
+            delay(50L)
+
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Phase B: Sending CMD_LOGIN (0x24)..."
+            )
             svc.enqueueBleWrite(
                 CuktechProtocol.MI_SERVICE_UUID,
                 CuktechProtocol.CHAR_AUTH_CTRL,
@@ -609,6 +755,12 @@ class CuktechBleManager(
                 withResponse = false
             )
 
+            // Step 4: Send App Random Key
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Phase B: Sending CMD_SEND_KEY..."
+            )
+            val randKey = ByteArray(16).also { random.nextBytes(it) }
             svc.enqueueBleWrite(
                 CuktechProtocol.MI_SERVICE_UUID,
                 CuktechProtocol.CHAR_AUTH_DATA,
@@ -616,13 +768,25 @@ class CuktechBleManager(
                 withResponse = false
             )
 
-            val rdy1 = withTimeoutOrNull(5000L) { authDataQueue.receive() }
-            if (rdy1 == null || !rdy1.contentEquals(CuktechProtocol.RCV_RDY)) {
-                _statusMessage.value = "Timeout waiting for RCV_RDY response"
+            // Wait for RCV_RDY (skipping any stale key exchange frames, up to 5 retries)
+            var gotRdy1 = false
+            for (retry in 0 until 5) {
+                val data = withTimeoutOrNull(3000L) { authDataQueue.receive() }
+                if (data != null && data.contentEquals(CuktechProtocol.RCV_RDY)) {
+                    gotRdy1 = true
+                    break
+                }
+            }
+            if (!gotRdy1) {
+                _statusMessage.value = "Timeout waiting for RCV_RDY after CMD_SEND_KEY"
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Phase B: Timeout waiting for RCV_RDY after CMD_SEND_KEY"
+                )
                 return false
             }
 
-            val randKey = ByteArray(16).also { random.nextBytes(it) }
+            // Send random key with header [0x01, 0x00]
             val keyFrame = byteArrayOf(0x01, 0x00) + randKey
             svc.enqueueBleWrite(
                 CuktechProtocol.MI_SERVICE_UUID,
@@ -631,175 +795,185 @@ class CuktechBleManager(
                 withResponse = false
             )
 
-            val ok1 = withTimeoutOrNull(5000L) { authDataQueue.receive() }
+            // Wait for RCV_OK
+            val ok1 = withTimeoutOrNull(3000L) { authDataQueue.receive() }
             if (ok1 == null || !ok1.contentEquals(CuktechProtocol.RCV_OK)) {
                 _statusMessage.value = "Did not receive RCV_OK after sending random key"
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Phase B: Did not receive RCV_OK after sending random key"
+                )
                 return false
             }
 
-            // Step 4: Receive device random (16B) and device HMAC (32B)
-            val devSendKeyCmd = withTimeoutOrNull(5000L) { authDataQueue.receive() }
-                ?: run {
-                    _statusMessage.value = "Timeout waiting for device public key"
-                    return false
-                }
-
-            val devRandom: ByteArray
-            val devHmac: ByteArray
-
-            if (devSendKeyCmd.size >= 6 && (devSendKeyCmd[2].toInt() and 0xFF) == 0x02) {
-                // Inline mode (device sends key + info inline without waiting for RCV_RDY)
-                devRandom = devSendKeyCmd.copyOfRange(4, minOf(20, devSendKeyCmd.size))
-                val devSendInfo1 = withTimeoutOrNull(5000L) { authDataQueue.receive() } ?: return false
-                val devSendInfo2 = withTimeoutOrNull(5000L) { authDataQueue.receive() } ?: return false
-                val part1 = if (devSendInfo1.size > 4) devSendInfo1.copyOfRange(4, devSendInfo1.size) else ByteArray(0)
-                val part2 = if (devSendInfo2.size > 2) devSendInfo2.copyOfRange(2, devSendInfo2.size) else ByteArray(0)
-                devHmac = part1 + part2
-            } else {
-                // Standard multi-frame mode
-                svc.enqueueBleWrite(
-                    CuktechProtocol.MI_SERVICE_UUID,
-                    CuktechProtocol.CHAR_AUTH_DATA,
-                    CuktechProtocol.RCV_RDY,
-                    withResponse = false
+            // Step 5: Receive Device Random Key (16B) and Device HMAC (32B)
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Phase B: Receiving device random key..."
+            )
+            val devRandomRaw = recvAuthResponse("device random")
+            if (devRandomRaw == null || devRandomRaw.size < 16) {
+                _statusMessage.value = "Invalid device random key received"
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Phase B: Invalid device random key (size=${devRandomRaw?.size ?: 0})"
                 )
-                val devKeyFrame = withTimeoutOrNull(5000L) { authDataQueue.receive() } ?: return false
-                devRandom = if (devKeyFrame.size > 2) devKeyFrame.copyOfRange(2, devKeyFrame.size) else devKeyFrame
-                svc.enqueueBleWrite(
-                    CuktechProtocol.MI_SERVICE_UUID,
-                    CuktechProtocol.CHAR_AUTH_DATA,
-                    CuktechProtocol.RCV_OK,
-                    withResponse = false
-                )
-
-                withTimeoutOrNull(5000L) { authDataQueue.receive() } ?: return false
-                svc.enqueueBleWrite(
-                    CuktechProtocol.MI_SERVICE_UUID,
-                    CuktechProtocol.CHAR_AUTH_DATA,
-                    CuktechProtocol.RCV_RDY,
-                    withResponse = false
-                )
-                val hmacF1 = withTimeoutOrNull(5000L) { authDataQueue.receive() } ?: return false
-                val hmacF2 = withTimeoutOrNull(5000L) { authDataQueue.receive() } ?: return false
-                val part1 = if (hmacF1.size > 2) hmacF1.copyOfRange(2, hmacF1.size) else ByteArray(0)
-                val part2 = if (hmacF2.size > 2) hmacF2.copyOfRange(2, hmacF2.size) else ByteArray(0)
-                devHmac = part1 + part2
-                svc.enqueueBleWrite(
-                    CuktechProtocol.MI_SERVICE_UUID,
-                    CuktechProtocol.CHAR_AUTH_DATA,
-                    CuktechProtocol.RCV_OK,
-                    withResponse = false
-                )
-            }
-
-            if (devRandom.size != 16) {
-                _statusMessage.value = "Unexpected device random length (${devRandom.size}B)"
                 return false
             }
+            val devRandom = devRandomRaw.copyOfRange(0, 16)
 
-            // Step 5: HKDF-SHA256 Key Derivation & App HMAC Transmission
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Phase B: Receiving device HMAC..."
+            )
+            val devHmacRaw = recvAuthResponse("device HMAC")
+            if (devHmacRaw == null || devHmacRaw.size < 32) {
+                _statusMessage.value = "Invalid device HMAC received"
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Phase B: Invalid device HMAC (size=${devHmacRaw?.size ?: 0})"
+                )
+                return false
+            }
+            val devHmac = devHmacRaw.copyOfRange(0, 32)
+
+            // Step 6: Derive Session Keys & Verify Device HMAC
             val derived = CuktechProtocol.deriveSessionKeys(tokenBytes, randKey, devRandom)
-            val ourHmac = CuktechProtocol.computeAppHmac(derived.appKey, randKey, devRandom)
+            val expectedDevHmac = CuktechProtocol.computeDeviceExpectedHmac(derived.devKey, devRandom, randKey)
+            if (!devHmac.contentEquals(expectedDevHmac)) {
+                _statusMessage.value = "Device HMAC verification failed! Invalid token or BLE key."
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Device HMAC verification failed! Verify MiOT token in Xiaomi account."
+                )
+                return false
+            }
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Phase B: Device HMAC verified successfully!"
+            )
 
+            // Step 7: Send App HMAC Confirmation
+            val ourHmac = CuktechProtocol.computeAppHmac(derived.appKey, randKey, devRandom)
             svc.enqueueBleWrite(
                 CuktechProtocol.MI_SERVICE_UUID,
                 CuktechProtocol.CHAR_AUTH_DATA,
                 CuktechProtocol.CMD_SEND_INFO,
                 withResponse = false
             )
-            val rdy2 = withTimeoutOrNull(5000L) { authDataQueue.receive() }
+
+            val rdy2 = withTimeoutOrNull(3000L) { authDataQueue.receive() }
             if (rdy2 == null || !rdy2.contentEquals(CuktechProtocol.RCV_RDY)) {
                 _statusMessage.value = "Did not receive RCV_RDY before sending HMAC"
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Phase B: Did not receive RCV_RDY before sending HMAC"
+                )
                 return false
             }
 
-            val hmacChunk1 = byteArrayOf(0x01, 0x00) + ourHmac.copyOfRange(0, 16)
-            val hmacChunk2 = byteArrayOf(0x02, 0x00) + ourHmac.copyOfRange(16, 32)
+            // Send HMAC (single 34-byte frame: 0x01 0x00 + 32-byte HMAC)
+            val hmacFrame = byteArrayOf(0x01, 0x00) + ourHmac
             svc.enqueueBleWrite(
                 CuktechProtocol.MI_SERVICE_UUID,
                 CuktechProtocol.CHAR_AUTH_DATA,
-                hmacChunk1,
-                withResponse = false
-            )
-            delay(50L)
-            svc.enqueueBleWrite(
-                CuktechProtocol.MI_SERVICE_UUID,
-                CuktechProtocol.CHAR_AUTH_DATA,
-                hmacChunk2,
+                hmacFrame,
                 withResponse = false
             )
 
-            val ok2 = withTimeoutOrNull(5000L) { authDataQueue.receive() }
-            if (ok2 == null || !ok2.contentEquals(CuktechProtocol.RCV_OK)) {
-                _statusMessage.value = "Did not receive RCV_OK after sending HMAC"
-                return false
-            }
+            val ok2 = withTimeoutOrNull(3000L) { authDataQueue.receive() }
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Phase B: HMAC ACK: ${ok2?.let { CuktechProtocol.bytesToHex(it) } ?: "null"}"
+            )
 
-            // Step 6: Phase 6 Challenge (0x0d) / Response (0x0c) Echo
-            val challengeCmd = withTimeoutOrNull(3000L) { authDataQueue.receive() }
-            if (challengeCmd != null &&
-                challengeCmd.size >= 4 &&
-                challengeCmd[0] == 0.toByte() &&
-                challengeCmd[1] == 0.toByte() &&
-                challengeCmd[2] == 0.toByte() &&
-                challengeCmd[3] == 0x0d.toByte()
-            ) {
-                svc.enqueueBleWrite(
-                    CuktechProtocol.MI_SERVICE_UUID,
-                    CuktechProtocol.CHAR_AUTH_DATA,
-                    CuktechProtocol.RCV_RDY,
-                    withResponse = false
-                )
-                withTimeoutOrNull(3000L) { authDataQueue.receive() }
-                svc.enqueueBleWrite(
-                    CuktechProtocol.MI_SERVICE_UUID,
-                    CuktechProtocol.CHAR_AUTH_DATA,
-                    CuktechProtocol.RCV_OK,
-                    withResponse = false
-                )
+            // Step 8: Phase 6 Challenge-Response loop (up to 8 seconds)
+            try {
+                val deadline = System.currentTimeMillis() + 8000L
+                var responseData: ByteArray? = null
 
-                val respCmd = withTimeoutOrNull(3000L) { authDataQueue.receive() }
-                if (respCmd != null &&
-                    respCmd.size >= 4 &&
-                    respCmd[0] == 0.toByte() &&
-                    respCmd[1] == 0.toByte() &&
-                    respCmd[2] == 0.toByte() &&
-                    respCmd[3] == 0x0c.toByte()
-                ) {
-                    svc.enqueueBleWrite(
-                        CuktechProtocol.MI_SERVICE_UUID,
-                        CuktechProtocol.CHAR_AUTH_DATA,
-                        CuktechProtocol.RCV_RDY,
-                        withResponse = false
-                    )
-                    val responsePayload = withTimeoutOrNull(3000L) { authDataQueue.receive() }
-                    svc.enqueueBleWrite(
-                        CuktechProtocol.MI_SERVICE_UUID,
-                        CuktechProtocol.CHAR_AUTH_DATA,
-                        CuktechProtocol.RCV_OK,
-                        withResponse = false
-                    )
-                    if (responsePayload != null && responsePayload.size >= 3) {
-                        val echo = byteArrayOf(0x01, 0x00, 0x0c) + responsePayload.copyOfRange(3, responsePayload.size)
+                while (System.currentTimeMillis() < deadline) {
+                    val remaining = deadline - System.currentTimeMillis()
+                    if (remaining <= 0) break
+                    val data = withTimeoutOrNull(minOf(remaining, 3000L)) { authDataQueue.receive() } ?: continue
+
+                    // Challenge: 00 00 02 0d [16B]
+                    if (data.size >= 3 && data[2] == 0x0d.toByte()) {
+                        BleBridgeService.addLogMessage(
+                            BleBridgeService.Companion.LogLevel.LEVEL2,
+                            "[Cuktech] Phase 6: Challenge received (${data.size}B)"
+                        )
                         svc.enqueueBleWrite(
                             CuktechProtocol.MI_SERVICE_UUID,
                             CuktechProtocol.CHAR_AUTH_DATA,
-                            echo,
+                            byteArrayOf(0x00, 0x00, 0x03, 0x00),
                             withResponse = false
                         )
-                        withTimeoutOrNull(2000L) { authDataQueue.receive() }
+                    } else if (data.size >= 3 && data[2] == 0x0c.toByte()) {
+                        // Response: 00 00 02 0c [32B]
+                        responseData = data
+                        BleBridgeService.addLogMessage(
+                            BleBridgeService.Companion.LogLevel.LEVEL2,
+                            "[Cuktech] Phase 6: Response received (${data.size}B)"
+                        )
+                        svc.enqueueBleWrite(
+                            CuktechProtocol.MI_SERVICE_UUID,
+                            CuktechProtocol.CHAR_AUTH_DATA,
+                            byteArrayOf(0x00, 0x00, 0x03, 0x00),
+                            withResponse = false
+                        )
+                        svc.enqueueBleWrite(
+                            CuktechProtocol.MI_SERVICE_UUID,
+                            CuktechProtocol.CHAR_AUTH_DATA,
+                            CuktechProtocol.CMD_SEND_INFO,
+                            withResponse = false
+                        )
+                    } else if (data.contentEquals(CuktechProtocol.RCV_RDY)) {
+                        break
+                    } else if (data.contentEquals(CuktechProtocol.RCV_OK)) {
+                        break
                     }
                 }
+
+                if (responseData != null) {
+                    val authRespPayload = byteArrayOf(0x01, 0x00, 0x0c) + responseData.copyOfRange(3, responseData.size)
+                    svc.enqueueBleWrite(
+                        CuktechProtocol.MI_SERVICE_UUID,
+                        CuktechProtocol.CHAR_AUTH_DATA,
+                        authRespPayload,
+                        withResponse = false
+                    )
+                    withTimeoutOrNull(3000L) { authDataQueue.receive() }
+                }
+            } catch (e: Exception) {
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL2,
+                    "[Cuktech] Phase 6 completed: ${e.message}"
+                )
             }
 
-            // Step 7: Confirm 0x21 (or 0x11) on CHAR_AUTH_CTRL
-            val ctrlResult = withTimeoutOrNull(4000L) { authCtrlQueue.receive() }
+            // Step 9: Final Auth Status on CHAR_AUTH_CTRL
+            val ctrlResult = withTimeoutOrNull(5000L) { authCtrlQueue.receive() }
             if (ctrlResult != null && ctrlResult.isNotEmpty()) {
                 val statusByte = ctrlResult[0].toInt() and 0xFF
-                if (statusByte != 0x21 && statusByte != 0x11) {
-                    _statusMessage.value = "Authentication status rejected: 0x${"%02X".format(statusByte)}"
+                if (statusByte == 0x21 || statusByte == 0x11) {
+                    BleBridgeService.addLogMessage(
+                        BleBridgeService.Companion.LogLevel.LEVEL2,
+                        "[Cuktech] Authentication successful (Status 0x%02X)".format(statusByte)
+                    )
+                } else {
+                    _statusMessage.value = "Authentication status rejected: 0x%02X".format(statusByte)
+                    BleBridgeService.addLogMessage(
+                        BleBridgeService.Companion.LogLevel.LEVEL1,
+                        "[Cuktech] Authentication status rejected: 0x%02X".format(statusByte)
+                    )
                     return false
                 }
+            } else {
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL2,
+                    "[Cuktech] No final auth status packet, assuming authenticated by session key agreement"
+                )
             }
 
             // Save session keys and reset counters
@@ -811,6 +985,10 @@ class CuktechBleManager(
             return true
         } catch (e: Exception) {
             _statusMessage.value = "Handshake error: ${e.message}"
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL1,
+                "[Cuktech] Handshake error: ${e.message}"
+            )
             return false
         }
     }

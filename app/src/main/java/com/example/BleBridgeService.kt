@@ -537,6 +537,13 @@ class BleBridgeService : Service() {
             bluetoothGatt = null
         }
 
+        activeTaskDeferred?.complete(false)
+        activeTaskDeferred = null
+        activeTaskReadBytes = null
+        while (taskChannel.tryReceive().isSuccess) {
+            // Drain pending tasks
+        }
+
         setBleConnectionState(BleConnectionState.DISCONNECTED, null)
         broadcastJson(createTelemetryJson("disconnected", null, null, null, null))
     }

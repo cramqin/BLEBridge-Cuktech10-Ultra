@@ -2,6 +2,14 @@
 
 > **Note:** This is a fork of the BLE Bridge with capability to modify the Cuktech10 Ultra. **For development purposes only.**
 
+## 📦 Releases
+
+Signed APKs are published on the [Releases](../../releases) page.
+
+To publish a new release: **Actions → Release APK → Run workflow**, enter a version (e.g. `1.0.1`). The workflow builds a signed release APK and creates a GitHub Release tagged `v<version>`. `versionCode` is set automatically from the workflow run number.
+
+Signing uses the repository secrets `KEYSTORE_BASE64`, `STORE_PASSWORD` and `KEY_PASSWORD`, created once by the **Setup Release Keystore** workflow. Never regenerate the key unless you intend to break updates for installed apps.
+
 ---
 
 # BLE-to-Network Bridge 🚀

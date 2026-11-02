@@ -28,6 +28,7 @@ import java.net.Socket
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
+import com.example.cuktech.ble.CuktechAuthState
 import com.example.cuktech.ble.CuktechBleManager
 import com.example.cuktech.cloud.XiaomiCloudClient
 import com.example.cuktech.db.CuktechPersistence

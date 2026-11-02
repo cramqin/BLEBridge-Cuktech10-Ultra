@@ -131,7 +131,6 @@ fun BleBridgeDashboard(
 
     var portInput by remember { mutableStateOf(serverPort.toString()) }
     var dropdownExpanded by remember { mutableStateOf(false) }
-    var showInstallDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(serverPort) {
         if (portInput != serverPort.toString()) {
@@ -711,107 +710,7 @@ fun BleBridgeDashboard(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
-                        HorizontalDivider(color = appColors.border)
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Button(
-                            onClick = { showInstallDialog = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = appColors.primaryContainer,
-                                contentColor = appColors.onPrimaryContainer
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("CLI & Automation (Shizuku / Shell)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
                     }
-                }
-
-                if (showInstallDialog) {
-                    var selectedTab by remember { mutableStateOf(0) }
-                    AlertDialog(
-                        onDismissRequest = { showInstallDialog = false },
-                        containerColor = appColors.surface,
-                        titleContentColor = appColors.textPrimary,
-                        textContentColor = appColors.textSecondary,
-                        title = { Text("CLI & Automation Guide", fontWeight = FontWeight.Bold) },
-                        text = {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                TabRow(
-                                    selectedTabIndex = selectedTab,
-                                    containerColor = appColors.surfaceVariant,
-                                    contentColor = appColors.primary,
-                                    modifier = Modifier.clip(RoundedCornerShape(8.dp))
-                                ) {
-                                    Tab(
-                                        selected = selectedTab == 0,
-                                        onClick = { selectedTab = 0 },
-                                        text = { Text("⚡ Shizuku / Shell", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-                                    )
-                                    Tab(
-                                        selected = selectedTab == 1,
-                                        onClick = { selectedTab = 1 },
-                                        text = { Text("🐍 Python Scripts", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                if (selectedTab == 0) {
-                                    Text(
-                                        "No Termux required! Control the bridge directly via Shizuku, Shevery, or ADB shell:",
-                                        fontSize = 12.sp,
-                                        color = appColors.textSecondary
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Surface(
-                                        color = Color(0xFF0F172A),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            text = "# 1. Start server:\nam broadcast -a com.cramqin.blecuktech10.START_SERVER --ei port 8080\n\n# 2. Stop server:\nam broadcast -a com.cramqin.blecuktech10.STOP_SERVER\n\n# 3. Connect via TCP socket:\necho '{\"command\":\"scan\"}' | nc 127.0.0.1 8080",
-                                            color = Color(0xFF38BDF8),
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 10.sp,
-                                            lineHeight = 15.sp,
-                                            modifier = Modifier.padding(12.dp)
-                                        )
-                                    }
-                                } else {
-                                    Text(
-                                        "Run this command to download the interactive TUI script:",
-                                        fontSize = 12.sp,
-                                        color = appColors.textSecondary
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Surface(
-                                        color = Color(0xFF0F172A),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            text = "curl -L https://raw.githubusercontent.com/cramqin/BLEBridge-Cuktech10-Ultra/main/ble_tui.py -o ble_tui.py && python ble_tui.py",
-                                            color = Color(0xFF38BDF8),
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 10.sp,
-                                            lineHeight = 15.sp,
-                                            modifier = Modifier.padding(12.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showInstallDialog = false }) {
-                                Text("DONE", color = appColors.primary, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    )
                 }
 
                 // --- CUKTECH 10 Ultra & Xiaomi Cloud Section ---

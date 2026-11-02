@@ -74,17 +74,6 @@ The BLE Bridge now includes a professional-grade Terminal User Interface (TUI) a
 - **Connection Resiliency**:
     - **Pulse Mode**: Automated heartbeats to keep sensitive connections alive.
     - **Auto-MTU**: Automatically negotiates 512-byte packets upon connection.
-- **Zero-Config Setup**: Self-bootstraps and updates its own dependencies (`textual`, `rich`, `requests`) on launch.
-
-### 🚀 Quick Start in Termux
-1. Launch the **BLE Bridge** Android app and toggle the server **ON**.
-2. Tap **Setup Python Tools** in the app and copy the installation command.
-3. Paste it into Termux or run:
-   ```bash
-   curl -L https://raw.githubusercontent.com/woldphone/BLEBridge/main/ble_tui.py -o ble_tui.py && \
-   curl -L https://raw.githubusercontent.com/woldphone/BLEBridge/main/uuids.json -o uuids.json && \
-   python3 ble_tui.py
-   ```
 
 ---
 

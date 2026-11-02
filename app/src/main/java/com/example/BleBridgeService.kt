@@ -28,6 +28,13 @@ import java.net.Socket
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
+import com.example.cuktech.ble.CuktechBleManager
+import com.example.cuktech.cloud.XiaomiCloudClient
+import com.example.cuktech.db.CuktechPersistence
+import com.example.cuktech.integrations.CloudIntegrations
+import com.example.cuktech.integrations.ShizukuCompanion
+import com.example.cuktech.security.SecureCredentialStore
+
 class BleBridgeService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -43,6 +50,8 @@ class BleBridgeService : Service() {
     // Sequential GATT task queue
     private val taskChannel = Channel<BleTask>(Channel.UNLIMITED)
     private var activeTaskDeferred: CompletableDeferred<Boolean>? = null
+    @Volatile
+    private var activeTaskReadBytes: ByteArray? = null
 
     private var isScanning = false
     private var scanCallbackInternal: ScanCallback? = null
@@ -56,15 +65,16 @@ class BleBridgeService : Service() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        ensureCuktechManagersInitialized(applicationContext)
         bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         bluetoothAdapter = bluetoothManager?.adapter
 
         // Initialize state
         _wifiIp.value = getLocalIpAddress()
-        
+
         // Start processing sequential BLE task queue
         startQueueProcessor()
-        
+
         log(LogLevel.LEVEL2, "BLE Bridge Service created.")
     }
 
@@ -84,6 +94,13 @@ class BleBridgeService : Service() {
             closeGattClean()
             stopBleScan()
             stopSelf()
+        } else if (action == ACTION_CONNECT_CUKTECH) {
+            val mac = intent.getStringExtra(EXTRA_MAC)
+            cuktechManager?.connectToCharger(mac)
+        } else if (action == ACTION_DISCONNECT_CUKTECH) {
+            cuktechManager?.disconnectCharger()
+        } else if (action == ACTION_SCAN_CUKTECH) {
+            cuktechManager?.startSearchForCuktechChargers(10000L)
         }
 
         return START_STICKY
@@ -246,6 +263,7 @@ class BleBridgeService : Service() {
 
         val callback = object : ScanCallback() {
             override fun onScanResult(callbackType: Int, result: ScanResult) {
+                cuktechManager?.onScanResult(result)
                 val device = result.device
                 val name = device.name ?: "Unknown"
                 val address = device.address
@@ -282,6 +300,7 @@ class BleBridgeService : Service() {
             override fun onScanFailed(errorCode: Int) {
                 log(LogLevel.LEVEL1, "Scan failed with hardware error code: $errorCode")
                 isScanning = false
+                cuktechManager?.onScanStopped()
                 broadcastJson(errorResponse("BLE Scan failed with hardware error: $errorCode"))
             }
         }
@@ -298,7 +317,48 @@ class BleBridgeService : Service() {
         } catch (e: SecurityException) {
             log(LogLevel.LEVEL1, "Security Exception during scan setup: ${e.message}")
             isScanning = false
+            cuktechManager?.onScanStopped()
             client.send(errorResponse("Security Exception: BLE Scan permission is missing or revoked"))
+        }
+    }
+
+    fun startNativeCuktechScan(durationMs: Long = 10000L) {
+        val scanner = bluetoothAdapter?.bluetoothLeScanner
+        if (scanner == null) {
+            log(LogLevel.LEVEL1, "Scan failed: Bluetooth LE Scanner not available")
+            cuktechManager?.onScanStopped()
+            return
+        }
+        if (isScanning) {
+            stopBleScan()
+        }
+        isScanning = true
+        log(LogLevel.LEVEL2, "Starting CUKTECH 10 Ultra BLE discovery scan (${durationMs / 1000}s)...")
+
+        val callback = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                cuktechManager?.onScanResult(result)
+            }
+
+            override fun onScanFailed(errorCode: Int) {
+                log(LogLevel.LEVEL1, "CUKTECH Scan failed with error code: $errorCode")
+                isScanning = false
+                cuktechManager?.onScanStopped()
+            }
+        }
+        scanCallbackInternal = callback
+        try {
+            scanner.startScan(callback)
+            serviceScope.launch {
+                delay(durationMs)
+                if (isScanning) {
+                    stopBleScan()
+                }
+            }
+        } catch (e: SecurityException) {
+            log(LogLevel.LEVEL1, "Security Exception during CUKTECH scan: ${e.message}")
+            isScanning = false
+            cuktechManager?.onScanStopped()
         }
     }
 
@@ -315,9 +375,91 @@ class BleBridgeService : Service() {
         }
         isScanning = false
         scanCallbackInternal = null
+        cuktechManager?.onScanStopped()
     }
 
     // --- BLE Connection & GATT Core ---
+
+    fun connectBleNative(address: String): Boolean {
+        if (isScanning) {
+            stopBleScan()
+        }
+        if (companionBleState != Companion.BleConnectionState.DISCONNECTED) {
+            closeGattClean()
+        }
+        val device = try {
+            bluetoothAdapter?.getRemoteDevice(address.uppercase().trim())
+        } catch (e: Exception) {
+            null
+        }
+        if (device == null) {
+            log(LogLevel.LEVEL1, "Invalid MAC address: $address")
+            return false
+        }
+        log(LogLevel.LEVEL2, "Connecting to CUKTECH BLE peripheral: $address")
+        setBleConnectionState(BleConnectionState.CONNECTING, address)
+        return try {
+            bluetoothGatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                device.connectGatt(this, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+            } else {
+                device.connectGatt(this, false, gattCallback)
+            }
+            bluetoothGatt != null
+        } catch (e: SecurityException) {
+            log(LogLevel.LEVEL1, "Security exception connecting: ${e.message}")
+            setBleConnectionState(BleConnectionState.DISCONNECTED, null)
+            false
+        } catch (e: Exception) {
+            log(LogLevel.LEVEL1, "Unexpected connection failure: ${e.message}")
+            setBleConnectionState(BleConnectionState.DISCONNECTED, null)
+            false
+        }
+    }
+
+    fun disconnectBleNative() {
+        closeGattClean()
+    }
+
+    fun requestGattRssi(): Boolean {
+        val g = bluetoothGatt ?: return false
+        return try {
+            g.readRemoteRssi()
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    suspend fun enqueueBleRead(serviceUuid: UUID, charUuid: UUID): ByteArray? {
+        val deferred = CompletableDeferred<ByteArray?>()
+        val task = BleTask.Read(serviceUuid, charUuid) { ok, bytes ->
+            deferred.complete(if (ok) bytes else null)
+        }
+        taskChannel.trySend(task)
+        return withTimeoutOrNull(3500L) { deferred.await() }
+    }
+
+    suspend fun enqueueBleWrite(
+        serviceUuid: UUID,
+        charUuid: UUID,
+        data: ByteArray,
+        withResponse: Boolean
+    ): Boolean {
+        val deferred = CompletableDeferred<Boolean>()
+        val task = BleTask.Write(serviceUuid, charUuid, data, withResponse) { ok, _ ->
+            deferred.complete(ok)
+        }
+        taskChannel.trySend(task)
+        return withTimeoutOrNull(3500L) { deferred.await() } ?: false
+    }
+
+    suspend fun enqueueBleNotify(serviceUuid: UUID, charUuid: UUID, enable: Boolean): Boolean {
+        val deferred = CompletableDeferred<Boolean>()
+        val task = BleTask.RegisterNotify(serviceUuid, charUuid, enable) { ok, _ ->
+            deferred.complete(ok)
+        }
+        taskChannel.trySend(task)
+        return withTimeoutOrNull(3500L) { deferred.await() } ?: false
+    }
 
     fun connectBle(address: String, client: ClientHandler) {
         if (companionBleState != Companion.BleConnectionState.DISCONNECTED) {
@@ -385,6 +527,7 @@ class BleBridgeService : Service() {
 
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             val addr = gatt.device.address
+            cuktechManager?.onConnectionStateChange(addr, status, newState)
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 if (newState == BluetoothGatt.STATE_CONNECTED) {
                     log(LogLevel.LEVEL2, "BLE state connected! Initiating Auto-MTU Negotiation...")
@@ -416,6 +559,12 @@ class BleBridgeService : Service() {
             }
         }
 
+        override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                cuktechManager?.onRemoteRssi(rssi)
+            }
+        }
+
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 log(LogLevel.LEVEL2, "Negotiated packet MTU successfully: $mtu bytes")
@@ -435,6 +584,7 @@ class BleBridgeService : Service() {
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 log(LogLevel.LEVEL2, "BLE GATT services discovered successfully!")
+                cuktechManager?.onServicesDiscovered(gatt, status)
 
                 val servicesArray = org.json.JSONArray()
                 gatt.services.forEach { service ->
@@ -470,6 +620,7 @@ class BleBridgeService : Service() {
                 }
             } else {
                 log(LogLevel.LEVEL1, "Service discovery failed with status $status")
+                cuktechManager?.onServicesDiscovered(gatt, status)
                 broadcastJson(errorResponse("Service discovery failed with status $status"))
             }
         }
@@ -502,6 +653,7 @@ class BleBridgeService : Service() {
             log(LogLevel.LEVEL3, "GATT Read Callback -> Status=$status, Size=${value.size}")
 
             if (ok) {
+                activeTaskReadBytes = value.copyOf()
                 val sUuid = characteristic.service?.uuid?.toString() ?: ""
                 val cUuid = characteristic.uuid?.toString() ?: ""
                 val telemetry = createTelemetryJson("read_success", gatt.device.address, sUuid, cUuid, value)
@@ -535,6 +687,9 @@ class BleBridgeService : Service() {
             val sUuid = characteristic.service?.uuid?.toString() ?: ""
             val cUuid = characteristic.uuid?.toString() ?: ""
             log(LogLevel.LEVEL3, "GATT Telemetry Stream Rx from [$cUuid]")
+            characteristic.uuid?.let { uuid ->
+                cuktechManager?.onCharacteristicChanged(uuid, value)
+            }
 
             val telemetry = createTelemetryJson("notification_received", gatt.device.address, sUuid, cUuid, value)
             broadcastJson(telemetry)
@@ -583,6 +738,7 @@ class BleBridgeService : Service() {
     private suspend fun executeTask(task: BleTask) {
         val deferred = CompletableDeferred<Boolean>()
         activeTaskDeferred = deferred
+        activeTaskReadBytes = null
 
         val initiated = when (task) {
             is BleTask.Read -> performRead(task)
@@ -598,15 +754,16 @@ class BleBridgeService : Service() {
 
         // Wait for async callback with 3-second timeout fallback
         try {
-            withTimeout(3000L) {
+            val ok = withTimeout(3000L) {
                 deferred.await()
             }
-            task.onResult(true, null)
+            task.onResult(ok, activeTaskReadBytes)
         } catch (e: TimeoutCancellationException) {
             log(LogLevel.LEVEL1, "BLE Hardware task timeout (3s) triggered for: ${task.charUuid}")
             task.onResult(false, null)
         } finally {
             activeTaskDeferred = null
+            activeTaskReadBytes = null
         }
     }
 
@@ -965,10 +1122,80 @@ class BleBridgeService : Service() {
     companion object {
         const val ACTION_START_SERVER = "com.example.action.START_SERVER"
         const val ACTION_STOP_SERVER = "com.example.action.STOP_SERVER"
+        const val ACTION_CONNECT_CUKTECH = "com.cramqin.blecuktech10.CONNECT_CHARGER"
+        const val ACTION_DISCONNECT_CUKTECH = "com.cramqin.blecuktech10.DISCONNECT_CHARGER"
+        const val ACTION_SCAN_CUKTECH = "com.cramqin.blecuktech10.SCAN_CHARGER"
+        const val ACTION_TELEMETRY_UPDATE = "com.cramqin.blecuktech10.TELEMETRY_UPDATE"
         const val EXTRA_PORT = "com.example.extra.PORT"
+        const val EXTRA_MAC = "mac"
         const val NOTIFICATION_ID = 10101
 
         private var instance: BleBridgeService? = null
+        fun getInstance(): BleBridgeService? = instance
+
+        @Volatile
+        var credentialStore: SecureCredentialStore? = null
+            private set
+
+        @Volatile
+        var persistence: CuktechPersistence? = null
+            private set
+
+        @Volatile
+        var cuktechManager: CuktechBleManager? = null
+            private set
+
+        @Volatile
+        var shizukuCompanion: ShizukuCompanion? = null
+            private set
+
+        @Volatile
+        var cloudIntegrations: CloudIntegrations? = null
+            private set
+
+        val xiaomiCloudClient = XiaomiCloudClient()
+
+        @Synchronized
+        fun ensureCuktechManagersInitialized(context: Context): CuktechBleManager {
+            val appCtx = context.applicationContext
+            val store = credentialStore ?: SecureCredentialStore(appCtx).also { credentialStore = it }
+            val db = persistence ?: CuktechPersistence(appCtx).also { persistence = it }
+            val shizuku = shizukuCompanion ?: ShizukuCompanion(appCtx).also { shizukuCompanion = it }
+            val mgr = cuktechManager ?: CuktechBleManager(appCtx, store, db).also { createdMgr ->
+                cuktechManager = createdMgr
+                val integrations = CloudIntegrations(appCtx) { portId, enabled ->
+                    createdMgr.setPortEnabled(portId, enabled)
+                }
+                cloudIntegrations = integrations
+                createdMgr.onTelemetryUpdated = { portsMap, totalWatts, devInfo ->
+                    integrations.onTelemetryUpdate(portsMap, totalWatts)
+                    broadcastTaskerTelemetry(appCtx, portsMap, totalWatts, devInfo.macAddress)
+                }
+            }
+            return mgr
+        }
+
+        fun broadcastTaskerTelemetry(
+            context: Context,
+            portsMap: Map<Int, com.example.cuktech.protocol.PortTelemetry>,
+            totalWatts: Double,
+            macAddress: String
+        ) {
+            runCatching {
+                val intent = Intent(ACTION_TELEMETRY_UPDATE).apply {
+                    putExtra("mac", macAddress)
+                    putExtra("total_watts", totalWatts)
+                    for ((pid, p) in portsMap) {
+                        putExtra("port_${pid}_v", p.voltageV)
+                        putExtra("port_${pid}_a", p.currentA)
+                        putExtra("port_${pid}_w", p.powerW)
+                        putExtra("port_${pid}_protocol", p.protocolName)
+                        putExtra("port_${pid}_enabled", p.enabled)
+                    }
+                }
+                context.sendBroadcast(intent)
+            }
+        }
 
         enum class BleConnectionState {
             DISCONNECTED,

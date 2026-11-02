@@ -60,6 +60,14 @@
             <intent-filter>
                 <action android:name="com.cramqin.blecuktech10.START_SERVER" />
                 <action android:name="com.cramqin.blecuktech10.STOP_SERVER" />
+                <action android:name="com.cramqin.blecuktech10.CONNECT_CHARGER" />
+                <action android:name="com.cramqin.blecuktech10.DISCONNECT_CHARGER" />
+                <action android:name="com.cramqin.blecuktech10.SCAN_CHARGER" />
+                <action android:name="com.cramqin.blecuktech10.SET_PORT_STATE" />
+                <action android:name="com.cramqin.blecuktech10.SET_SCENE_MODE" />
+                <action android:name="com.cramqin.blecuktech10.SET_SCREEN_TIMEOUT" />
+                <action android:name="com.cramqin.blecuktech10.SET_CHARGE_LIMIT" />
+                <action android:name="com.cramqin.blecuktech10.QUERY_STATUS" />
                 <action android:name="com.example.action.START_SERVER" />
                 <action android:name="com.example.action.STOP_SERVER" />
             </intent-filter>

@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ui.cuktech.CuktechDashboardScreen
 import com.example.ui.theme.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -50,6 +51,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        BleBridgeService.ensureCuktechManagersInitialized(applicationContext)
 
         val prefs = getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
         val initialTheme = when (prefs.getString("theme_mode", "SYSTEM")) {
@@ -93,6 +95,13 @@ fun BleBridgeDashboard(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
+    val cuktechManager = remember { BleBridgeService.ensureCuktechManagersInitialized(context) }
+    val shizukuCompanion = remember { BleBridgeService.shizukuCompanion!! }
+    val cloudIntegrations = remember { BleBridgeService.cloudIntegrations!! }
+
+    // 0 = CUKTECH 10 Ultra Controller, 1 = Original BLE Bridge Gateway
+    var selectedMainSection by remember { mutableStateOf(0) }
+
     // Collect states dynamically from BleBridgeService's companion object
     val isRunning by BleBridgeService.isServerRunning.collectAsStateWithLifecycle()
     val serverPort by BleBridgeService.serverPort.collectAsStateWithLifecycle()
@@ -130,18 +139,51 @@ fun BleBridgeDashboard(
     }
 
     var permissionsGranted by remember { mutableStateOf(false) }
+    var pendingPermissionCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
         val ok = results.all { it.value }
         permissionsGranted = ok
-        if (!ok) {
+        if (ok) {
+            pendingPermissionCallback?.invoke()
+            pendingPermissionCallback = null
+        } else {
             Toast.makeText(context, "Bluetooth and Notification permissions are required.", Toast.LENGTH_LONG).show()
         }
     }
 
+    fun ensureBleServiceStartedAndPermissions(onReady: () -> Unit) {
+        val svcIntent = Intent(context, BleBridgeService::class.java)
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(svcIntent)
+            } else {
+                context.startService(svcIntent)
+            }
+        }
+        val allOk = permissionsToRequest.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (allOk) {
+            permissionsGranted = true
+            onReady()
+        } else {
+            pendingPermissionCallback = onReady
+            permissionLauncher.launch(permissionsToRequest.toTypedArray())
+        }
+    }
+
     LaunchedEffect(Unit) {
+        val svcIntent = Intent(context, BleBridgeService::class.java)
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(svcIntent)
+            } else {
+                context.startService(svcIntent)
+            }
+        }
         val allOk = permissionsToRequest.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
@@ -390,18 +432,62 @@ fun BleBridgeDashboard(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // --- Server Configuration Section ---
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = appColors.surface),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
+                TabRow(
+                    selectedTabIndex = selectedMainSection,
+                    containerColor = appColors.surface,
+                    contentColor = appColors.primary
                 ) {
+                    Tab(
+                        selected = selectedMainSection == 0,
+                        onClick = { selectedMainSection = 0 },
+                        text = {
+                            Text(
+                                text = "⚡ CUKTECH 10 Ultra",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    )
+                    Tab(
+                        selected = selectedMainSection == 1,
+                        onClick = { selectedMainSection = 1 },
+                        text = {
+                            Text(
+                                text = "🌐 BLE Bridge 网关",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    )
+                }
+
+                if (selectedMainSection == 0) {
+                    CuktechDashboardScreen(
+                        bleManager = cuktechManager,
+                        cloudClient = BleBridgeService.xiaomiCloudClient,
+                        shizukuCompanion = shizukuCompanion,
+                        cloudIntegrations = cloudIntegrations,
+                        onRequestBlePermissions = { onReady ->
+                            ensureBleServiceStartedAndPermissions(onReady)
+                        }
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // --- Server Configuration Section ---
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = appColors.surface),
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
+                        ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -888,6 +974,8 @@ fun BleBridgeDashboard(
                                 }
                             }
                         }
+                    }
+                }
                     }
                 }
             }

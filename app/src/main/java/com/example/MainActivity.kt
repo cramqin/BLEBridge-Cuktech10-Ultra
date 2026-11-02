@@ -1266,7 +1266,7 @@ fun BleBridgeDashboard(
                                 IconButton(
                                     onClick = {
                                         val fullLogText = logs.joinToString("\n") { logMsg ->
-                                            "[${formatTimeLog(logMsg.timestamp)}] ${logMsg.message}"
+                                            "[${formatTimeHMS(logMsg.timestamp)}] ${logMsg.message}"
                                         }
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
                                         val clip = android.content.ClipData.newPlainText("Console Output", fullLogText)

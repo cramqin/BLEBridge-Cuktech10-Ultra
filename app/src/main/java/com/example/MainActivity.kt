@@ -1262,16 +1262,38 @@ fun BleBridgeDashboard(
                                 )
                             }
 
-                            IconButton(
-                                onClick = { BleBridgeService.clearLogs() },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Clear logs",
-                                    tint = Color(0xFF94A3B8),
-                                    modifier = Modifier.size(16.dp)
-                                )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = {
+                                        val fullLogText = logs.joinToString("\n") { logMsg ->
+                                            "[${formatTimeLog(logMsg.timestamp)}] ${logMsg.message}"
+                                        }
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText("Console Output", fullLogText)
+                                        clipboard?.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Console output copied to clipboard", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copy logs",
+                                        tint = Color(0xFF94A3B8),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(
+                                    onClick = { BleBridgeService.clearLogs() },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Clear logs",
+                                        tint = Color(0xFF94A3B8),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
 

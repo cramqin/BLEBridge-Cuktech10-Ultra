@@ -543,7 +543,7 @@ class CuktechBleManager(
                 CuktechProtocol.MI_SERVICE_UUID,
                 CuktechProtocol.CHAR_AUTH_CTRL,
                 CuktechProtocol.CMD_INIT_A4,
-                withResponse = true
+                withResponse = false
             )
             if (!a4WriteOk) {
                 _statusMessage.value = "Failed to write 0xA4 to CHAR_AUTH_CTRL"
@@ -561,7 +561,7 @@ class CuktechBleManager(
                     withResponse = false
                 )
 
-                val keyData = withTimeoutOrNull(3000L) { authDataQueue.receive() }
+                val keyData = withTimeoutOrNull(5000L) { authDataQueue.receive() }
                 if (keyData != null) {
                     if (keyData.size < 20) {
                         // Stale frame desync recovery
@@ -606,14 +606,14 @@ class CuktechBleManager(
                 CuktechProtocol.MI_SERVICE_UUID,
                 CuktechProtocol.CHAR_AUTH_CTRL,
                 CuktechProtocol.CMD_LOGIN,
-                withResponse = true
+                withResponse = false
             )
 
             svc.enqueueBleWrite(
                 CuktechProtocol.MI_SERVICE_UUID,
                 CuktechProtocol.CHAR_AUTH_DATA,
                 CuktechProtocol.CMD_SEND_KEY,
-                withResponse = true
+                withResponse = false
             )
 
             val rdy1 = withTimeoutOrNull(5000L) { authDataQueue.receive() }
@@ -705,7 +705,7 @@ class CuktechBleManager(
                 CuktechProtocol.MI_SERVICE_UUID,
                 CuktechProtocol.CHAR_AUTH_DATA,
                 CuktechProtocol.CMD_SEND_INFO,
-                withResponse = true
+                withResponse = false
             )
             val rdy2 = withTimeoutOrNull(5000L) { authDataQueue.receive() }
             if (rdy2 == null || !rdy2.contentEquals(CuktechProtocol.RCV_RDY)) {
@@ -785,7 +785,7 @@ class CuktechBleManager(
                             CuktechProtocol.MI_SERVICE_UUID,
                             CuktechProtocol.CHAR_AUTH_DATA,
                             echo,
-                            withResponse = true
+                            withResponse = false
                         )
                         withTimeoutOrNull(2000L) { authDataQueue.receive() }
                     }
@@ -1137,7 +1137,7 @@ class CuktechBleManager(
             CuktechProtocol.MI_SERVICE_UUID,
             CuktechProtocol.CHAR_CMD_SEND,
             packet,
-            withResponse = true
+            withResponse = false
         )
         if (!writeOk) {
             pendingMiotResponses.remove(reqId)

@@ -770,15 +770,22 @@ class BleBridgeService : Service() {
             return
         }
 
-        // Wait for async callback with 3-second timeout fallback
+        val isWriteNoResp = (task is BleTask.Write && !task.withResponse)
+        // Wait for async callback with 3-second timeout fallback (or 250ms for no-response writes)
         try {
-            val ok = withTimeout(3000L) {
+            val timeoutMs = if (isWriteNoResp) 250L else 3000L
+            val ok = withTimeout(timeoutMs) {
                 deferred.await()
             }
             task.onResult(ok, activeTaskReadBytes)
         } catch (e: TimeoutCancellationException) {
-            log(LogLevel.LEVEL1, "BLE Hardware task timeout (3s) triggered for: ${task.charUuid}")
-            task.onResult(false, null)
+            if (isWriteNoResp) {
+                // WRITE_TYPE_NO_RESPONSE was accepted by hardware stack; complete as success
+                task.onResult(true, null)
+            } else {
+                log(LogLevel.LEVEL1, "BLE Hardware task timeout (3s) triggered for: ${task.charUuid}")
+                task.onResult(false, null)
+            }
         } finally {
             activeTaskDeferred = null
             activeTaskReadBytes = null
@@ -808,21 +815,31 @@ class BleBridgeService : Service() {
         val c = s.getCharacteristic(task.charUuid) ?: return false
 
         return try {
-            log(LogLevel.LEVEL3, "Initiating hardware characteristic write: ${task.charUuid}")
-            c.writeType = if (task.withResponse) {
-                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            } else {
-                BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+            val canWriteWithResp = (c.properties and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0
+            val canWriteNoResp = (c.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0
+            val targetWriteType = when {
+                task.withResponse && canWriteWithResp -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                canWriteNoResp -> BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                canWriteWithResp -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                else -> if (task.withResponse) BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT else BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
             }
+            c.writeType = targetWriteType
+            log(LogLevel.LEVEL3, "Writing ${task.data.size}B to ${task.charUuid} (type=$targetWriteType, props=${c.properties})")
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 val code = gatt.writeCharacteristic(c, task.data, c.writeType)
+                if (code != BluetoothStatusCodes.SUCCESS) {
+                    log(LogLevel.LEVEL1, "writeCharacteristic rejected for ${task.charUuid} (code=$code)")
+                }
                 code == BluetoothStatusCodes.SUCCESS
             } else {
                 @Suppress("DEPRECATION")
                 c.value = task.data
                 @Suppress("DEPRECATION")
                 val ok = gatt.writeCharacteristic(c)
+                if (!ok) {
+                    log(LogLevel.LEVEL1, "writeCharacteristic returned false for ${task.charUuid}")
+                }
                 ok
             }
         } catch (e: SecurityException) {

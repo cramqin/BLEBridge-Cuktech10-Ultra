@@ -38,6 +38,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.security.SecureRandom
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -1032,22 +1033,26 @@ class CuktechBleManager(
         val frameType = raw[2].toInt() and 0xFF
         val payloadToDecrypt = if (frameType == 0x02) {
             // Write ACK immediately (matches controller.py line 1027)
-            BleBridgeService.getInstance()?.enqueueBleWrite(
-                CuktechProtocol.MI_SERVICE_UUID,
-                CuktechProtocol.CHAR_CMD_RECV,
-                byteArrayOf(0x00, 0x00, 0x03, 0x00),
-                withResponse = false
-            )
+            scope.launch {
+                BleBridgeService.getInstance()?.enqueueBleWrite(
+                    CuktechProtocol.MI_SERVICE_UUID,
+                    CuktechProtocol.CHAR_CMD_RECV,
+                    byteArrayOf(0x00, 0x00, 0x03, 0x00),
+                    withResponse = false
+                )
+            }
             if (raw.size < 6) return
             raw.copyOfRange(4, raw.size)
         } else if (frameType == 0x00 && raw.size >= 6) {
             // Multi-frame header: send RCV_RDY
-            BleBridgeService.getInstance()?.enqueueBleWrite(
-                CuktechProtocol.MI_SERVICE_UUID,
-                CuktechProtocol.CHAR_CMD_RECV,
-                byteArrayOf(0x00, 0x00, 0x01, 0x01),
-                withResponse = false
-            )
+            scope.launch {
+                BleBridgeService.getInstance()?.enqueueBleWrite(
+                    CuktechProtocol.MI_SERVICE_UUID,
+                    CuktechProtocol.CHAR_CMD_RECV,
+                    byteArrayOf(0x00, 0x00, 0x01, 0x01),
+                    withResponse = false
+                )
+            }
             return
         } else if (raw.size >= 6) {
             raw

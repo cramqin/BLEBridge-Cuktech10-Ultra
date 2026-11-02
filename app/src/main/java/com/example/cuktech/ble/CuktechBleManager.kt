@@ -1025,11 +1025,39 @@ class CuktechBleManager(
 
     private fun handleEncryptedCmdRecv(raw: ByteArray) {
         val keys = sessionKeys ?: return
-        if (raw.size < 12) return
-        if ((raw[0].toInt() and 0xFF) != 0x01 || (raw[1].toInt() and 0xFF) != 0x00) return
+        if (raw.size < 4) return
 
-        val itLo = (raw[2].toInt() and 0xFF) or ((raw[3].toInt() and 0xFF) shl 8)
-        val ciphertextWithTag = raw.copyOfRange(4, raw.size)
+        // Inline format on CHAR_CMD_RECV: 00 00 02 XX [encrypted_payload]
+        // Multi-frame header: 00 00 00 XX count_lo count_hi
+        val frameType = raw[2].toInt() and 0xFF
+        val payloadToDecrypt = if (frameType == 0x02) {
+            // Write ACK immediately (matches controller.py line 1027)
+            BleBridgeService.getInstance()?.enqueueBleWrite(
+                CuktechProtocol.MI_SERVICE_UUID,
+                CuktechProtocol.CHAR_CMD_RECV,
+                byteArrayOf(0x00, 0x00, 0x03, 0x00),
+                withResponse = false
+            )
+            if (raw.size < 6) return
+            raw.copyOfRange(4, raw.size)
+        } else if (frameType == 0x00 && raw.size >= 6) {
+            // Multi-frame header: send RCV_RDY
+            BleBridgeService.getInstance()?.enqueueBleWrite(
+                CuktechProtocol.MI_SERVICE_UUID,
+                CuktechProtocol.CHAR_CMD_RECV,
+                byteArrayOf(0x00, 0x00, 0x01, 0x01),
+                withResponse = false
+            )
+            return
+        } else if (raw.size >= 6) {
+            raw
+        } else {
+            return
+        }
+
+        if (payloadToDecrypt.size < 6) return
+        val itLo = (payloadToDecrypt[0].toInt() and 0xFF) or ((payloadToDecrypt[1].toInt() and 0xFF) shl 8)
+        val ciphertextWithTag = payloadToDecrypt.copyOfRange(2, payloadToDecrypt.size)
 
         // Detect 16-bit counter rollover (`controller.py::_on_cmd_recv`)
         if (itLo < lastDevItLo && (lastDevItLo - itLo) > 32768) {
@@ -1047,7 +1075,7 @@ class CuktechBleManager(
         for (counter in candidateCounters) {
             val nonce = CuktechProtocol.buildNonce(keys.devIv, counter)
             val attempt = runCatching {
-                CuktechProtocol.aesCcmDecrypt(keys.devKey, nonce, ciphertextWithTag)
+                CuktechProtocol.aesCcmDecrypt(keys.devKey, nonce, ciphertextWithTag, aad = ByteArray(0))
             }.getOrNull()
             if (attempt != null) {
                 plaintext = attempt
@@ -1057,6 +1085,34 @@ class CuktechBleManager(
         }
 
         val decrypted = plaintext ?: return
+        val b4 = if (decrypted.size > 4) decrypted[4].toInt() and 0xFF else -1
+        val siid = if (decrypted.size > 6) decrypted[6].toInt() and 0xFF else -1
+        val piid = if (decrypted.size > 7) decrypted[7].toInt() and 0xFF else -1
+        val reqId = (decrypted[0].toInt() and 0xFF) or ((decrypted[1].toInt() and 0xFF) shl 8)
+
+        // Live Port Push notification (b4 == 0x04, siid == 2, piid in 1..4)
+        if (b4 == 0x04 && siid == CuktechProtocol.SIID_CHARGER && piid in 1..4) {
+            val curPorts = _ports.value
+            val existing = curPorts[piid]
+            val decoded = PortTelemetryDecoder.decodePortV2(piid, decrypted, existing)
+            if (decoded != null) {
+                updatePortTelemetry(piid, decoded)
+            }
+            return
+        }
+
+        // Hardware protocol push (b4 == 0x04, siid == 2, piid in 17..18)
+        if (b4 == 0x04 && siid == CuktechProtocol.SIID_CHARGER && (piid == 17 || piid == 18)) {
+            if (decrypted.size >= 16) {
+                val val32 = (decrypted[12].toLong() and 0xFF) or
+                    ((decrypted[13].toLong() and 0xFF) shl 8) or
+                    ((decrypted[14].toLong() and 0xFF) shl 16) or
+                    ((decrypted[15].toLong() and 0xFF) shl 24)
+                handleHwProtocolPush(piid, val32)
+            }
+            return
+        }
+
         val frame = PortTelemetryDecoder.parseMiotFrame(decrypted) ?: return
 
         // Complete any awaiting command deferred
@@ -1064,6 +1120,103 @@ class CuktechBleManager(
 
         // Apply state update
         applyDecodedMiotFrame(frame)
+    }
+
+    private fun handleHwProtocolPush(piid: Int, val32: Long) {
+        val lowHalf = (val32 and 0xFFFF).toInt()
+        val highHalf = ((val32 shr 16) and 0xFFFF).toInt()
+        val hiProto = (highHalf shr 8) and 0xFF
+        val loProto = (lowHalf shr 8) and 0xFF
+
+        val curPorts = _ports.value.toMutableMap()
+        if (piid == 17) {
+            // C1 (high) and C2 (low)
+            val p1 = curPorts[1]
+            if (p1 != null && hiProto > 0) {
+                curPorts[1] = p1.copy(
+                    mijiaProtocolCode = hiProto,
+                    protocolName = PortTelemetryDecoder.MIJIA_PROTOCOL_MAP[hiProto] ?: p1.protocolName
+                )
+            }
+            val p2 = curPorts[2]
+            if (p2 != null && loProto > 0) {
+                curPorts[2] = p2.copy(
+                    mijiaProtocolCode = loProto,
+                    protocolName = PortTelemetryDecoder.MIJIA_PROTOCOL_MAP[loProto] ?: p2.protocolName
+                )
+            }
+        } else if (piid == 18) {
+            // C3 (high) and A (low)
+            val p3 = curPorts[3]
+            if (p3 != null && hiProto > 0) {
+                curPorts[3] = p3.copy(
+                    mijiaProtocolCode = hiProto,
+                    protocolName = PortTelemetryDecoder.MIJIA_PROTOCOL_MAP[hiProto] ?: p3.protocolName
+                )
+            }
+            val p4 = curPorts[4]
+            if (p4 != null && loProto > 0) {
+                curPorts[4] = p4.copy(
+                    mijiaProtocolCode = loProto,
+                    protocolName = PortTelemetryDecoder.MIJIA_PROTOCOL_MAP[loProto] ?: p4.protocolName
+                )
+            }
+        }
+        _ports.value = curPorts
+    }
+
+    private fun updatePortTelemetry(portId: Int, decoded: PortTelemetry) {
+        val curPorts = _ports.value.toMutableMap()
+        val nowSec = System.currentTimeMillis() / 1000.0
+        val integrator = energyIntegrators[portId]!!
+        val deltaWh = integrator.update(decoded.powerW, nowSec)
+        val cumulativeWh = integrator.totalWh
+
+        val detector = sessionDetectors[portId]!!
+        val finishedSession = detector.onSample(decoded.powerW, deltaWh, decoded.protocolName, nowSec)
+        if (finishedSession != null) {
+            persistence.insertCompletedSession(finishedSession)
+            _completedSessions.value = persistence.getRecentSessions(50)
+        }
+
+        val updatedActive = _activeSessions.value.toMutableMap()
+        val curActive = detector.activeSession
+        if (curActive != null) {
+            updatedActive[portId] = curActive
+        } else {
+            updatedActive.remove(portId)
+        }
+        _activeSessions.value = updatedActive
+
+        val updatedPort = decoded.copy(cumulativeWh = cumulativeWh)
+        curPorts[portId] = updatedPort
+        _ports.value = curPorts
+
+        val totalW = curPorts.values.sumOf { it.powerW }
+        val roundedTotalW = (totalW * 100.0).roundToInt() / 100.0
+        val oldTotalW = _totalPowerWatts.value
+        _totalPowerWatts.value = roundedTotalW
+
+        if (abs(oldTotalW - roundedTotalW) >= 0.5 || System.currentTimeMillis() - lastHistoryWriteMs >= 5000L) {
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Telemetry: Total=%.1fW (C1=%.1fW, C2=%.1fW, C3=%.1fW, A=%.1fW)".format(
+                    roundedTotalW,
+                    curPorts[1]?.powerW ?: 0.0,
+                    curPorts[2]?.powerW ?: 0.0,
+                    curPorts[3]?.powerW ?: 0.0,
+                    curPorts[4]?.powerW ?: 0.0
+                )
+            )
+        }
+
+        // Check per-port charge limit auto-cutoff
+        checkAndEnforcePortChargeLimit(portId, cumulativeWh)
+
+        // Record chart point & periodic SQLite history
+        recordChartAndHistory(curPorts, roundedTotalW)
+
+        onTelemetryUpdated?.invoke(curPorts, roundedTotalW, _deviceInfo.value)
     }
 
     private fun applyDecodedMiotFrame(frame: DecodedMiotFrame) {
@@ -1090,47 +1243,10 @@ class CuktechBleManager(
             CuktechProtocol.PIID_PORT_C3,
             CuktechProtocol.PIID_PORT_A -> {
                 val portId = frame.piid
-                val curPorts = _ports.value.toMutableMap()
+                val curPorts = _ports.value
                 val existing = curPorts[portId]
                 val decoded = PortTelemetryDecoder.decodePortV2(portId, frame.payload, existing) ?: return
-
-                // Integrate Wh & detect charging sessions
-                val nowSec = System.currentTimeMillis() / 1000.0
-                val integrator = energyIntegrators[portId]!!
-                val deltaWh = integrator.update(decoded.powerW, nowSec)
-                val cumulativeWh = integrator.totalWh
-
-                val detector = sessionDetectors[portId]!!
-                val finishedSession = detector.onSample(decoded.powerW, deltaWh, decoded.protocolName, nowSec)
-                if (finishedSession != null) {
-                    persistence.insertCompletedSession(finishedSession)
-                    _completedSessions.value = persistence.getRecentSessions(50)
-                }
-
-                val updatedActive = _activeSessions.value.toMutableMap()
-                val curActive = detector.activeSession
-                if (curActive != null) {
-                    updatedActive[portId] = curActive
-                } else {
-                    updatedActive.remove(portId)
-                }
-                _activeSessions.value = updatedActive
-
-                val updatedPort = decoded.copy(cumulativeWh = cumulativeWh)
-                curPorts[portId] = updatedPort
-                _ports.value = curPorts
-
-                val totalW = curPorts.values.sumOf { it.powerW }
-                val roundedTotalW = (totalW * 100.0).roundToInt() / 100.0
-                _totalPowerWatts.value = roundedTotalW
-
-                // Check per-port charge limit auto-cutoff
-                checkAndEnforcePortChargeLimit(portId, cumulativeWh)
-
-                // Record chart point & periodic SQLite history
-                recordChartAndHistory(curPorts, roundedTotalW)
-
-                onTelemetryUpdated?.invoke(curPorts, roundedTotalW, _deviceInfo.value)
+                updatePortTelemetry(portId, decoded)
             }
 
             CuktechProtocol.PIID_PORT_C1_PROTOCOL,

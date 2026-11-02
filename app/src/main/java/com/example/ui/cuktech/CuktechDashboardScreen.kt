@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.cuktech.ble.CuktechAuthState
@@ -147,7 +149,10 @@ fun CuktechDashboardScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             imageVector = Icons.Default.VerifiedUser,
                             contentDescription = null,
@@ -155,37 +160,45 @@ fun CuktechDashboardScreen(
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (accountSession != null) {
-                                    "Xiaomi Cloud (UID: ${accountSession!!.userId})"
+                                    "Xiaomi Cloud (${accountSession!!.userId})"
                                 } else if (activeCred != null) {
-                                    "Loaded Key: ${activeCred!!.name}"
+                                    "Key: ${activeCred!!.name}"
                                 } else {
                                     "Xiaomi Cloud Not Logged In"
                                 },
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = if (activeCred != null) {
-                                    "Device: ${activeCred!!.mac} · Token: ${if (activeCred!!.hasValidToken) "Ready" else "Not configured"}"
+                                    "${activeCred!!.mac} · ${if (activeCred!!.hasValidToken) "Ready" else "No Token"}"
                                 } else {
-                                    "Log in to auto-retrieve charger MAC, Token & BLE Key"
+                                    "Sign in to auto-retrieve charger keys"
                                 },
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
+                    Spacer(modifier = Modifier.width(8.dp))
+
                     FilledTonalButton(
                         onClick = { showXiaomiLoginDialog = true },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.height(32.dp)
                     ) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (accountSession != null || activeCred != null) "Credentials" else "Sign In", fontSize = 12.sp)
+                        Text(if (accountSession != null || activeCred != null) "Account" else "Sign In", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -209,7 +222,8 @@ fun CuktechDashboardScreen(
                 if (accountSession != null || activeCred != null) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (activeCred != null) {
                             val isConnected = authState == CuktechAuthState.AUTHENTICATED ||
@@ -230,7 +244,11 @@ fun CuktechDashboardScreen(
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isConnected) MaterialTheme.colorScheme.error else Color(0xFF10B981)
                                 ),
-                                modifier = Modifier.weight(1f)
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(34.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                             ) {
                                 Icon(
                                     imageVector = if (isConnected) Icons.Default.LinkOff else Icons.Default.Bolt,
@@ -238,31 +256,20 @@ fun CuktechDashboardScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(if (isConnected) "Disconnect Charger" else "Connect Charger", fontSize = 12.sp)
+                                Text(if (isConnected) "Disconnect" else "Connect", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
                         OutlinedButton(
                             onClick = { bleManager.refreshAllTelemetryNow() },
-                            enabled = authState == CuktechAuthState.AUTHENTICATED
+                            enabled = authState == CuktechAuthState.AUTHENTICATED,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(34.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Refresh", fontSize = 12.sp)
-                        }
-
-                        IconButton(
-                            onClick = {
-                                bleManager.disconnectCharger()
-                                bleManager.credentialStore.logoutAndWipeAll()
-                                Toast.makeText(context, "Xiaomi session & local keys wiped securely", Toast.LENGTH_SHORT).show()
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteForever,
-                                contentDescription = "Wipe credentials",
-                                tint = MaterialTheme.colorScheme.error
-                            )
+                            Text("Refresh", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -270,536 +277,586 @@ fun CuktechDashboardScreen(
         }
 
         // =====================================================================
-        // 2. TOTAL OUTPUT POWER & CHARGER DIAGNOSTICS HERO CARD
+        // DASHBOARD CATEGORIZATION TABS
         // =====================================================================
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = devInfo.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            text = statusMsg,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    val badgeColor = when (authState) {
-                        CuktechAuthState.AUTHENTICATED -> Color(0xFF10B981)
-                        CuktechAuthState.AUTH_FAILED -> Color(0xFFEF4444)
-                        CuktechAuthState.DISCONNECTED -> Color.Gray
-                        else -> Color(0xFFF59E0B)
-                    }
-                    Surface(
-                        color = badgeColor.copy(alpha = 0.16f),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(badgeColor)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = authState.label,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = badgeColor
-                            )
-                        }
-                    }
-                }
-
-                // Total Output Power Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    Column {
-                        Text(
-                            text = "TOTAL OUTPUT POWER",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Row(verticalAlignment = Alignment.Bottom) {
-                            Text(
-                                text = "%.1f".format(totalWatts),
-                                fontSize = 38.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "W / 120W",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(bottom = 6.dp)
-                            )
-                        }
-                    }
-
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "RSSI: ${devInfo.rssi} dBm · Quality ${devInfo.connectionQualityScore}%",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "FW: ${devInfo.firmwareVersion} · Model: ${devInfo.model}",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                LinearProgressIndicator(
-                    progress = { (totalWatts.toFloat() / 120f).coerceIn(0f, 1f) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                )
-            }
-        }
-
-        // =====================================================================
-        // 3. FOUR INDIVIDUAL PORTS TELEMETRY & CONTROLS (USB-C1, C2, C3, USB-A)
-        // =====================================================================
-        Text(
-            text = "4-Port Live Telemetry & Control (USB-C1 / C2 / C3 / USB-A)",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+        var selectedTab by rememberSaveable { mutableStateOf(0) }
+        val tabItems = listOf(
+            Triple("Telemetry", Icons.Default.Bolt, 0),
+            Triple("Controls", Icons.Default.Settings, 1),
+            Triple("Sessions", Icons.Default.Refresh, 2),
+            Triple("Integrations", Icons.Default.CloudDone, 3)
         )
 
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            for (portId in 1..4) {
-                val port = portsMap[portId] ?: PortTelemetry(portId, "Port $portId")
-                val limit = chargeLimits[portId]
-                PortTelemetryCard(
-                    port = port,
-                    chargeLimit = limit,
-                    onToggleEnabled = { enabled -> bleManager.setPortEnabled(portId, enabled) },
-                    onSelectCountdown = { code -> bleManager.setPortCountdown(portId, code) },
-                    onOpenChargeLimit = { chargeLimitDialogPort = portId }
-                )
-            }
-        }
-
-        // =====================================================================
-        // 4. REAL-TIME POWER WAVEFORM CHART
-        // =====================================================================
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Live Power Waveform (W)",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                    Text(
-                        text = "Samples: ${chartHistory.size}",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                LivePowerChart(
-                    points = chartHistory,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                )
-            }
-        }
-
-        // =====================================================================
-        // 5. CHARGER SETTINGS & FAST-CHARGE PROTOCOL SWITCHES
-        // =====================================================================
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(
-                    text = "Charger Hardware Configuration (MIoT SIID=2)",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-
-                // Scene Mode (PIID 5)
-                Text("Power Allocation Mode (PIID 5):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    CuktechProtocol.SCENE_MODES.forEach { (code, label) ->
-                        FilterChip(
-                            selected = settings.sceneMode == code,
-                            onClick = { bleManager.setSceneMode(code) },
-                            label = { Text(label, fontSize = 12.sp) }
+            tabItems.forEach { (label, icon, idx) ->
+                Tab(
+                    selected = selectedTab == idx,
+                    onClick = { selectedTab = idx },
+                    text = {
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = if (selectedTab == idx) FontWeight.Bold else FontWeight.Medium
                         )
-                    }
-                }
-
-                // Screen Timeout (PIID 6)
-                Text("Screen Sleep Timeout (PIID 6):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    CuktechProtocol.SCREEN_TIMEOUTS.forEach { (code, label) ->
-                        FilterChip(
-                            selected = settings.screenTimeout == code,
-                            onClick = { bleManager.setScreenTimeout(code) },
-                            label = { Text(label, fontSize = 12.sp) }
-                        )
-                    }
-                }
-
-                // Fast-Charge Protocol Switches (PIID 21: PD, PPS, UFCS, SCP)
-                Text("Fast-Charge Protocol Extensions (PIID 21):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = settings.pdEnabled,
-                        onClick = { bleManager.setFastChargeProtocols(pd = !settings.pdEnabled) },
-                        label = { Text("PD") }
-                    )
-                    FilterChip(
-                        selected = settings.ppsEnabled,
-                        onClick = { bleManager.setFastChargeProtocols(pps = !settings.ppsEnabled) },
-                        label = { Text("PPS / Mi Turbo") }
-                    )
-                    FilterChip(
-                        selected = settings.ufcsEnabled,
-                        onClick = { bleManager.setFastChargeProtocols(ufcs = !settings.ufcsEnabled) },
-                        label = { Text("UFCS") }
-                    )
-                    FilterChip(
-                        selected = settings.scpEnabled,
-                        onClick = { bleManager.setFastChargeProtocols(scp = !settings.scpEnabled) },
-                        label = { Text("SCP") }
-                    )
-                }
-
-                HorizontalDivider()
-
-                // Boolean Switches (PIID 15, 19, 20, 13)
-                SettingSwitchRow(
-                    title = "USB-A Low Current Mode (PIID 15)",
-                    subtitle = "For earbuds, fitness bands and low-current IoT accessories",
-                    checked = settings.usbALowCurrent,
-                    onCheckedChange = { bleManager.setUsbALowCurrent(it) }
+                    },
+                    icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(16.dp)) }
                 )
-                SettingSwitchRow(
-                    title = "Idle Screen Off (PIID 19)",
-                    subtitle = "Automatically turns off charger screen when no load is detected",
-                    checked = settings.idleScreenOff,
-                    onCheckedChange = { bleManager.setIdleScreenOff(it) }
-                )
-                SettingSwitchRow(
-                    title = "Screen Orientation Lock (PIID 20)",
-                    subtitle = "Locks the charger's physical screen orientation",
-                    checked = settings.orientationLock,
-                    onCheckedChange = { bleManager.setOrientationLock(it) }
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Device Language (PIID 13)", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        CuktechProtocol.LANGUAGE_OPTIONS.forEach { (code, label) ->
-                            FilterChip(
-                                selected = settings.language == code,
-                                onClick = { bleManager.setLanguage(code) },
-                                label = { Text(label, fontSize = 12.sp) }
-                            )
-                        }
-                    }
-                }
             }
         }
 
-        // =====================================================================
-        // 6. CHARGING SESSIONS & CSV EXPORT CARD
-        // =====================================================================
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Charging Session Statistics (Wh)",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                val file = bleManager.persistence.exportSessionsAndHistoryCsv()
-                                Toast.makeText(context, "Exported CSV: ${file.absolutePath}", Toast.LENGTH_LONG).show()
-                            },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text("Export CSV", fontSize = 11.sp)
-                        }
-                        TextButton(
-                            onClick = {
-                                bleManager.persistence.clearSessions()
-                                Toast.makeText(context, "Cleared session history", Toast.LENGTH_SHORT).show()
-                            }
-                        ) {
-                            Text("Clear", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                }
-
-                if (activeSessions.isEmpty() && completedSessions.isEmpty()) {
-                    Text(
-                        text = "No charging sessions recorded yet. Trapezoidal Wh integration begins automatically whenever port output ≥ 0.5W.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    activeSessions.values.forEach { s ->
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
+        when (selectedTab) {
+            0 -> {
+                // =============================================================
+                // TAB 0: LIVE TELEMETRY & HERO POWER
+                // =============================================================
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Total Output Power & Charger Diagnostics Hero Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(10.dp),
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column {
-                                    Text("${s.portLabel} · Charging (${s.protocolUsed})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     Text(
-                                        text = "Duration: ${s.durationSeconds / 60}m ${s.durationSeconds % 60}s · Peak: ${"%.1f".format(s.peakWatts)}W · Avg: ${"%.1f".format(s.avgWatts)}W",
+                                        text = devInfo.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                    Text(
+                                        text = statusMsg,
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                                Text(
-                                    text = "${"%.2f".format(s.whAccumulated)} Wh",
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+
+                                val badgeColor = when (authState) {
+                                    CuktechAuthState.AUTHENTICATED -> Color(0xFF10B981)
+                                    CuktechAuthState.AUTH_FAILED -> Color(0xFFEF4444)
+                                    CuktechAuthState.DISCONNECTED -> Color.Gray
+                                    else -> Color(0xFFF59E0B)
+                                }
+                                Surface(
+                                    color = badgeColor.copy(alpha = 0.16f),
+                                    shape = RoundedCornerShape(20.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(badgeColor)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = authState.label,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = badgeColor
+                                        )
+                                    }
+                                }
                             }
+
+                            // Total Output Power Row
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "TOTAL OUTPUT POWER",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Row(verticalAlignment = Alignment.Bottom) {
+                                        Text(
+                                            text = "%.1f".format(totalWatts),
+                                            fontSize = 38.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "W / 120W",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(bottom = 6.dp)
+                                        )
+                                    }
+                                }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "RSSI: ${devInfo.rssi} dBm · Quality ${devInfo.connectionQualityScore}%",
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "FW: ${devInfo.firmwareVersion} · Model: ${devInfo.model}",
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            LinearProgressIndicator(
+                                progress = { (totalWatts.toFloat() / 120f).coerceIn(0f, 1f) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                            )
                         }
                     }
 
-                    completedSessions.take(6).forEach { s ->
-                        Row(
+                    // Four Individual Port Telemetry Tiles
+                    Text(
+                        text = "Individual Port Live Telemetry (USB-C1 / C2 / C3 / USB-A)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        for (portId in 1..4) {
+                            val port = portsMap[portId] ?: PortTelemetry(portId, "Port $portId")
+                            val limit = chargeLimits[portId]
+                            PortTelemetryCard(
+                                port = port,
+                                chargeLimit = limit,
+                                onToggleEnabled = { enabled -> bleManager.setPortEnabled(portId, enabled) },
+                                onSelectCountdown = { code -> bleManager.setPortCountdown(portId, code) },
+                                onOpenChargeLimit = { chargeLimitDialogPort = portId }
+                            )
+                        }
+                    }
+
+                    // Real-Time Power Waveform Chart
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Column {
-                                Text("${s.portLabel} (${s.protocolUsed})", fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
-                                    text = "Duration: ${s.durationSeconds / 60}m · Peak: ${"%.1f".format(s.peakWatts)}W · Avg: ${"%.1f".format(s.avgWatts)}W",
+                                    text = "Live Power Waveform (W)",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "Samples: ${chartHistory.size}",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Text(
-                                text = "${"%.2f".format(s.whAccumulated)} Wh",
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
+                            LivePowerChart(
+                                points = chartHistory,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(140.dp)
+                                )
                         }
                     }
                 }
             }
-        }
 
-        // =====================================================================
-        // 7. SHIZUKU COMPANION, TASKER API & BEMFA/HA CLOUD INTEGRATIONS CARD
-        // =====================================================================
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = "Shizuku, Tasker Automation & Cloud Bridge",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
+            1 -> {
+                // =============================================================
+                // TAB 1: CONTROLS & HARDWARE SETTINGS
+                // =============================================================
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "Charger Hardware Configuration (MIoT SIID=2)",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
 
-                Text(
-                    text = "Shizuku: ${shizukuStatus.providerPackage} · Battery Whitelist: ${if (shizukuStatus.batteryWhitelisted) "Active" else "Disabled"}",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                shizukuCompanion.applyHyperOsKeepaliveOptimization()
+                            // Scene Mode (PIID 5)
+                            Text("Power Allocation Mode (PIID 5):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                CuktechProtocol.SCENE_MODES.forEach { (code, label) ->
+                                    FilterChip(
+                                        selected = settings.sceneMode == code,
+                                        onClick = { bleManager.setSceneMode(code) },
+                                        label = { Text(label, fontSize = 12.sp) }
+                                    )
+                                }
                             }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Apply Doze Whitelist", fontSize = 11.sp)
-                    }
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                shizukuCompanion.runBluetoothStackDiagnostics()
+
+                            // Screen Timeout (PIID 6)
+                            Text("Screen Sleep Timeout (PIID 6):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                CuktechProtocol.SCREEN_TIMEOUTS.forEach { (code, label) ->
+                                    FilterChip(
+                                        selected = settings.screenTimeout == code,
+                                        onClick = { bleManager.setScreenTimeout(code) },
+                                        label = { Text(label, fontSize = 12.sp) }
+                                    )
+                                }
                             }
-                        },
-                        modifier = Modifier.weight(1f)
+
+                            // Fast-Charge Protocol Switches (PIID 21: PD, PPS, UFCS, SCP)
+                            Text("Fast-Charge Protocol Extensions (PIID 21):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = settings.pdEnabled,
+                                    onClick = { bleManager.setFastChargeProtocols(pd = !settings.pdEnabled) },
+                                    label = { Text("PD") }
+                                )
+                                FilterChip(
+                                    selected = settings.ppsEnabled,
+                                    onClick = { bleManager.setFastChargeProtocols(pps = !settings.ppsEnabled) },
+                                    label = { Text("PPS / Mi Turbo") }
+                                )
+                                FilterChip(
+                                    selected = settings.ufcsEnabled,
+                                    onClick = { bleManager.setFastChargeProtocols(ufcs = !settings.ufcsEnabled) },
+                                    label = { Text("UFCS") }
+                                )
+                                FilterChip(
+                                    selected = settings.scpEnabled,
+                                    onClick = { bleManager.setFastChargeProtocols(scp = !settings.scpEnabled) },
+                                    label = { Text("SCP") }
+                                )
+                            }
+
+                            HorizontalDivider()
+
+                            // Boolean Switches (PIID 15, 19, 20, 13)
+                            SettingSwitchRow(
+                                title = "USB-A Low Current Mode (PIID 15)",
+                                subtitle = "For earbuds, fitness bands and low-current IoT accessories",
+                                checked = settings.usbALowCurrent,
+                                onCheckedChange = { bleManager.setUsbALowCurrent(it) }
+                            )
+                            SettingSwitchRow(
+                                title = "Idle Screen Off (PIID 19)",
+                                subtitle = "Automatically turns off charger screen when no load is detected",
+                                checked = settings.idleScreenOff,
+                                onCheckedChange = { bleManager.setIdleScreenOff(it) }
+                            )
+                            SettingSwitchRow(
+                                title = "Screen Orientation Lock (PIID 20)",
+                                subtitle = "Locks the charger's physical screen orientation",
+                                checked = settings.orientationLock,
+                                onCheckedChange = { bleManager.setOrientationLock(it) }
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Device Language (PIID 13)", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    CuktechProtocol.LANGUAGE_OPTIONS.forEach { (code, label) ->
+                                        FilterChip(
+                                            selected = settings.language == code,
+                                            onClick = { bleManager.setLanguage(code) },
+                                            label = { Text(label, fontSize = 12.sp) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            2 -> {
+                // =============================================================
+                // TAB 2: CHARGING SESSIONS & HISTORICAL DATA
+                // =============================================================
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
-                        Text("BLE Stack Diagnostics", fontSize = 11.sp)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Charging Session Statistics (Wh)",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            val file = bleManager.persistence.exportSessionsAndHistoryCsv()
+                                            Toast.makeText(context, "Exported CSV: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("Export CSV", fontSize = 11.sp)
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            bleManager.persistence.clearSessions()
+                                            Toast.makeText(context, "Cleared session history", Toast.LENGTH_SHORT).show()
+                                        }
+                                    ) {
+                                        Text("Clear", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+
+                            if (activeSessions.isEmpty() && completedSessions.isEmpty()) {
+                                Text(
+                                    text = "No charging sessions recorded yet. Trapezoidal Wh integration begins automatically whenever port output ≥ 0.5W.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                activeSessions.values.forEach { s ->
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column {
+                                                Text("${s.portLabel} · Charging (${s.protocolUsed})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                                Text(
+                                                    text = "Duration: ${s.durationSeconds / 60}m ${s.durationSeconds % 60}s · Peak: ${"%.1f".format(s.peakWatts)}W · Avg: ${"%.1f".format(s.avgWatts)}W",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                            Text(
+                                                text = "${"%.2f".format(s.whAccumulated)} Wh",
+                                                fontWeight = FontWeight.ExtraBold,
+                                                fontFamily = FontFamily.Monospace,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+
+                                completedSessions.take(6).forEach { s ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text("${s.portLabel} (${s.protocolUsed})", fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                            Text(
+                                                text = "Duration: ${s.durationSeconds / 60}m · Peak: ${"%.1f".format(s.peakWatts)}W · Avg: ${"%.1f".format(s.avgWatts)}W",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Text(
+                                            text = "${"%.2f".format(s.whAccumulated)} Wh",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
+            }
 
-                if (shizukuStatus.lastDiagnosticOutput.isNotBlank()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+            3 -> {
+                // =============================================================
+                // TAB 3: CLOUD, TASKER & AUTOMATION INTEGRATIONS
+                // =============================================================
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
-                        Text(
-                            text = shizukuStatus.lastDiagnosticOutput,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(8.dp)
-                        )
-                    }
-                }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "Shizuku, Tasker Automation & Cloud Bridge",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    TextButton(onClick = { showCloudConfig = !showCloudConfig }) {
-                        Text(if (showCloudConfig) "Hide Bemfa / HA Config" else "Configure Bemfa / HA")
-                    }
-                    TextButton(onClick = { showTaskerDocs = !showTaskerDocs }) {
-                        Text(if (showTaskerDocs) "Hide Tasker Docs" else "View Tasker Broadcast API")
-                    }
-                }
+                            Text(
+                                text = "Shizuku: ${shizukuStatus.providerPackage} · Battery Whitelist: ${if (shizukuStatus.batteryWhitelisted) "Active" else "Disabled"}",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
 
-                if (showCloudConfig) {
-                    CloudIntegrationConfigPanel(
-                        config = integrationCfg,
-                        bemfaConnected = bemfaConnected,
-                        onSave = { cloudIntegrations.updateConfig(it) }
-                    )
-                }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        scope.launch {
+                                            shizukuCompanion.applyHyperOsKeepaliveOptimization()
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Apply Doze Whitelist", fontSize = 11.sp)
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        scope.launch {
+                                            shizukuCompanion.runBluetoothStackDiagnostics()
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("BLE Stack Diagnostics", fontSize = 11.sp)
+                                }
+                            }
 
-                if (showTaskerDocs) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = """
-                                Tasker / ADB Broadcast Intent API (Package: com.cramqin.blecuktech10):
-                                • Connect Charger:
-                                  Action: com.cramqin.blecuktech10.CONNECT_CHARGER
-                                  Extra (optional): mac:AA:BB:CC:DD:EE:FF
-                                • Disconnect:
-                                  Action: com.cramqin.blecuktech10.DISCONNECT_CHARGER
-                                • Toggle Port Power (port=1..4, enabled=true/false):
-                                  Action: com.cramqin.blecuktech10.SET_PORT_STATE
-                                • Set Scene Mode (mode=1..4):
-                                  Action: com.cramqin.blecuktech10.SET_SCENE_MODE
-                                • Set Port Charge Limit (port=1..4, wh_target=30.0, mode=once/always):
-                                  Action: com.cramqin.blecuktech10.SET_CHARGE_LIMIT
-                                • Receive Live Telemetry (Tasker Intent Received):
-                                  Action: com.cramqin.blecuktech10.TELEMETRY_UPDATE
-                                  Extras: %total_watts, %port_1_v, %port_1_a, %port_1_w, %port_1_protocol (1..4)
-                            """.trimIndent(),
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            modifier = Modifier.padding(10.dp)
-                        )
+                            if (shizukuStatus.lastDiagnosticOutput.isNotBlank()) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = shizukuStatus.lastDiagnosticOutput,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.padding(8.dp)
+                                    )
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                TextButton(onClick = { showCloudConfig = !showCloudConfig }) {
+                                    Text(if (showCloudConfig) "Hide Bemfa / HA Config" else "Configure Bemfa / HA")
+                                }
+                                TextButton(onClick = { showTaskerDocs = !showTaskerDocs }) {
+                                    Text(if (showTaskerDocs) "Hide Tasker Docs" else "View Tasker Broadcast API")
+                                }
+                            }
+
+                            if (showCloudConfig) {
+                                CloudIntegrationConfigPanel(
+                                    config = integrationCfg,
+                                    bemfaConnected = bemfaConnected,
+                                    onSave = { cloudIntegrations.updateConfig(it) }
+                                )
+                            }
+
+                            if (showTaskerDocs) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = """
+                                            Tasker / ADB Broadcast Intent API (Package: com.cramqin.blecuktech10):
+                                            • Connect Charger:
+                                              Action: com.cramqin.blecuktech10.CONNECT_CHARGER
+                                              Extra (optional): mac:AA:BB:CC:DD:EE:FF
+                                            • Disconnect:
+                                              Action: com.cramqin.blecuktech10.DISCONNECT_CHARGER
+                                            • Toggle Port Power (port=1..4, enabled=true/false):
+                                              Action: com.cramqin.blecuktech10.SET_PORT_STATE
+                                            • Set Scene Mode (mode=1..4):
+                                              Action: com.cramqin.blecuktech10.SET_SCENE_MODE
+                                            • Set Port Charge Limit (port=1..4, wh_target=30.0, mode=once/always):
+                                              Action: com.cramqin.blecuktech10.SET_CHARGE_LIMIT
+                                            • Receive Live Telemetry (Tasker Intent Received):
+                                              Action: com.cramqin.blecuktech10.TELEMETRY_UPDATE
+                                              Extras: %total_watts, %port_1_v, %port_1_a, %port_1_w, %port_1_protocol (1..4)
+                                        """.trimIndent(),
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.padding(10.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

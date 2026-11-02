@@ -217,7 +217,7 @@ object CuktechProtocol {
         key: ByteArray,
         nonce: ByteArray,
         plaintext: ByteArray,
-        aad: ByteArray = byteArrayOf(0x11),
+        aad: ByteArray = ByteArray(0),
         tagLen: Int = 4
     ): ByteArray {
         require(nonce.size in 7..13) { "Invalid CCM nonce size: ${nonce.size}" }
@@ -247,7 +247,7 @@ object CuktechProtocol {
         key: ByteArray,
         nonce: ByteArray,
         ciphertextWithTag: ByteArray,
-        aad: ByteArray = byteArrayOf(0x11),
+        aad: ByteArray = ByteArray(0),
         tagLen: Int = 4
     ): ByteArray {
         if (ciphertextWithTag.size < tagLen) {

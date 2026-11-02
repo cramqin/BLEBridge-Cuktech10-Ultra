@@ -90,6 +90,27 @@ class CuktechProtocolTest {
     }
 
     @Test
+    fun `test decodePortV2 with native Cuktech 10 Ultra 4-byte record and 16-byte decrypted frame`() {
+        // [status, code, current*10, voltage*10] = [1, 0x07, 30, 90] -> 9.0V, 3.0A, 27.0W
+        val frame4 = byteArrayOf(0x01, 0x07, 30, 90)
+        val decoded4 = PortTelemetryDecoder.decodePortV2(1, frame4)
+        assertNotNull(decoded4)
+        assertEquals(9.0, decoded4!!.voltageV, 0.01)
+        assertEquals(3.0, decoded4.currentA, 0.01)
+        assertEquals(27.0, decoded4.powerW, 0.05)
+        assertTrue(decoded4.isCharging)
+
+        // 16-byte decrypted MiOT push frame from test_virtual_charger.py:
+        // [16, 0x20, 0, 0, 0x04, 0x01, 2, 1, 0, 0, 0, 0, 1, 0x07, 30, 90]
+        val fullFrame16 = byteArrayOf(16, 0x20, 0, 0, 0x04, 0x01, 2, 1, 0, 0, 0, 0, 1, 0x07, 30, 90)
+        val decoded16 = PortTelemetryDecoder.decodePortV2(1, fullFrame16)
+        assertNotNull(decoded16)
+        assertEquals(9.0, decoded16!!.voltageV, 0.01)
+        assertEquals(3.0, decoded16.currentA, 0.01)
+        assertEquals(27.0, decoded16.powerW, 0.05)
+    }
+
+    @Test
     fun `test 0xFE95 advertisement parser for Product ID 0x660E`() {
         // frameCtrl = 0x0010 (hasMac), productId = 0x660e (LE: 0x0e, 0x66), counter = 0x05, MAC LE = 66:55:44:33:22:11
         val serviceData = byteArrayOf(

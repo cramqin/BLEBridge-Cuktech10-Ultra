@@ -144,33 +144,53 @@ object PortTelemetryDecoder {
         rawPayload: ByteArray,
         existingPort: PortTelemetry? = null
     ): PortTelemetry? {
-        val d = if (rawPayload.size >= 9 && (rawPayload[0].toInt() and 0xFF) == 0x08) {
-            rawPayload.copyOfRange(1, 9)
-        } else if (rawPayload.size >= 8) {
-            rawPayload.copyOfRange(0, 8)
-        } else {
-            return null
-        }
+        if (rawPayload.isEmpty()) return null
 
-        val status = d[0].toInt() and 0xFF
-        val voltageRaw = (d[1].toInt() and 0xFF) or ((d[2].toInt() and 0xFF) shl 8)
-        val currentRaw = (d[3].toInt() and 0xFF) or ((d[4].toInt() and 0xFF) shl 8)
-        val powerMw = (d[5].toInt() and 0xFF) or ((d[6].toInt() and 0xFF) shl 8)
-        val protoRaw = d[7].toInt() and 0xFF
+        val status: Int
+        val voltageV: Double
+        val currentA: Double
+        val powerW: Double
+        val powerMw: Int
+        val protoRaw: Int
 
-        val voltageV = round2(voltageRaw / 100.0)
-        val currentA = round2(currentRaw / 100.0)
-        val calcW = voltageV * currentA
-
-        val powerW = if (powerMw in 1..65499) {
-            val mwAsW = powerMw / 1000.0
-            if (calcW > 0.1 && abs(mwAsW - calcW) / calcW < 0.10) {
-                round2(mwAsW)
+        if (rawPayload.size >= 9 && (rawPayload[0].toInt() and 0xFF) == 0x08) {
+            // Legacy 9-byte length-prefixed frame
+            val d = rawPayload.copyOfRange(1, 9)
+            status = d[0].toInt() and 0xFF
+            val voltageRaw = (d[1].toInt() and 0xFF) or ((d[2].toInt() and 0xFF) shl 8)
+            val currentRaw = (d[3].toInt() and 0xFF) or ((d[4].toInt() and 0xFF) shl 8)
+            powerMw = (d[5].toInt() and 0xFF) or ((d[6].toInt() and 0xFF) shl 8)
+            protoRaw = d[7].toInt() and 0xFF
+            voltageV = round2(voltageRaw / 100.0)
+            currentA = round2(currentRaw / 100.0)
+            val calcW = voltageV * currentA
+            powerW = if (powerMw in 1..65499) {
+                val mwAsW = powerMw / 1000.0
+                if (calcW > 0.1 && abs(mwAsW - calcW) / calcW < 0.10) round2(mwAsW) else round2(calcW)
             } else {
                 round2(calcW)
             }
+        } else if (rawPayload.size >= 4) {
+            // Native CUKTECH 10 Ultra MiOT format (state_protocol_v2.py::RawPortData)
+            // Last 4 bytes: [in_use/status_raw, code, current*10 (100mA), voltage*10 (100mV)]
+            val b = rawPayload.copyOfRange(rawPayload.size - 4, rawPayload.size)
+            val statusRaw = b[0].toInt() and 0xFF
+            val inUse = statusRaw != 0
+            val code = b[1].toInt() and 0xFF
+            val currentRaw = b[2].toInt() and 0xFF
+            val voltageRaw = b[3].toInt() and 0xFF
+
+            voltageV = round2(voltageRaw / 10.0)
+            currentA = round2(currentRaw / 10.0)
+            val calcW = round2(voltageV * currentA)
+            powerW = calcW
+            powerMw = (powerW * 1000.0).roundToInt()
+            protoRaw = code
+
+            val isCharging = inUse || powerW >= 0.3 || currentA >= 0.05
+            status = if (!inUse && voltageV < 0.5 && currentA < 0.02) 0 else if (isCharging) 2 else 1
         } else {
-            round2(calcW)
+            return null
         }
 
         val mijiaCode = if (status == 2 || powerW > 0.2) existingPort?.mijiaProtocolCode else null

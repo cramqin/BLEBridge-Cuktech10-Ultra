@@ -858,9 +858,13 @@ fun BleBridgeDashboard(
                                             },
                                             fontSize = 11.sp,
                                             fontFamily = FontFamily.Monospace,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                             color = if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) StatusError else appColors.textSecondary
                                         )
                                     }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
 
                                     if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1142,8 +1146,13 @@ fun BleBridgeDashboard(
                                                         text = "Connected: ${formatTime(client.connectedAt)}",
                                                         color = appColors.textSecondary,
                                                         fontSize = 11.sp,
-                                                        fontFamily = FontFamily.Monospace
+                                                        fontFamily = FontFamily.Monospace,
+                                                        modifier = Modifier.weight(1f, fill = false),
+                                                        maxLines = 1,
+                                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                                     )
+
+                                                    Spacer(modifier = Modifier.width(8.dp))
 
                                                     Button(
                                                         onClick = {
@@ -1174,7 +1183,7 @@ fun BleBridgeDashboard(
                                                         shape = RoundedCornerShape(8.dp),
                                                         modifier = Modifier.height(32.dp)
                                                     ) {
-                                                        Text("Open Telemetry & Controls \u2192", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Text("Telemetry \u2192", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                                     }
                                                 }
                                             }

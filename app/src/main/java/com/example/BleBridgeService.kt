@@ -223,9 +223,27 @@ class BleBridgeService : Service() {
         log(LogLevel.LEVEL2, "TCP Gateway Server stopped.")
     }
 
-    private fun updateClientsList() {
+    fun updateClientsList() {
         val list = activeClients.values.map { client ->
             ClientInfo(id = client.id, ip = client.ip, port = client.port)
+        }.toMutableList()
+
+        // If Cuktech 10 Ultra is connected & authenticated, register as an active client
+        val cuktech = cuktechManager
+        val bleAddr = _bleDeviceAddress.value
+        if (cuktech != null && bleAddr != null &&
+            (cuktech.authState.value == CuktechAuthState.AUTHENTICATED || _bleConnectionState.value == BleConnectionState.CONNECTED)) {
+            val devName = cuktech.deviceInfo.value.name.ifBlank { "CUKTECH 10 Ultra" }
+            list.add(
+                0,
+                ClientInfo(
+                    id = "$devName ($bleAddr)",
+                    ip = "BLE Gateway",
+                    port = _serverPort.value,
+                    isCuktechCharger = true,
+                    cuktechMac = bleAddr
+                )
+            )
         }
         _connectedClients.value = list
     }
@@ -1171,6 +1189,49 @@ class BleBridgeService : Service() {
                     integrations.onTelemetryUpdate(portsMap, totalWatts)
                     broadcastTaskerTelemetry(appCtx, portsMap, totalWatts, devInfo.macAddress)
                 }
+
+                val syncScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+                syncScope.launch {
+                    createdMgr.authState.collect { authState ->
+                        val mac = createdMgr.deviceInfo.value.macAddress.ifBlank { null }
+                        when (authState) {
+                            CuktechAuthState.AUTHENTICATED -> {
+                                _bleConnectionState.value = BleConnectionState.CONNECTED
+                                _bleDeviceAddress.value = mac
+                                refreshClientsList()
+                                addLogMessage(LogLevel.LEVEL2, "CUKTECH 10 Ultra connected & authenticated ($mac). Active client registered.")
+                            }
+                            CuktechAuthState.DISCONNECTED -> {
+                                if (_bleConnectionState.value != BleConnectionState.DISCONNECTED) {
+                                    _bleConnectionState.value = BleConnectionState.DISCONNECTED
+                                    _bleDeviceAddress.value = null
+                                    refreshClientsList()
+                                    addLogMessage(LogLevel.LEVEL2, "CUKTECH 10 Ultra disconnected.")
+                                }
+                            }
+                            CuktechAuthState.CONNECTING_GATT,
+                            CuktechAuthState.DISCOVERING_SERVICES,
+                            CuktechAuthState.PHASE_A_INIT_A4,
+                            CuktechAuthState.PHASE_B_HANDSHAKE -> {
+                                _bleConnectionState.value = BleConnectionState.CONNECTING
+                                if (mac != null) _bleDeviceAddress.value = mac
+                                addLogMessage(LogLevel.LEVEL2, "CUKTECH 10 Ultra BLE: ${authState.label}")
+                            }
+                            CuktechAuthState.AUTH_FAILED -> {
+                                addLogMessage(LogLevel.LEVEL1, "CUKTECH 10 Ultra authentication failed. Verify MiOT token / Xiaomi account credentials.")
+                            }
+                            else -> {}
+                        }
+                    }
+                }
+
+                syncScope.launch {
+                    createdMgr.statusMessage.collect { msg ->
+                        if (msg.isNotBlank() && msg != "Ready" && msg != "Disconnected") {
+                            addLogMessage(LogLevel.LEVEL2, "[Cuktech] $msg")
+                        }
+                    }
+                }
             }
             return mgr
         }
@@ -1209,7 +1270,14 @@ class BleBridgeService : Service() {
             LEVEL3  // Full Telemetry
         }
 
-        data class ClientInfo(val id: String, val ip: String, val port: Int, val connectedAt: Long = System.currentTimeMillis())
+        data class ClientInfo(
+            val id: String,
+            val ip: String,
+            val port: Int,
+            val connectedAt: Long = System.currentTimeMillis(),
+            val isCuktechCharger: Boolean = false,
+            val cuktechMac: String? = null
+        )
         data class LogMessage(val timestamp: Long, val level: LogLevel, val message: String)
 
         private val _isServerRunning = MutableStateFlow(false)
@@ -1295,8 +1363,37 @@ class BleBridgeService : Service() {
             _logs.value = filtered
         }
 
+        fun refreshClientsList() {
+            instance?.updateClientsList() ?: run {
+                val cuktech = cuktechManager
+                val bleAddr = _bleDeviceAddress.value
+                val list = mutableListOf<ClientInfo>()
+                if (cuktech != null && bleAddr != null &&
+                    (cuktech.authState.value == CuktechAuthState.AUTHENTICATED || _bleConnectionState.value == BleConnectionState.CONNECTED)) {
+                    val devName = cuktech.deviceInfo.value.name.ifBlank { "CUKTECH 10 Ultra" }
+                    list.add(
+                        ClientInfo(
+                            id = "$devName ($bleAddr)",
+                            ip = "BLE Gateway",
+                            port = _serverPort.value,
+                            isCuktechCharger = true,
+                            cuktechMac = bleAddr
+                        )
+                    )
+                }
+                _connectedClients.value = list
+            }
+        }
+
         fun disconnectClientExternal(id: String) {
-            instance?.bootClientInternal(id)
+            val cuktech = cuktechManager
+            val currentChargerClient = _connectedClients.value.firstOrNull { it.id == id && it.isCuktechCharger }
+            if (currentChargerClient != null) {
+                cuktech?.disconnectCharger()
+                addLogMessage(LogLevel.LEVEL2, "CUKTECH 10 Ultra disconnected by user request.")
+            } else {
+                instance?.bootClientInternal(id)
+            }
         }
 
         fun getLocalIpAddress(): String {
@@ -1323,6 +1420,12 @@ class BleBridgeService : Service() {
     private fun setBleConnectionState(state: BleConnectionState, address: String?) {
         _bleConnectionState.value = state
         _bleDeviceAddress.value = address
+        updateClientsList()
+        if (state == BleConnectionState.CONNECTED && address != null) {
+            log(LogLevel.LEVEL2, "CUKTECH 10 Ultra connected ($address) - registered as active client")
+        } else if (state == BleConnectionState.DISCONNECTED) {
+            log(LogLevel.LEVEL2, "BLE peripheral disconnected")
+        }
     }
 
     private fun log(level: LogLevel, valString: String) {

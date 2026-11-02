@@ -12,7 +12,7 @@ data class ChargeSessionRecord(
     val whAccumulated: Double = 0.0,
     val peakWatts: Double = 0.0,
     val avgWatts: Double = 0.0,
-    val protocolUsed: String = "空闲",
+    val protocolUsed: String = "Idle",
     val isActive: Boolean = true
 ) {
     val durationSeconds: Long
@@ -129,7 +129,7 @@ class ChargeSessionDetector(
             val nextWh = current.whAccumulated + deltaWh
             val nextPeak = max(current.peakWatts, watts)
             val nextAvg = sampleSumWatts / sampleCount
-            val nextProto = if (protocolName != "空闲" && protocolName.isNotBlank()) {
+            val nextProto = if (protocolName != "Idle" && protocolName != "空闲" && protocolName.isNotBlank()) {
                 protocolName
             } else {
                 current.protocolUsed

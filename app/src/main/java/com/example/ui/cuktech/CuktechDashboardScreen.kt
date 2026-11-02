@@ -46,7 +46,8 @@ fun CuktechDashboardScreen(
     cloudClient: XiaomiCloudClient,
     shizukuCompanion: ShizukuCompanion,
     cloudIntegrations: CloudIntegrations,
-    onRequestBlePermissions: (() -> Unit) -> Unit
+    onRequestBlePermissions: (() -> Unit) -> Unit,
+    onNavigateBack: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -85,6 +86,23 @@ fun CuktechDashboardScreen(
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // =====================================================================
+        // Navigation Back Button (when embedded from Gateway)
+        // =====================================================================
+        if (onNavigateBack != null) {
+            OutlinedButton(
+                onClick = onNavigateBack,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("← Back to BLE Bridge Gateway", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+        }
+
         // =====================================================================
         // 1. PROMINENT SEARCH & PAIR BUTTON + CONNECTION HEADER CARD
         // =====================================================================
@@ -140,20 +158,20 @@ fun CuktechDashboardScreen(
                         Column {
                             Text(
                                 text = if (accountSession != null) {
-                                    "小米云已登录 (UID: ${accountSession!!.userId})"
+                                    "Xiaomi Cloud (UID: ${accountSession!!.userId})"
                                 } else if (activeCred != null) {
-                                    "已加载加密凭证 (${activeCred!!.name})"
+                                    "Loaded Key: ${activeCred!!.name}"
                                 } else {
-                                    "小米云账号未登录"
+                                    "Xiaomi Cloud Not Logged In"
                                 },
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             )
                             Text(
                                 text = if (activeCred != null) {
-                                    "当前设备: ${activeCred!!.mac} · Token: ${if (activeCred!!.hasValidToken) "已加密就绪" else "未配置"}"
+                                    "Device: ${activeCred!!.mac} · Token: ${if (activeCred!!.hasValidToken) "Ready" else "Not configured"}"
                                 } else {
-                                    "登录小米账号后可自动获取充电器 MAC、Token 与 BLE Key"
+                                    "Log in to auto-retrieve charger MAC, Token & BLE Key"
                                 },
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -167,7 +185,7 @@ fun CuktechDashboardScreen(
                     ) {
                         Icon(Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (accountSession != null || activeCred != null) "账号/凭证" else "登录小米云", fontSize = 12.sp)
+                        Text(if (accountSession != null || activeCred != null) "Credentials" else "Sign In", fontSize = 12.sp)
                     }
                 }
 
@@ -220,7 +238,7 @@ fun CuktechDashboardScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(if (isConnected) "断开充电器连接" else "一键直连充电器", fontSize = 12.sp)
+                                Text(if (isConnected) "Disconnect Charger" else "Connect Charger", fontSize = 12.sp)
                             }
                         }
 
@@ -228,21 +246,21 @@ fun CuktechDashboardScreen(
                             onClick = { bleManager.refreshAllTelemetryNow() },
                             enabled = authState == CuktechAuthState.AUTHENTICATED
                         ) {
-                            Icon(Icons.Default.Refresh, contentDescription = "刷新", modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("刷新", fontSize = 12.sp)
+                            Text("Refresh", fontSize = 12.sp)
                         }
 
                         IconButton(
                             onClick = {
                                 bleManager.disconnectCharger()
                                 bleManager.credentialStore.logoutAndWipeAll()
-                                Toast.makeText(context, "已安全擦除小米云会话与本地加密密钥", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Xiaomi session & local keys wiped securely", Toast.LENGTH_SHORT).show()
                             }
                         ) {
                             Icon(
                                 imageVector = Icons.Default.DeleteForever,
-                                contentDescription = "清除凭证",
+                                contentDescription = "Wipe credentials",
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
@@ -322,7 +340,7 @@ fun CuktechDashboardScreen(
                 ) {
                     Column {
                         Text(
-                            text = "总输出功率 (TOTAL OUTPUT)",
+                            text = "TOTAL OUTPUT POWER",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -348,13 +366,13 @@ fun CuktechDashboardScreen(
 
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            text = "信号: ${devInfo.rssi} dBm · 质量 ${devInfo.connectionQualityScore}%",
+                            text = "RSSI: ${devInfo.rssi} dBm · Quality ${devInfo.connectionQualityScore}%",
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "固件: ${devInfo.firmwareVersion} · 型号: ${devInfo.model}",
+                            text = "FW: ${devInfo.firmwareVersion} · Model: ${devInfo.model}",
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -376,7 +394,7 @@ fun CuktechDashboardScreen(
         // 3. FOUR INDIVIDUAL PORTS TELEMETRY & CONTROLS (USB-C1, C2, C3, USB-A)
         // =====================================================================
         Text(
-            text = "四口独立实时遥测与控制 (USB-C1 / C2 / C3 / USB-A)",
+            text = "4-Port Live Telemetry & Control (USB-C1 / C2 / C3 / USB-A)",
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
@@ -416,12 +434,12 @@ fun CuktechDashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "实时功率曲线 (W)",
+                        text = "Live Power Waveform (W)",
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
                     Text(
-                        text = "样本数: ${chartHistory.size}",
+                        text = "Samples: ${chartHistory.size}",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -450,13 +468,13 @@ fun CuktechDashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "充电器硬件参数与协议开关 (MIoT SIID=2)",
+                    text = "Charger Hardware Configuration (MIoT SIID=2)",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
 
                 // Scene Mode (PIID 5)
-                Text("功率分配场景模式 (PIID 5):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Power Allocation Mode (PIID 5):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -473,7 +491,7 @@ fun CuktechDashboardScreen(
                 }
 
                 // Screen Timeout (PIID 6)
-                Text("屏幕常亮/息屏时间 (PIID 6):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Screen Sleep Timeout (PIID 6):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -490,7 +508,7 @@ fun CuktechDashboardScreen(
                 }
 
                 // Fast-Charge Protocol Switches (PIID 21: PD, PPS, UFCS, SCP)
-                Text("快充协议扩展开关 (PIID 21):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Fast-Charge Protocol Extensions (PIID 21):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -508,7 +526,7 @@ fun CuktechDashboardScreen(
                     FilterChip(
                         selected = settings.ufcsEnabled,
                         onClick = { bleManager.setFastChargeProtocols(ufcs = !settings.ufcsEnabled) },
-                        label = { Text("UFCS 融合快充") }
+                        label = { Text("UFCS") }
                     )
                     FilterChip(
                         selected = settings.scpEnabled,
@@ -521,20 +539,20 @@ fun CuktechDashboardScreen(
 
                 // Boolean Switches (PIID 15, 19, 20, 13)
                 SettingSwitchRow(
-                    title = "USB-A 小电流模式 (PIID 15)",
-                    subtitle = "适合蓝牙耳机、手环等微电流设备充电",
+                    title = "USB-A Low Current Mode (PIID 15)",
+                    subtitle = "For earbuds, fitness bands and low-current IoT accessories",
                     checked = settings.usbALowCurrent,
                     onCheckedChange = { bleManager.setUsbALowCurrent(it) }
                 )
                 SettingSwitchRow(
-                    title = "空载自动息屏 (PIID 19)",
-                    subtitle = "所有接口无负载输出时自动关闭充电器屏幕",
+                    title = "Idle Screen Off (PIID 19)",
+                    subtitle = "Automatically turns off charger screen when no load is detected",
                     checked = settings.idleScreenOff,
                     onCheckedChange = { bleManager.setIdleScreenOff(it) }
                 )
                 SettingSwitchRow(
-                    title = "屏幕重力方向锁定 (PIID 20)",
-                    subtitle = "锁定充电器机身显示屏旋转方向",
+                    title = "Screen Orientation Lock (PIID 20)",
+                    subtitle = "Locks the charger's physical screen orientation",
                     checked = settings.orientationLock,
                     onCheckedChange = { bleManager.setOrientationLock(it) }
                 )
@@ -544,7 +562,7 @@ fun CuktechDashboardScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("机身界面语言 (PIID 13)", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text("Device Language (PIID 13)", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         CuktechProtocol.LANGUAGE_OPTIONS.forEach { (code, label) ->
                             FilterChip(
@@ -578,7 +596,7 @@ fun CuktechDashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "充电会话统计与能量记录 (Wh)",
+                        text = "Charging Session Statistics (Wh)",
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
@@ -586,26 +604,26 @@ fun CuktechDashboardScreen(
                         OutlinedButton(
                             onClick = {
                                 val file = bleManager.persistence.exportSessionsAndHistoryCsv()
-                                Toast.makeText(context, "已导出 CSV: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, "Exported CSV: ${file.absolutePath}", Toast.LENGTH_LONG).show()
                             },
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                         ) {
-                            Text("导出 CSV", fontSize = 11.sp)
+                            Text("Export CSV", fontSize = 11.sp)
                         }
                         TextButton(
                             onClick = {
                                 bleManager.persistence.clearSessions()
-                                Toast.makeText(context, "已清空历史会话", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Cleared session history", Toast.LENGTH_SHORT).show()
                             }
                         ) {
-                            Text("清空", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
+                            Text("Clear", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
 
                 if (activeSessions.isEmpty() && completedSessions.isEmpty()) {
                     Text(
-                        text = "暂无充电会话记录。当任一端口输出功率 ≥ 0.5W 时将自动开始梯形积分累计 Wh。",
+                        text = "No charging sessions recorded yet. Trapezoidal Wh integration begins automatically whenever port output ≥ 0.5W.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -622,9 +640,9 @@ fun CuktechDashboardScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column {
-                                    Text("${s.portLabel} · 正在充电 (${s.protocolUsed})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("${s.portLabel} · Charging (${s.protocolUsed})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     Text(
-                                        text = "时长: ${s.durationSeconds / 60}分${s.durationSeconds % 60}秒 · 峰值: ${"%.1f".format(s.peakWatts)}W · 均值: ${"%.1f".format(s.avgWatts)}W",
+                                        text = "Duration: ${s.durationSeconds / 60}m ${s.durationSeconds % 60}s · Peak: ${"%.1f".format(s.peakWatts)}W · Avg: ${"%.1f".format(s.avgWatts)}W",
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -650,7 +668,7 @@ fun CuktechDashboardScreen(
                             Column {
                                 Text("${s.portLabel} (${s.protocolUsed})", fontWeight = FontWeight.Medium, fontSize = 12.sp)
                                 Text(
-                                    text = "耗时 ${s.durationSeconds / 60}m · 峰值 ${"%.1f".format(s.peakWatts)}W · 均功 ${"%.1f".format(s.avgWatts)}W",
+                                    text = "Duration: ${s.durationSeconds / 60}m · Peak: ${"%.1f".format(s.peakWatts)}W · Avg: ${"%.1f".format(s.avgWatts)}W",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -682,13 +700,13 @@ fun CuktechDashboardScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Shizuku 增强、Tasker 自动化与智能家居云桥接",
+                    text = "Shizuku, Tasker Automation & Cloud Bridge",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
 
                 Text(
-                    text = "Shizuku 状态: ${shizukuStatus.providerPackage} · 电池无限制白名单: ${if (shizukuStatus.batteryWhitelisted) "已开启" else "未开启"}",
+                    text = "Shizuku: ${shizukuStatus.providerPackage} · Battery Whitelist: ${if (shizukuStatus.batteryWhitelisted) "Active" else "Disabled"}",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -705,7 +723,7 @@ fun CuktechDashboardScreen(
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("HyperOS 后台保活加固", fontSize = 11.sp)
+                        Text("Apply Doze Whitelist", fontSize = 11.sp)
                     }
                     OutlinedButton(
                         onClick = {
@@ -715,7 +733,7 @@ fun CuktechDashboardScreen(
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("蓝牙 GATT 协议栈诊断", fontSize = 11.sp)
+                        Text("BLE Stack Diagnostics", fontSize = 11.sp)
                     }
                 }
 
@@ -739,10 +757,10 @@ fun CuktechDashboardScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     TextButton(onClick = { showCloudConfig = !showCloudConfig }) {
-                        Text(if (showCloudConfig) "收起巴法云 / HA 配置" else "展开巴法云 (小爱同学) / HA 配置")
+                        Text(if (showCloudConfig) "Hide Bemfa / HA Config" else "Configure Bemfa / HA")
                     }
                     TextButton(onClick = { showTaskerDocs = !showTaskerDocs }) {
-                        Text(if (showTaskerDocs) "收起 Tasker 接口文档" else "查看 Tasker 广播接口")
+                        Text(if (showTaskerDocs) "Hide Tasker Docs" else "View Tasker Broadcast API")
                     }
                 }
 
@@ -762,19 +780,19 @@ fun CuktechDashboardScreen(
                     ) {
                         Text(
                             text = """
-                                Tasker / ADB 广播指令接口 (Package: com.cramqin.blecuktech10):
-                                • 连接充电器:
+                                Tasker / ADB Broadcast Intent API (Package: com.cramqin.blecuktech10):
+                                • Connect Charger:
                                   Action: com.cramqin.blecuktech10.CONNECT_CHARGER
-                                  Extra (可选): mac:AA:BB:CC:DD:EE:FF
-                                • 断开连接:
+                                  Extra (optional): mac:AA:BB:CC:DD:EE:FF
+                                • Disconnect:
                                   Action: com.cramqin.blecuktech10.DISCONNECT_CHARGER
-                                • 控制端口通断 (port=1..4, enabled=true/false):
+                                • Toggle Port Power (port=1..4, enabled=true/false):
                                   Action: com.cramqin.blecuktech10.SET_PORT_STATE
-                                • 设置功率分配模式 (mode=1..4):
+                                • Set Scene Mode (mode=1..4):
                                   Action: com.cramqin.blecuktech10.SET_SCENE_MODE
-                                • 设置单口电量上限 (port=1..4, wh_target=30.0, mode=once/always):
+                                • Set Port Charge Limit (port=1..4, wh_target=30.0, mode=once/always):
                                   Action: com.cramqin.blecuktech10.SET_CHARGE_LIMIT
-                                • 实时遥测广播接收 (Tasker Intent Received):
+                                • Receive Live Telemetry (Tasker Intent Received):
                                   Action: com.cramqin.blecuktech10.TELEMETRY_UPDATE
                                   Extras: %total_watts, %port_1_v, %port_1_a, %port_1_w, %port_1_protocol (1..4)
                             """.trimIndent(),
@@ -797,7 +815,7 @@ fun CuktechDashboardScreen(
             credentialStore = bleManager.credentialStore,
             onDismiss = { showXiaomiLoginDialog = false },
             onDevicesSynced = { list ->
-                Toast.makeText(context, "成功同步 ${list.size} 台设备凭证", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Successfully synced ${list.size} device credentials", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -894,7 +912,7 @@ private fun PortTelemetryCard(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (port.enabled) "已开启" else "已断电",
+                        text = if (port.enabled) "ENABLED" else "DISABLED",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -911,15 +929,15 @@ private fun PortTelemetryCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                MetricColumn("电压 (V)", "%.2f V".format(port.voltageV), accentColor)
-                MetricColumn("电流 (A)", "%.2f A".format(port.currentA), accentColor)
-                MetricColumn("功率 (W)", "%.2f W".format(port.powerW), accentColor)
-                MetricColumn("累计能量", "%.2f Wh".format(port.cumulativeWh), MaterialTheme.colorScheme.onSurface)
+                MetricColumn("Voltage (V)", "%.2f V".format(port.voltageV), accentColor)
+                MetricColumn("Current (A)", "%.2f A".format(port.currentA), accentColor)
+                MetricColumn("Power (W)", "%.2f W".format(port.powerW), accentColor)
+                MetricColumn("Energy (Wh)", "%.2f Wh".format(port.cumulativeWh), MaterialTheme.colorScheme.onSurface)
             }
 
             port.pdoCaps?.let { pdo ->
                 Text(
-                    text = "协商 PDO 档位: ${pdo.formatSummary()}",
+                    text = "Negotiated PDO: ${pdo.formatSummary()}",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -936,7 +954,7 @@ private fun PortTelemetryCard(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "定量断电保护 (${if (chargeLimit.mode == "always") "每次生效" else "单次"}): ${"%.2f".format(used)} / ${"%.1f".format(chargeLimit.whTarget)} Wh",
+                            text = "Energy Cutoff (${if (chargeLimit.mode == "always") "Always" else "Once"}): ${"%.2f".format(used)} / ${"%.1f".format(chargeLimit.whTarget)} Wh",
                             fontSize = 11.sp,
                             color = accentColor
                         )
@@ -970,7 +988,7 @@ private fun PortTelemetryCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("定时:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Timer:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     CuktechProtocol.COUNTDOWN_OPTIONS.forEach { (code, label) ->
                         FilterChip(
                             selected = port.countdownCode == code,
@@ -986,7 +1004,7 @@ private fun PortTelemetryCard(
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = if (chargeLimit?.enabled == true) "上限 ${"%.0f".format(chargeLimit.whTarget)}Wh" else "电量上限",
+                        text = if (chargeLimit?.enabled == true) "Limit ${"%.0f".format(chargeLimit.whTarget)}Wh" else "Energy Limit",
                         fontSize = 11.sp
                     )
                 }
@@ -1080,29 +1098,29 @@ private fun PortChargeLimitDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("端口 $portId 定量断电保护 (Wh)") },
+        title = { Text("Port $portId Energy Cutoff Protection (Wh)") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "当该端口累计输出能量达到设定 Wh 阈值时，将自动通过 PIID 16 切断该端口输出。",
+                    text = "When cumulative Wh on this port reaches the target threshold, power will automatically cut off via PIID 16.",
                     fontSize = 12.sp
                 )
                 OutlinedTextField(
                     value = whInput,
                     onValueChange = { whInput = it },
-                    label = { Text("目标能量上限 (Wh)") },
+                    label = { Text("Target Energy Limit (Wh)") },
                     singleLine = true
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = mode == "once",
                         onClick = { mode = "once" },
-                        label = { Text("单次触发 (once)") }
+                        label = { Text("One-Time (once)") }
                     )
                     FilterChip(
                         selected = mode == "always",
                         onClick = { mode = "always" },
-                        label = { Text("每次生效 (always)") }
+                        label = { Text("Always Active") }
                     )
                 }
             }
@@ -1114,18 +1132,18 @@ private fun PortChargeLimitDialog(
                     onConfirm(target, mode, target > 0.0)
                 }
             ) {
-                Text("启用上限")
+                Text("Enable Limit")
             }
         },
         dismissButton = {
             Row {
                 if (existingLimit != null) {
                     TextButton(onClick = { onConfirm(0.0, mode, false) }) {
-                        Text("关闭限制", color = MaterialTheme.colorScheme.error)
+                        Text("Disable Limit", color = MaterialTheme.colorScheme.error)
                     }
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text("Cancel")
                 }
             }
         }
@@ -1150,20 +1168,20 @@ private fun CloudIntegrationConfigPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("巴法云语音控制 (小爱同学/Siri · ${if (bemfaConnected) "已连接" else "未连接"})", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("Bemfa Cloud Voice Bridge (XiaoAI / Siri · ${if (bemfaConnected) "Connected" else "Disconnected"})", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Switch(checked = bemfaEn, onCheckedChange = { bemfaEn = it })
         }
         OutlinedTextField(
             value = bemfaUid,
             onValueChange = { bemfaUid = it },
-            label = { Text("巴法云私钥 UID") },
+            label = { Text("Bemfa Secret UID") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
             value = bemfaTopic,
             onValueChange = { bemfaTopic = it },
-            label = { Text("巴法云主题 Topic (如 cuktech10002)") },
+            label = { Text("Bemfa Topic (e.g. cuktech10002)") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
@@ -1172,7 +1190,7 @@ private fun CloudIntegrationConfigPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Home Assistant Webhook 遥测推送", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("Home Assistant Webhook Telemetry Push", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             Switch(checked = haEn, onCheckedChange = { haEn = it })
         }
         OutlinedTextField(
@@ -1196,7 +1214,7 @@ private fun CloudIntegrationConfigPanel(
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("保存云端桥接设置")
+            Text("Save Cloud Bridge Settings")
         }
     }
 }

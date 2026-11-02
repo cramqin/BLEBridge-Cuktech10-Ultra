@@ -42,14 +42,14 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 enum class CuktechAuthState(val label: String) {
-    DISCONNECTED("未连接"),
-    SCANNING("正在搜索充电器..."),
-    CONNECTING_GATT("正在建立 BLE 连接..."),
-    DISCOVERING_SERVICES("正在发现 GATT 服务..."),
-    PHASE_A_INIT_A4("阶段 A: 0xA4 握手初始化..."),
-    PHASE_B_HANDSHAKE("阶段 B: MiOT 密钥协商与鉴权..."),
-    AUTHENTICATED("已认证 · 实时监控中"),
-    AUTH_FAILED("认证失败")
+    DISCONNECTED("Disconnected"),
+    SCANNING("Searching for chargers..."),
+    CONNECTING_GATT("Establishing BLE connection..."),
+    DISCOVERING_SERVICES("Discovering GATT services..."),
+    PHASE_A_INIT_A4("Phase A: 0xA4 Handshake init..."),
+    PHASE_B_HANDSHAKE("Phase B: MiOT Key exchange..."),
+    AUTHENTICATED("Authenticated · Live Telemetry"),
+    AUTH_FAILED("Authentication Failed")
 }
 
 data class DiscoveredCuktechDevice(
@@ -132,7 +132,7 @@ class CuktechBleManager(
     private val _authState = MutableStateFlow(CuktechAuthState.DISCONNECTED)
     val authState: StateFlow<CuktechAuthState> = _authState.asStateFlow()
 
-    private val _statusMessage = MutableStateFlow("准备就绪")
+    private val _statusMessage = MutableStateFlow("Ready")
     val statusMessage: StateFlow<String> = _statusMessage.asStateFlow()
 
     private val _discoveredDevices = MutableStateFlow<List<DiscoveredCuktechDevice>>(emptyList())
@@ -196,12 +196,12 @@ class CuktechBleManager(
     fun startSearchForCuktechChargers(durationMs: Long = 10000L) {
         val svc = BleBridgeService.getInstance()
         if (svc == null) {
-            _statusMessage.value = "后台蓝牙服务正在启动，请稍候重试"
+            _statusMessage.value = "Bluetooth service is starting, please retry in a moment"
             return
         }
         clearDiscoveredDevices()
         _authState.value = CuktechAuthState.SCANNING
-        _statusMessage.value = "正在扫描附近的 CUKTECH 10 Ultra 充电器..."
+        _statusMessage.value = "Scanning for nearby CUKTECH 10 Ultra chargers..."
         svc.startNativeCuktechScan(durationMs)
     }
 
@@ -210,9 +210,9 @@ class CuktechBleManager(
             _authState.value = CuktechAuthState.DISCONNECTED
             val count = _discoveredDevices.value.size
             _statusMessage.value = if (count > 0) {
-                "扫描完成，发现 $count 台设备"
+                "Scan complete, found $count device(s)"
             } else {
-                "未扫描到广播设备，可直接点击已保存凭证连接"
+                "No broadcast devices found. You can tap a saved credential to connect."
             }
         }
     }
@@ -249,7 +249,9 @@ class CuktechBleManager(
             parsedFe95?.isCuktech10Ultra == true -> if (rawName.isNotBlank()) rawName else "CUKTECH 10 Ultra"
             rawName.isNotBlank() -> rawName
             else -> "MiOT BLE (${mac.takeLast(5)})"
-        }
+        }.replace("酷态科10号超级电能充", "CUKTECH 10 Ultra")
+         .replace("酷态科", "CUKTECH ")
+         .trim()
 
         val entry = DiscoveredCuktechDevice(
             mac = mac,
@@ -291,7 +293,7 @@ class CuktechBleManager(
 
         val targetMac = (macAddress ?: targetCred?.mac)?.uppercase()?.trim()
         if (targetMac.isNullOrBlank()) {
-            _statusMessage.value = "请先登录小米账号获取凭证或扫描选择充电器"
+            _statusMessage.value = "Please log in to Xiaomi account or scan to select a charger"
             return
         }
 
@@ -301,7 +303,7 @@ class CuktechBleManager(
 
         val svc = BleBridgeService.getInstance()
         if (svc == null) {
-            _statusMessage.value = "BLE 服务未就绪"
+            _statusMessage.value = "BLE Service is not ready"
             return
         }
 
@@ -315,7 +317,7 @@ class CuktechBleManager(
             name = targetCred?.name ?: "CUKTECH 10 Ultra"
         )
         _authState.value = CuktechAuthState.CONNECTING_GATT
-        _statusMessage.value = "正在连接 $targetMac..."
+        _statusMessage.value = "Connecting to $targetMac..."
         svc.connectBleNative(targetMac)
     }
 
@@ -326,14 +328,14 @@ class CuktechBleManager(
         stopBackgroundLoops()
         sessionKeys = null
         _authState.value = CuktechAuthState.DISCONNECTED
-        _statusMessage.value = "已手动断开连接"
+        _statusMessage.value = "Disconnected"
         BleBridgeService.getInstance()?.disconnectBleNative()
     }
 
     fun onConnectionStateChange(address: String, status: Int, newState: Int) {
         if (newState == BluetoothGatt.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
             _authState.value = CuktechAuthState.DISCOVERING_SERVICES
-            _statusMessage.value = "GATT 已连接，正在发现服务..."
+            _statusMessage.value = "GATT connected, discovering services..."
         } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
             authJob?.cancel()
             stopBackgroundLoops()
@@ -346,7 +348,7 @@ class CuktechBleManager(
             if (_authState.value != CuktechAuthState.AUTH_FAILED) {
                 _authState.value = CuktechAuthState.DISCONNECTED
             }
-            _statusMessage.value = "连接已断开 (status=$status)"
+            _statusMessage.value = "Disconnected (status=$status)"
 
             if (autoReconnectEnabled && !lastConnectedMac.isNullOrBlank()) {
                 scheduleAutoReconnect(lastConnectedMac!!)
@@ -359,7 +361,7 @@ class CuktechBleManager(
         reconnectJob = scope.launch {
             delay(4500L)
             if (autoReconnectEnabled && _authState.value == CuktechAuthState.DISCONNECTED) {
-                _statusMessage.value = "正在尝试自动重连 $mac..."
+                _statusMessage.value = "Attempting auto-reconnect to $mac..."
                 BleBridgeService.getInstance()?.connectBleNative(mac)
             }
         }
@@ -368,7 +370,7 @@ class CuktechBleManager(
     fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
         if (status != BluetoothGatt.GATT_SUCCESS) {
             _authState.value = CuktechAuthState.AUTH_FAILED
-            _statusMessage.value = "GATT 服务发现失败 (status=$status)"
+            _statusMessage.value = "GATT service discovery failed (status=$status)"
             return
         }
         val miService = gatt.getService(CuktechProtocol.MI_SERVICE_UUID)
@@ -385,14 +387,14 @@ class CuktechBleManager(
 
             if (activeCred == null || !activeCred.hasValidToken) {
                 _authState.value = CuktechAuthState.AUTH_FAILED
-                _statusMessage.value = "缺少有效的 12 字节 MiOT Token，请先登录小米账号同步凭证"
+                _statusMessage.value = "Missing valid 12-byte MiOT Token. Please log in to Xiaomi account to sync credentials."
                 return@launch
             }
 
             val ok = runAuthenticationHandshake(activeCred.tokenBytes())
             if (ok) {
                 _authState.value = CuktechAuthState.AUTHENTICATED
-                _statusMessage.value = "CUKTECH 10 Ultra 认证成功，实时遥测已激活"
+                _statusMessage.value = "CUKTECH 10 Ultra authenticated successfully! Live telemetry active."
                 consecutiveFailures = 0
                 startBackgroundLoops()
                 queryInitialChargerState()
@@ -434,14 +436,14 @@ class CuktechBleManager(
 
             // Step 1: Subscribe to CMD_RECV (0x001b), CMD_SEND (0x001a), DEVICE_INFO (0x001c), AUTH_DATA (0x0019)
             _authState.value = CuktechAuthState.PHASE_A_INIT_A4
-            _statusMessage.value = "正在订阅 MiOT 特征通知..."
+            _statusMessage.value = "Subscribing to MiOT characteristics..."
 
             svc.enqueueBleNotify(CuktechProtocol.MI_SERVICE_UUID, CuktechProtocol.CHAR_CMD_RECV, true)
             svc.enqueueBleNotify(CuktechProtocol.MI_SERVICE_UUID, CuktechProtocol.CHAR_CMD_SEND, true)
             svc.enqueueBleNotify(CuktechProtocol.MI_SERVICE_UUID, CuktechProtocol.CHAR_DEVICE_INFO, true)
             val subAuthDataOk = svc.enqueueBleNotify(CuktechProtocol.MI_SERVICE_UUID, CuktechProtocol.CHAR_AUTH_DATA, true)
             if (!subAuthDataOk) {
-                _statusMessage.value = "订阅 CHAR_AUTH_DATA (0x0019) 失败"
+                _statusMessage.value = "Failed to subscribe to CHAR_AUTH_DATA (0x0019)"
                 return false
             }
 
@@ -454,7 +456,7 @@ class CuktechBleManager(
             }
 
             // Step 2: Phase A (0xA4 Pre-Handshake Initialization)
-            _statusMessage.value = "阶段 A: 发送 0xA4 初始化指令..."
+            _statusMessage.value = "Phase A: Sending 0xA4 initialization command..."
             drainChannel(authDataQueue)
             val a4WriteOk = svc.enqueueBleWrite(
                 CuktechProtocol.MI_SERVICE_UUID,
@@ -463,7 +465,7 @@ class CuktechBleManager(
                 withResponse = true
             )
             if (!a4WriteOk) {
-                _statusMessage.value = "写入 0xA4 到 CHAR_AUTH_CTRL 失败"
+                _statusMessage.value = "Failed to write 0xA4 to CHAR_AUTH_CTRL"
                 return false
             }
 
@@ -513,7 +515,7 @@ class CuktechBleManager(
 
             // Step 3: Phase B (0x24 MiOT Token Handshake)
             _authState.value = CuktechAuthState.PHASE_B_HANDSHAKE
-            _statusMessage.value = "阶段 B: 发送 CMD_LOGIN (0x24) 发起密钥协商..."
+            _statusMessage.value = "Phase B: Sending CMD_LOGIN (0x24) for key negotiation..."
 
             svc.enqueueBleNotify(CuktechProtocol.MI_SERVICE_UUID, CuktechProtocol.CHAR_AUTH_CTRL, true)
             drainChannel(authCtrlQueue)
@@ -535,7 +537,7 @@ class CuktechBleManager(
 
             val rdy1 = withTimeoutOrNull(5000L) { authDataQueue.receive() }
             if (rdy1 == null || !rdy1.contentEquals(CuktechProtocol.RCV_RDY)) {
-                _statusMessage.value = "等待 RCV_RDY 超时或响应异常"
+                _statusMessage.value = "Timeout waiting for RCV_RDY response"
                 return false
             }
 
@@ -550,14 +552,14 @@ class CuktechBleManager(
 
             val ok1 = withTimeoutOrNull(5000L) { authDataQueue.receive() }
             if (ok1 == null || !ok1.contentEquals(CuktechProtocol.RCV_OK)) {
-                _statusMessage.value = "发送随机密钥后未收到 RCV_OK"
+                _statusMessage.value = "Did not receive RCV_OK after sending random key"
                 return false
             }
 
             // Step 4: Receive device random (16B) and device HMAC (32B)
             val devSendKeyCmd = withTimeoutOrNull(5000L) { authDataQueue.receive() }
                 ?: run {
-                    _statusMessage.value = "等待设备公钥超时"
+                    _statusMessage.value = "Timeout waiting for device public key"
                     return false
                 }
 
@@ -610,7 +612,7 @@ class CuktechBleManager(
             }
 
             if (devRandom.size != 16) {
-                _statusMessage.value = "设备随机数长度异常 (${devRandom.size}B)"
+                _statusMessage.value = "Unexpected device random length (${devRandom.size}B)"
                 return false
             }
 
@@ -626,7 +628,7 @@ class CuktechBleManager(
             )
             val rdy2 = withTimeoutOrNull(5000L) { authDataQueue.receive() }
             if (rdy2 == null || !rdy2.contentEquals(CuktechProtocol.RCV_RDY)) {
-                _statusMessage.value = "发送 HMAC 前未收到 RCV_RDY"
+                _statusMessage.value = "Did not receive RCV_RDY before sending HMAC"
                 return false
             }
 
@@ -648,7 +650,7 @@ class CuktechBleManager(
 
             val ok2 = withTimeoutOrNull(5000L) { authDataQueue.receive() }
             if (ok2 == null || !ok2.contentEquals(CuktechProtocol.RCV_OK)) {
-                _statusMessage.value = "发送 HMAC 后未收到 RCV_OK"
+                _statusMessage.value = "Did not receive RCV_OK after sending HMAC"
                 return false
             }
 
@@ -714,7 +716,7 @@ class CuktechBleManager(
             if (ctrlResult != null && ctrlResult.isNotEmpty()) {
                 val statusByte = ctrlResult[0].toInt() and 0xFF
                 if (statusByte != 0x21 && statusByte != 0x11) {
-                    _statusMessage.value = "认证状态码拒绝: 0x${"%02X".format(statusByte)}"
+                    _statusMessage.value = "Authentication status rejected: 0x${"%02X".format(statusByte)}"
                     return false
                 }
             }
@@ -727,7 +729,7 @@ class CuktechBleManager(
             reqCounter = 0x0300
             return true
         } catch (e: Exception) {
-            _statusMessage.value = "握手异常: ${e.message}"
+            _statusMessage.value = "Handshake error: ${e.message}"
             return false
         }
     }
@@ -1342,7 +1344,7 @@ class CuktechBleManager(
         if (usedWh >= limit.whTarget) {
             // Cut off port power automatically via PIID 16
             setPortEnabled(portId, false)
-            _statusMessage.value = "端口 ${PortTelemetryDecoder.PORT_NAMES[portId]} 已达电量上限 (${"%.1f".format(limit.whTarget)} Wh)，已自动断电"
+            _statusMessage.value = "Port ${PortTelemetryDecoder.PORT_NAMES[portId]} reached limit (${"%.1f".format(limit.whTarget)} Wh) - auto cut off"
 
             val updatedLimit = if (limit.mode == "always") {
                 limit.copy(baselineWh = cumulativeWh, triggered = false)

@@ -8,7 +8,7 @@ data class PdoCapabilities(
     val ppsMaxVoltageMv: Int? = null
 ) {
     fun formatSummary(): String {
-        if (fixedVoltagesMv.isEmpty() && ppsMaxVoltageMv == null) return "无 PDO"
+        if (fixedVoltagesMv.isEmpty() && ppsMaxVoltageMv == null) return "No PDO"
         val fixedStr = fixedVoltagesMv.joinToString("/") { "${it / 1000}V" }
         val ppsStr = ppsMaxVoltageMv?.let { "PPS(${it / 1000}V)" } ?: ""
         return listOf(fixedStr, ppsStr).filter { it.isNotEmpty() }.joinToString(" + ")
@@ -25,7 +25,7 @@ data class PortTelemetry(
     val rawPowerMw: Int = 0,
     val rawProtocolCode: Int = 0,
     val mijiaProtocolCode: Int? = null,
-    val protocolName: String = "空闲",
+    val protocolName: String = "Idle",
     val enabled: Boolean = true,
     val countdownCode: Int = 0,
     val pdoCaps: PdoCapabilities? = null,
@@ -77,7 +77,7 @@ object PortTelemetryDecoder {
 
     // Exact Mijia protocol code map from `state_protocol_v2.py::MIJIA_PROTOCOL_MAP`
     val MIJIA_PROTOCOL_MAP = mapOf(
-        0 to "空闲",
+        0 to "Idle",
         1 to "QC2.0",
         2 to "QC3.0",
         3 to "QC3+",
@@ -213,7 +213,7 @@ object PortTelemetryDecoder {
         mijiaProtocolCode: Int?
     ): String {
         if (status == 0 && voltageV < 0.5 && currentA < 0.02) {
-            return "空闲"
+            return "Idle"
         }
         if (mijiaProtocolCode != null && mijiaProtocolCode > 0) {
             MIJIA_PROTOCOL_MAP[mijiaProtocolCode]?.let { return it }
@@ -230,8 +230,8 @@ object PortTelemetryDecoder {
         currentA: Double,
         status: Int
     ): String {
-        if (status == 0 && voltageV < 0.5) return "空闲"
-        if (voltageV < 3.0 && currentA < 0.02) return "已连接 (待机)"
+        if (status == 0 && voltageV < 0.5) return "Idle"
+        if (voltageV < 3.0 && currentA < 0.02) return "Connected (Standby)"
         if (portId == 4) {
             // USB-A port
             return when {
@@ -239,7 +239,7 @@ object PortTelemetryDecoder {
                 voltageV > 7.5 -> "QC2.0 / AFC (9V)"
                 currentA > 2.2 -> "SCP / UFCS"
                 currentA > 0.05 -> "USB-A 5V"
-                else -> "待机 (5V)"
+                else -> "Standby (5V)"
             }
         }
         // USB-C1/C2/C3
@@ -255,7 +255,7 @@ object PortTelemetryDecoder {
             nearestStandard >= 12.0 -> "PD 12V"
             nearestStandard >= 9.0 -> "PD 9V"
             currentA > 0.05 -> "PD 5V"
-            else -> "待机 (5V)"
+            else -> "Standby (5V)"
         }
     }
 

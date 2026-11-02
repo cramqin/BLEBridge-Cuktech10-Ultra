@@ -12,7 +12,7 @@ import java.io.InputStreamReader
 
 data class ShizukuStatus(
     val isInstalled: Boolean = false,
-    val providerPackage: String = "未检测到",
+    val providerPackage: String = "Not detected",
     val batteryWhitelisted: Boolean = false,
     val lastDiagnosticOutput: String = ""
 )
@@ -54,7 +54,7 @@ class ShizukuCompanion(private val context: Context) {
 
         _status.value = _status.value.copy(
             isInstalled = foundPkg != null,
-            providerPackage = foundPkg ?: "未检测到 Shizuku (可选组件)",
+            providerPackage = foundPkg ?: "Not detected (optional)",
             batteryWhitelisted = ignoringBattery
         )
     }
@@ -68,9 +68,9 @@ class ShizukuCompanion(private val context: Context) {
         val res = runElevatedOrLocalCommand(cmd)
         refreshStatus()
         val msg = if (res.isSuccess) {
-            "已执行后台保活与 Doze 白名单指令:\n${res.getOrDefault("OK").ifBlank { "成功" }}"
+            "Background keepalive & Doze whitelist commands applied:\n${res.getOrDefault("OK").ifBlank { "Success" }}"
         } else {
-            "请确认 Shizuku 已启动并授权 (或在系统设置中将本应用设为无限制): ${res.exceptionOrNull()?.message}"
+            "Ensure Shizuku is running and authorized (or set Unrestricted Battery in system settings): ${res.exceptionOrNull()?.message}"
         }
         _status.value = _status.value.copy(lastDiagnosticOutput = msg)
         msg
@@ -82,8 +82,8 @@ class ShizukuCompanion(private val context: Context) {
     suspend fun runBluetoothStackDiagnostics(): String = withContext(Dispatchers.IO) {
         val cmd = "dumpsys bluetooth_manager | grep -E 'enabled|ConnectionState|AdapterProperties|BondState|GattService' | head -n 25"
         val res = runElevatedOrLocalCommand(cmd)
-        val out = res.getOrElse { "读取蓝牙诊断信息需 Shizuku 权限: ${it.message}" }
-            .ifBlank { "蓝牙协议栈状态正常 (Native Android BLE API 已就绪)" }
+        val out = res.getOrElse { "Reading Bluetooth diagnostics requires Shizuku permission: ${it.message}" }
+            .ifBlank { "Bluetooth stack status normal (Native Android BLE API is ready)" }
         _status.value = _status.value.copy(lastDiagnosticOutput = out)
         out
     }

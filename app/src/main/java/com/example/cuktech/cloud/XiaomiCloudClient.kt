@@ -97,14 +97,14 @@ class XiaomiCloudClient {
             val json = JSONObject(stripXiaomiPrefix(resp.body))
             val code = json.optInt("code", -1)
             if (code != 0) {
-                throw IllegalStateException("获取二维码失败: ${json.optString("desc", "code=$code")}")
+                throw IllegalStateException("Failed to obtain QR code: ${json.optString("desc", "code=$code")}")
             }
             val loginUrl = json.optString("loginUrl", "")
             val qrImageUrl = json.optString("qr", "")
             val lpUrl = json.optString("lp", "")
             val timeout = json.optInt("timeout", 120)
             if (loginUrl.isBlank() || lpUrl.isBlank()) {
-                throw IllegalStateException("二维码会话缺少 loginUrl 或 lp 参数")
+                throw IllegalStateException("QR session missing loginUrl or lp parameter")
             }
             QrLoginSession(
                 loginUrl = loginUrl,
@@ -150,7 +150,7 @@ class XiaomiCloudClient {
             val passToken = json.optString("passToken", "")
 
             if (userId.isBlank() || ssecurity.isBlank() || location.isBlank()) {
-                return@withContext QrPollResult.Error("扫码返回数据不完整")
+                return@withContext QrPollResult.Error("Incomplete response data from QR login")
             }
 
             val serviceToken = completeStsRedirect(
@@ -159,7 +159,7 @@ class XiaomiCloudClient {
                 extraCookies = resp.cookies + mapOf("userId" to userId, "passToken" to passToken)
             )
             if (serviceToken.isBlank()) {
-                return@withContext QrPollResult.Error("未能获取 serviceToken")
+                return@withContext QrPollResult.Error("Failed to retrieve serviceToken")
             }
 
             QrPollResult.Success(
@@ -173,7 +173,7 @@ class XiaomiCloudClient {
         } catch (e: java.net.SocketTimeoutException) {
             QrPollResult.Waiting
         } catch (e: Exception) {
-            QrPollResult.Error(e.message ?: "轮询异常")
+            QrPollResult.Error(e.message ?: "Polling exception")
         }
     }
 
@@ -255,7 +255,7 @@ class XiaomiCloudClient {
             val location = step2Json.optString("location", "")
 
             if (code != 0 || ssecurity.isBlank() || location.isBlank()) {
-                val desc = step2Json.optString("description", step2Json.optString("desc", "登录失败 (code=$code)"))
+                val desc = step2Json.optString("description", step2Json.optString("desc", "Login failed (code=$code)"))
                 return@withContext XiaomiLoginResult.Error(desc)
             }
 
@@ -265,7 +265,7 @@ class XiaomiCloudClient {
                 extraCookies = baseCookies
             )
             if (serviceToken.isBlank()) {
-                return@withContext XiaomiLoginResult.Error("未能获取 serviceToken")
+                return@withContext XiaomiLoginResult.Error("Failed to retrieve serviceToken")
             }
 
             XiaomiLoginResult.Success(
@@ -277,7 +277,7 @@ class XiaomiCloudClient {
                 )
             )
         } catch (e: Exception) {
-            XiaomiLoginResult.Error(e.message ?: "登录请求异常")
+            XiaomiLoginResult.Error(e.message ?: "Login request exception")
         }
     }
 
@@ -378,7 +378,7 @@ class XiaomiCloudClient {
                 val code = json.optInt("code", -1)
                 if (code != 0) {
                     throw IllegalStateException(
-                        json.optString("tips", json.optString("desc", "验证码发送失败 (code=$code)，请尝试下方安全网页验证"))
+                        json.optString("tips", json.optString("desc", "Verification code sending failed (code=$code). Please try web verification below."))
                     )
                 }
             }
@@ -424,13 +424,13 @@ class XiaomiCloudClient {
             val code = json.optInt("code", -1)
             val location = json.optString("location", "")
             if (code != 0 || location.isBlank()) {
-                val msg = json.optString("tips", json.optString("desc", "验证码校验未通过 (code=$code)"))
+                val msg = json.optString("tips", json.optString("desc", "Verification code invalid (code=$code)"))
                 return@withContext XiaomiLoginResult.Error(msg)
             }
 
             complete2faFinishRedirect(location, cookies, challenge.deviceId, challenge.region)
         } catch (e: Exception) {
-            XiaomiLoginResult.Error(e.message ?: "二步验证校验失败")
+            XiaomiLoginResult.Error(e.message ?: "2FA verification failed")
         }
     }
 
@@ -503,10 +503,10 @@ class XiaomiCloudClient {
                     )
                 )
             } else {
-                XiaomiLoginResult.Error("未能从二步验证回调提取完整会话凭证")
+                XiaomiLoginResult.Error("Failed to extract complete session credentials from 2FA callback")
             }
         } catch (e: Exception) {
-            XiaomiLoginResult.Error(e.message ?: "完成二步验证会话失败")
+            XiaomiLoginResult.Error(e.message ?: "Failed to complete 2FA verification session")
         }
     }
 
@@ -682,10 +682,15 @@ class XiaomiCloudClient {
             }
 
             if (mac.isNotBlank() || token.isNotBlank()) {
+                val cleanName = name.replace("酷态科10号超级电能充", "CUKTECH 10 Ultra")
+                    .replace("酷态科", "CUKTECH ")
+                    .trim()
+                    .ifBlank { "CUKTECH 10 Ultra" }
+
                 credentialsList.add(
                     CuktechDeviceCredentials(
                         did = did,
-                        name = name,
+                        name = cleanName,
                         model = model,
                         mac = mac,
                         tokenHex = token,
@@ -761,7 +766,8 @@ class XiaomiCloudClient {
     // =========================================================================
 
     companion object {
-        val SUPPORTED_REGIONS = listOf("cn", "de", "us", "ru", "tw", "sg", "in", "i2")
+        // Supported regions: Default to Mainland China (cn), Philippines (ph), plus global regions
+        val SUPPORTED_REGIONS = listOf("cn", "ph", "de", "us", "ru", "tw", "sg", "in", "i2")
 
         private const val USER_AGENT_BROWSER =
             "Mozilla/5.0 (Linux; Android 14; Xiaomi 17) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"

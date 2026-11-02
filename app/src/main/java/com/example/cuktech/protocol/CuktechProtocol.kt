@@ -78,30 +78,30 @@ object CuktechProtocol {
     const val PIID_PROTOCOL_EXTEND = 21
 
     val SCENE_MODES = mapOf(
-        1 to "动态分配",
-        2 to "笔记本优先",
-        3 to "单口模式",
-        4 to "双口同充"
+        1 to "Dynamic Allocation",
+        2 to "Laptop Priority",
+        3 to "Single Port Mode",
+        4 to "Dual Port Fast Charge"
     )
 
     val SCREEN_TIMEOUTS = mapOf(
-        0 to "常亮",
-        1 to "60 秒",
-        2 to "5 分钟",
-        3 to "60 分钟"
+        0 to "Always On",
+        1 to "60 Seconds",
+        2 to "5 Minutes",
+        3 to "60 Minutes"
     )
 
     val COUNTDOWN_OPTIONS = mapOf(
-        0 to "不开启",
-        1 to "1 小时",
-        2 to "2 小时",
-        3 to "4 小时",
-        4 to "8 小时",
-        5 to "10 小时"
+        0 to "Disabled",
+        1 to "1 Hour",
+        2 to "2 Hours",
+        3 to "4 Hours",
+        4 to "8 Hours",
+        5 to "10 Hours"
     )
 
     val LANGUAGE_OPTIONS = mapOf(
-        0 to "中文",
+        0 to "Chinese",
         1 to "English"
     )
 

@@ -1,3 +1,9 @@
+# BLEBridge – Cuktech10 Ultra Fork
+
+> **Note:** This is a fork of the BLE Bridge with capability to modify the Cuktech10 Ultra. **For development purposes only.**
+
+---
+
 # BLE-to-Network Bridge 🚀
 
 Welcome to the **BLE-to-Network Bridge**! This highly resilient and configurable Android application allows a non-rooted Android device to act as a bi-directional gateway. It bridges local/remote TCP network socket connections straight into physical Bluetooth Low Energy (BLE) peripherals.

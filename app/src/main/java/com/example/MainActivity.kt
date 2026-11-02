@@ -863,17 +863,30 @@ fun BleBridgeDashboard(
                                     }
 
                                     if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
-                                        Button(
-                                            onClick = { showXiaomiLoginDialog = true },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = StatusError,
-                                                contentColor = Color.White
-                                            ),
-                                            shape = RoundedCornerShape(8.dp),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                            modifier = Modifier.height(32.dp)
-                                        ) {
-                                            Text("Get Token", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            if (accountSession != null) {
+                                                Button(
+                                                    onClick = { cuktechManager.syncCredentialsAndRetryAuth() },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = appColors.primary,
+                                                        contentColor = Color.White
+                                                    ),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                    modifier = Modifier.height(32.dp)
+                                                ) {
+                                                    Text("Sync Token", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                            }
+                                            OutlinedButton(
+                                                onClick = { showXiaomiLoginDialog = true },
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                modifier = Modifier.height(32.dp)
+                                            ) {
+                                                Text(if (accountSession != null) "Re-Login" else "Get Token", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                     } else if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) {
                                         Button(
@@ -1319,7 +1332,11 @@ fun BleBridgeDashboard(
                 onDismiss = { showXiaomiLoginDialog = false },
                 onDevicesSynced = { list ->
                     showXiaomiLoginDialog = false
-                    Toast.makeText(context, "Successfully synced ${list.size} device credentials", Toast.LENGTH_SHORT).show()
+                    if (list.isNotEmpty()) {
+                        Toast.makeText(context, "Successfully synced ${list.size} device credentials from Xiaomi Cloud", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Xiaomi account session saved. Ready to connect to charger.", Toast.LENGTH_SHORT).show()
+                    }
                 }
             )
         }

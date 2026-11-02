@@ -1171,7 +1171,11 @@ class BleBridgeService : Service() {
         var cloudIntegrations: CloudIntegrations? = null
             private set
 
-        val xiaomiCloudClient = XiaomiCloudClient()
+        val xiaomiCloudClient = XiaomiCloudClient().apply {
+            logger = { isError, msg ->
+                addLogMessage(if (isError) LogLevel.LEVEL1 else LogLevel.LEVEL2, msg)
+            }
+        }
 
         @Synchronized
         fun ensureCuktechManagersInitialized(context: Context): CuktechBleManager {

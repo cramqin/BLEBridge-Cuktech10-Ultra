@@ -385,21 +385,43 @@ class CuktechBleManager(
         authJob?.cancel()
         authJob = scope.launch {
             val gattMac = gatt.device.address.uppercase().trim()
-            val activeCred = credentialStore.devices.value.firstOrNull {
+            var activeCred = credentialStore.devices.value.firstOrNull {
                 it.mac.replace(":", "").equals(gattMac.replace(":", ""), ignoreCase = true)
             } ?: credentialStore.activeDevice.value
               ?: if (credentialStore.devices.value.size == 1 && credentialStore.devices.value[0].hasValidToken) {
                   credentialStore.devices.value[0]
               } else null
 
+            // If token is missing, attempt automatic sync with saved Xiaomi Cloud session
+            if (activeCred == null || !activeCred.hasValidToken) {
+                val session = credentialStore.session.value
+                if (session != null) {
+                    _statusMessage.value = "Fetching MiOT token from Xiaomi Cloud for $gattMac..."
+                    BleBridgeService.addLogMessage(
+                        BleBridgeService.Companion.LogLevel.LEVEL2,
+                        "[Cuktech] Token missing for $gattMac. Syncing from Xiaomi Cloud (UID: ${session.userId})..."
+                    )
+                    val res = BleBridgeService.xiaomiCloudClient.fetchDevicesAndBleKeys(session, searchAllRegionsIfEmpty = true)
+                    res.onSuccess { list ->
+                        if (list.isNotEmpty()) {
+                            credentialStore.saveDevices(list)
+                            activeCred = list.firstOrNull {
+                                it.mac.replace(":", "").equals(gattMac.replace(":", ""), ignoreCase = true)
+                            } ?: list.firstOrNull { it.isCuktech10Ultra && it.hasValidToken }
+                              ?: list.firstOrNull { it.hasValidToken }
+                        }
+                    }
+                }
+            }
+
             if (activeCred == null || !activeCred.hasValidToken) {
                 _authState.value = CuktechAuthState.AUTH_FAILED
-                _statusMessage.value = "Missing valid 12-byte MiOT Token. Please log in to Xiaomi account to sync credentials."
+                _statusMessage.value = "Missing valid 12-byte MiOT Token. Tap 'Sync Token' or log in to Xiaomi account."
                 BleBridgeService.refreshClientsList()
                 return@launch
             }
 
-            val ok = runAuthenticationHandshake(activeCred.tokenBytes())
+            val ok = runAuthenticationHandshake(activeCred!!.tokenBytes())
             if (ok) {
                 _authState.value = CuktechAuthState.AUTHENTICATED
                 _statusMessage.value = "CUKTECH 10 Ultra authenticated successfully! Live telemetry active."
@@ -410,6 +432,54 @@ class CuktechBleManager(
             } else {
                 _authState.value = CuktechAuthState.AUTH_FAILED
                 BleBridgeService.refreshClientsList()
+            }
+        }
+    }
+
+    /**
+     * Manually triggers a Xiaomi Cloud credential sync using the saved session and retries
+     * BLE connection/authentication to the charger.
+     */
+    fun syncCredentialsAndRetryAuth() {
+        val session = credentialStore.session.value
+        if (session == null) {
+            _statusMessage.value = "No Xiaomi account session found. Please log in first."
+            return
+        }
+        scope.launch {
+            _statusMessage.value = "Syncing credentials from Xiaomi Cloud..."
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Syncing credentials from Xiaomi Cloud (UID ${session.userId})..."
+            )
+            val res = BleBridgeService.xiaomiCloudClient.fetchDevicesAndBleKeys(session, searchAllRegionsIfEmpty = true)
+            res.onSuccess { list ->
+                if (list.isNotEmpty()) {
+                    credentialStore.saveDevices(list)
+                    BleBridgeService.addLogMessage(
+                        BleBridgeService.Companion.LogLevel.LEVEL2,
+                        "[Cuktech] Saved ${list.size} device credential(s) from Xiaomi Cloud."
+                    )
+                    val targetMac = lastConnectedMac
+                        ?: credentialStore.activeDevice.value?.mac
+                        ?: list.firstOrNull { it.hasValidToken }?.mac
+                    if (!targetMac.isNullOrBlank()) {
+                        connectToCharger(targetMac)
+                    }
+                } else {
+                    _statusMessage.value = "No CUKTECH devices found in Xiaomi Cloud"
+                    BleBridgeService.addLogMessage(
+                        BleBridgeService.Companion.LogLevel.LEVEL1,
+                        "[Cuktech] No CUKTECH devices found in Xiaomi Cloud account."
+                    )
+                }
+            }.onFailure { err ->
+                val clean = XiaomiCloudClient.translateXiaomiError(err.message ?: "Sync failed")
+                _statusMessage.value = "Sync failed: $clean"
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Sync failed: $clean"
+                )
             }
         }
     }

@@ -85,23 +85,20 @@ fun XiaomiAccountLoginDialog(
 
     suspend fun handleAuthenticatedSession(session: XiaomiAccountSession) {
         credentialStore.saveSession(session)
-        loginStatusText = "Logged in (UID: ${session.userId}). Fetching CUKTECH credentials & BLE Key..."
+        loginStatusText = "Logged in (UID: ${session.userId}). Fetching devices from Xiaomi Cloud..."
         qrStatusText = loginStatusText
         val devRes = cloudClient.fetchDevicesAndBleKeys(session, searchAllRegionsIfEmpty = true)
         devRes.onSuccess { list ->
             if (list.isNotEmpty()) {
                 credentialStore.saveDevices(list)
                 onDevicesSynced(list)
-                onDismiss()
             } else {
-                loginStatusText = "Logged in (UID: ${session.userId}), but no CUKTECH devices found in region [${session.region.uppercase()}]. Please ensure your charger was added under Mainland China ('CN') in the Mi Home app."
-                qrStatusText = loginStatusText
+                onDevicesSynced(emptyList())
             }
-        }.onFailure { err ->
-            val cleanErr = XiaomiCloudClient.translateXiaomiError(err.message ?: "Failed to fetch devices")
-            loginStatusText = "Logged in, but failed to fetch devices: $cleanErr"
-            qrStatusText = loginStatusText
+        }.onFailure {
+            onDevicesSynced(emptyList())
         }
+        onDismiss()
     }
 
     // Automatically start QR login when tab 0 is opened

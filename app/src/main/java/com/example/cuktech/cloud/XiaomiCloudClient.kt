@@ -62,6 +62,25 @@ class XiaomiCloudClient {
 
     private val random = SecureRandom()
 
+    /**
+     * Optional sink for user-visible diagnostics (wired to Console Output by BleBridgeService).
+     * First arg = isError. Never receives secrets.
+     */
+    @Volatile
+    var logger: ((Boolean, String) -> Unit)? = null
+
+    private fun cloudLog(message: String, isError: Boolean = false) {
+        if (isError) Log.w(TAG, message) else Log.i(TAG, message)
+        runCatching { logger?.invoke(isError, "[Xiaomi Cloud] $message") }
+    }
+
+    /** Same randomized agent format as cuktech-ble-server/xiaomi_cloud.py. */
+    private val androidAgent: String by lazy {
+        val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        fun rnd(n: Int) = (1..n).map { chars[random.nextInt(chars.length)] }.joinToString("")
+        "Android-7.1.1-1.0.0-ONEPLUS A3010-136-${rnd(11)} MIIO/${rnd(6)}"
+    }
+
     fun generateDeviceId(): String {
         val chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
         return (1..16).map { chars[random.nextInt(chars.length)] }.joinToString("")
@@ -397,6 +416,7 @@ class XiaomiCloudClient {
         useEmail: Boolean = false
     ): XiaomiLoginResult = withContext(Dispatchers.IO) {
         try {
+            cloudLog("Submitting 2FA verification code (${if (useEmail) "Email" else "Phone/SMS"})...")
             val endpoint = if (useEmail) {
                 "https://account.xiaomi.com/identity/auth/verifyEmail"
             } else {
@@ -416,7 +436,7 @@ class XiaomiCloudClient {
                 urlStr = "$endpoint?_dc=${System.currentTimeMillis()}",
                 method = "POST",
                 headers = mapOf(
-                    "User-Agent" to USER_AGENT_BROWSER,
+                    "User-Agent" to androidAgent,
                     "Accept-Language" to "en-US,en;q=0.9",
                     "Content-Type" to "application/x-www-form-urlencoded",
                     "Cookie" to formatCookies(cookies)
@@ -427,20 +447,35 @@ class XiaomiCloudClient {
             cookies.putAll(resp.cookies)
             val json = JSONObject(stripXiaomiPrefix(resp.body))
             val code = json.optInt("code", -1)
-            val location = json.optString("location", "")
-            if (code != 0 || location.isBlank()) {
+            var location = json.optString("location", "")
+            if (location.isBlank()) {
+                location = resp.redirectLocation ?: ""
+            }
+            if (location.isBlank() && resp.body.contains("result/check")) {
+                val regex = Regex("""https://account\.xiaomi\.com/identity/result/check\?[^"']+""")
+                regex.find(resp.body)?.let { location = it.value }
+            }
+
+            if (code != 0 && location.isBlank()) {
                 val rawMsg = json.optString("tips", json.optString("desc", "Verification code invalid (code=$code)"))
+                cloudLog("2FA verification failed: $rawMsg", isError = true)
                 return@withContext XiaomiLoginResult.Error(translateXiaomiError(rawMsg))
             }
 
+            cloudLog("2FA verification accepted! Completing session redirect chain...")
             complete2faFinishRedirect(location, cookies, challenge.deviceId, challenge.region)
         } catch (e: Exception) {
+            cloudLog("2FA verification exception: ${e.message}", isError = true)
             XiaomiLoginResult.Error(e.message ?: "2FA verification failed")
         }
     }
 
     /**
-     * Completes a 2FA redirect chain (either from OTP verification or interactive WebView callback).
+     * Completes a 2FA redirect chain matching PiotrMachowski's Xiaomi-cloud-tokens-extractor:
+     * 1. GET result/check (do not follow redirects) -> obtain end_url
+     * 2. GET end_url (do not follow redirects) -> extract ssecurity from 'extension-pragma'
+     * 3. Extract STS location from Location header or body
+     * 4. GET STS location (following redirects) -> obtain serviceToken and userId
      */
     suspend fun complete2faFinishRedirect(
         finishUrl: String,
@@ -450,55 +485,112 @@ class XiaomiCloudClient {
     ): XiaomiLoginResult = withContext(Dispatchers.IO) {
         try {
             val cookies = cookiesIn.toMutableMap()
+            if (deviceId.isNotBlank()) cookies["deviceId"] = deviceId
             var currentUrl = if (finishUrl.startsWith("http")) finishUrl else "https://account.xiaomi.com$finishUrl"
             var ssecurity = ""
-            var userId = cookies["userId"].orEmpty()
             var serviceToken = cookies["serviceToken"].orEmpty()
+            var userId = cookies["userId"].orEmpty()
 
-            for (hop in 0 until 6) {
-                val resp = httpRequest(
+            val reqHeaders = mapOf(
+                "User-Agent" to androidAgent,
+                "Content-Type" to "application/x-www-form-urlencoded"
+            )
+
+            // Step 1: Visit result/check (if in URL) without redirects to get end_url
+            if (currentUrl.contains("identity/result/check")) {
+                val checkResp = httpRequest(
                     urlStr = currentUrl,
                     method = "GET",
-                    headers = mapOf(
-                        "User-Agent" to USER_AGENT_BROWSER,
-                        "Cookie" to formatCookies(cookies)
-                    ),
+                    headers = reqHeaders + mapOf("Cookie" to formatCookies(cookies)),
                     followRedirects = false,
                     timeoutMs = 15000
                 )
-                cookies.putAll(resp.cookies)
-                resp.headers["extension-pragma"]?.firstOrNull()?.let { pragma ->
-                    runCatching {
-                        val pJson = JSONObject(pragma)
-                        if (pJson.optString("ssecurity").isNotBlank()) {
-                            ssecurity = pJson.optString("ssecurity")
-                        }
-                    }
+                cookies.putAll(checkResp.cookies)
+                checkResp.redirectLocation?.takeIf { it.isNotBlank() }?.let { next ->
+                    currentUrl = if (next.startsWith("http")) next else URL(URL(currentUrl), next).toString()
                 }
-                if (cookies["serviceToken"]?.isNotBlank() == true) {
-                    serviceToken = cookies["serviceToken"]!!
-                }
-                if (cookies["userId"]?.isNotBlank() == true) {
-                    userId = cookies["userId"]!!
-                }
-                if (resp.body.contains("ssecurity")) {
-                    runCatching {
-                        val bJson = JSONObject(stripXiaomiPrefix(resp.body))
-                        if (bJson.optString("ssecurity").isNotBlank()) ssecurity = bJson.optString("ssecurity")
-                        if (bJson.opt("userId") != null) userId = bJson.opt("userId").toString()
-                        val nextLoc = bJson.optString("location", "")
-                        if (nextLoc.isNotBlank() && resp.redirectLocation.isNullOrBlank()) {
-                            currentUrl = nextLoc
-                            continue
-                        }
-                    }
-                }
-                val redirect = resp.redirectLocation
-                if (redirect.isNullOrBlank()) break
-                currentUrl = if (redirect.startsWith("http")) redirect else URL(URL(currentUrl), redirect).toString()
             }
 
+            // Step 2: Visit Auth2/end without redirects to capture 'extension-pragma' header
+            var endResp = httpRequest(
+                urlStr = currentUrl,
+                method = "GET",
+                headers = reqHeaders + mapOf("Cookie" to formatCookies(cookies)),
+                followRedirects = false,
+                timeoutMs = 15000
+            )
+            cookies.putAll(endResp.cookies)
+
+            // If the server returns a 200 'Tips' intermediate page, call endUrl once more
+            if (endResp.statusCode == 200 && endResp.body.contains("Xiaomi Account - Tips")) {
+                endResp = httpRequest(
+                    urlStr = currentUrl,
+                    method = "GET",
+                    headers = reqHeaders + mapOf("Cookie" to formatCookies(cookies)),
+                    followRedirects = false,
+                    timeoutMs = 15000
+                )
+                cookies.putAll(endResp.cookies)
+            }
+
+            // Extract ssecurity from extension-pragma header
+            endResp.headers["extension-pragma"]?.firstOrNull()?.let { pragma ->
+                runCatching {
+                    val pJson = JSONObject(pragma)
+                    if (pJson.optString("ssecurity").isNotBlank()) {
+                        ssecurity = pJson.optString("ssecurity")
+                    }
+                }
+            }
+            if (ssecurity.isBlank() && endResp.body.contains("ssecurity")) {
+                runCatching {
+                    val bJson = JSONObject(stripXiaomiPrefix(endResp.body))
+                    if (bJson.optString("ssecurity").isNotBlank()) ssecurity = bJson.optString("ssecurity")
+                    if (bJson.opt("userId") != null) userId = bJson.opt("userId").toString()
+                }
+            }
+
+            // Step 3: Extract STS redirect URL
+            var stsUrl = endResp.redirectLocation.orEmpty()
+            if (stsUrl.isBlank() && endResp.body.contains("https://sts.api.io.mi.com/sts")) {
+                val idx = endResp.body.indexOf("https://sts.api.io.mi.com/sts")
+                val end = endResp.body.indexOf('"', idx).takeIf { it > idx } ?: (idx + 300).coerceAtMost(endResp.body.length)
+                stsUrl = endResp.body.substring(idx, end)
+            }
+            if (stsUrl.isNotBlank() && !stsUrl.startsWith("http")) {
+                stsUrl = URL(URL(currentUrl), stsUrl).toString()
+            }
+
+            // Step 4: Visit STS to obtain serviceToken
+            if (stsUrl.isNotBlank()) {
+                val stsResp = httpRequest(
+                    urlStr = stsUrl,
+                    method = "GET",
+                    headers = reqHeaders + mapOf("Cookie" to formatCookies(cookies)),
+                    followRedirects = true,
+                    timeoutMs = 15000
+                )
+                cookies.putAll(stsResp.cookies)
+                stsResp.cookies["serviceToken"]?.takeIf { it.isNotBlank() }?.let { serviceToken = it }
+                stsResp.cookies["userId"]?.takeIf { it.isNotBlank() }?.let { userId = it }
+            }
+
+            // Step 5: Fallback passToken re-login if available
+            val passToken = cookies["passToken"].orEmpty()
+            if ((ssecurity.isBlank() || serviceToken.isBlank()) && passToken.isNotBlank()) {
+                cloudLog("Attempting passToken session exchange...")
+                val passSession = serviceLoginWithPassToken(cookies, deviceId, region)
+                if (passSession != null) {
+                    return@withContext XiaomiLoginResult.Success(passSession)
+                }
+            }
+
+            if (userId.isBlank()) userId = cookies["userId"].orEmpty()
+            if (userId.isBlank()) userId = cookies["cUserId"].orEmpty()
+            if (serviceToken.isBlank()) serviceToken = cookies["serviceToken"].orEmpty()
+
             if (userId.isNotBlank() && ssecurity.isNotBlank() && serviceToken.isNotBlank()) {
+                cloudLog("Xiaomi Cloud session successfully authenticated! UID: $userId, Region: ${region.uppercase()}")
                 XiaomiLoginResult.Success(
                     XiaomiAccountSession(
                         userId = userId,
@@ -508,10 +600,57 @@ class XiaomiCloudClient {
                     )
                 )
             } else {
-                XiaomiLoginResult.Error("Failed to extract complete session credentials from 2FA callback")
+                cloudLog("Failed to extract complete session: ssecurity=${ssecurity.isNotBlank()}, serviceToken=${serviceToken.isNotBlank()}, userId=$userId", isError = true)
+                XiaomiLoginResult.Error("Verification accepted, but Xiaomi Cloud did not return complete token keys. Please try QR Code login.")
             }
         } catch (e: Exception) {
+            cloudLog("Exception in 2FA redirect completion: ${e.message}", isError = true)
             XiaomiLoginResult.Error(e.message ?: "Failed to complete 2FA verification session")
+        }
+    }
+
+    private fun serviceLoginWithPassToken(
+        cookiesIn: Map<String, String>,
+        deviceId: String,
+        region: String
+    ): XiaomiAccountSession? {
+        return try {
+            val cookies = linkedMapOf(
+                "deviceId" to deviceId.ifBlank { generateDeviceId() },
+                "sdkVersion" to "accountsdk-18.8.15",
+                "passToken" to cookiesIn["passToken"].orEmpty()
+            )
+            cookiesIn["userId"]?.takeIf { it.isNotBlank() }?.let { cookies["userId"] = it }
+            cookiesIn["cUserId"]?.takeIf { it.isNotBlank() }?.let { cookies["cUserId"] = it }
+
+            val resp = httpRequest(
+                urlStr = "https://account.xiaomi.com/pass/serviceLogin?sid=xiaomiio&_json=true&_locale=en_US",
+                method = "GET",
+                headers = mapOf(
+                    "User-Agent" to androidAgent,
+                    "Accept-Language" to "en-US,en;q=0.9",
+                    "Cookie" to formatCookies(cookies)
+                ),
+                followRedirects = false,
+                timeoutMs = 15000
+            )
+            val json = JSONObject(stripXiaomiPrefix(resp.body))
+            val ssecurity = json.optString("ssecurity", "")
+            val userId = json.opt("userId")?.toString().orEmpty()
+            val location = json.optString("location", "")
+            if (ssecurity.isBlank() || location.isBlank() || userId.isBlank()) {
+                return null
+            }
+            val serviceToken = completeStsRedirect(location, deviceId, cookies + resp.cookies)
+            if (serviceToken.isBlank()) return null
+            XiaomiAccountSession(
+                userId = userId,
+                ssecurity = ssecurity,
+                serviceToken = serviceToken,
+                region = region
+            )
+        } catch (_: Exception) {
+            null
         }
     }
 
@@ -526,13 +665,14 @@ class XiaomiCloudClient {
             urlStr = location,
             method = "GET",
             headers = mapOf(
-                "User-Agent" to USER_AGENT_BROWSER,
+                "User-Agent" to androidAgent,
+                "Content-Type" to "application/x-www-form-urlencoded",
                 "Cookie" to formatCookies(cookies)
             ),
-            followRedirects = false,
+            followRedirects = true,
             timeoutMs = 15000
         )
-        return resp.cookies["serviceToken"].orEmpty()
+        return resp.cookies["serviceToken"] ?: cookies["serviceToken"].orEmpty()
     }
 
     // =========================================================================
@@ -613,6 +753,7 @@ class XiaomiCloudClient {
         region: String
     ): List<CuktechDeviceCredentials> {
         val rawDevMap = linkedMapOf<String, JSONObject>()
+        cloudLog("Fetching device list from Xiaomi Cloud for region [${region.uppercase()}]...")
 
         // 1. /v2/homeroom/gethome -> /v2/home/home_device_list
         runCatching {
@@ -629,19 +770,22 @@ class XiaomiCloudClient {
                 }
             )
             val homeList = homeData.optJSONObject("result")?.optJSONArray("homelist")
-            if (homeList != null) {
+            if (homeList != null && homeList.length() > 0) {
+                cloudLog("Region [${region.uppercase()}]: found ${homeList.length()} home(s)")
                 for (i in 0 until homeList.length()) {
                     val home = homeList.getJSONObject(i)
-                    val homeId = home.optString("id", "").toLongOrNull() ?: continue
-                    val ownerUid = home.optLong("uid", session.userId.toLongOrNull() ?: 0L)
+                    val homeId = home.opt("id")?.toString().orEmpty()
+                    val homeName = home.optString("name", "Home $i")
+                    val ownerUid = home.opt("uid")?.toString() ?: session.userId
+                    if (homeId.isBlank()) continue
 
                     val devResp = apiPostEncrypted(
                         session = session,
                         region = region,
                         uri = "/v2/home/home_device_list",
                         dataObj = JSONObject().apply {
-                            put("home_owner", ownerUid)
-                            put("home_id", homeId)
+                            put("home_owner", ownerUid.toLongOrNull() ?: ownerUid)
+                            put("home_id", homeId.toLongOrNull() ?: homeId)
                             put("limit", 200)
                             put("get_split_device", true)
                             put("support_smart_home", true)
@@ -649,6 +793,8 @@ class XiaomiCloudClient {
                     )
                     val devInfo = devResp.optJSONObject("result")?.optJSONArray("device_info")
                         ?: devResp.optJSONObject("result")?.optJSONArray("list")
+                    val devCount = devInfo?.length() ?: 0
+                    cloudLog("Home '$homeName': found $devCount device(s)")
                     if (devInfo != null) {
                         for (j in 0 until devInfo.length()) {
                             val d = devInfo.getJSONObject(j)
@@ -657,9 +803,11 @@ class XiaomiCloudClient {
                         }
                     }
                 }
+            } else {
+                cloudLog("Region [${region.uppercase()}]: /v2/homeroom/gethome returned 0 homes")
             }
         }.onFailure { e ->
-            Log.w(TAG, "Error fetching homeroom devices in region $region: ${e.message}")
+            cloudLog("Error querying homeroom in region $region: ${e.message}", isError = true)
         }
 
         // 2. Also query /home/device_list to catch BLE devices not assigned to a specific room
@@ -677,6 +825,8 @@ class XiaomiCloudClient {
             )
             val listArr = listResp.optJSONObject("result")?.optJSONArray("list")
                 ?: listResp.optJSONObject("result")?.optJSONArray("device_info")
+            val listCount = listArr?.length() ?: 0
+            cloudLog("Region [${region.uppercase()}]: /home/device_list returned $listCount device(s)")
             if (listArr != null) {
                 for (i in 0 until listArr.length()) {
                     val d = listArr.getJSONObject(i)
@@ -687,10 +837,10 @@ class XiaomiCloudClient {
                 }
             }
         }.onFailure { e ->
-            Log.w(TAG, "Error fetching /home/device_list in region $region: ${e.message}")
+            cloudLog("Error querying /home/device_list in region $region: ${e.message}", isError = true)
         }
 
-        Log.i(TAG, "Region [$region] retrieved ${rawDevMap.size} raw devices")
+        cloudLog("Region [${region.uppercase()}] retrieved ${rawDevMap.size} total device(s). Identifying CUKTECH charger...")
 
         val credentialsList = mutableListOf<CuktechDeviceCredentials>()
         for ((did, d) in rawDevMap) {
@@ -700,17 +850,21 @@ class XiaomiCloudClient {
             val mac = formatMacAddress(rawMac)
             val token = d.optString("token", "").lowercase().trim()
 
-            // Fetch BLE beaconkey for CUKTECH or BLE-capable devices
-            var bleKey = ""
-            if (did.startsWith("blt.") ||
+            val isCuktech = did.startsWith("blt.") ||
                 model.contains("ad1204", ignoreCase = true) ||
                 model.contains("cuktech", ignoreCase = true) ||
                 name.contains("CUKTECH", ignoreCase = true) ||
                 name.contains("酷态科", ignoreCase = true) ||
                 name.contains("10", ignoreCase = true) ||
                 token.length == 24
-            ) {
+
+            var bleKey = ""
+            if (isCuktech) {
+                cloudLog("Identified device candidate '$name' (did=$did, model=$model, mac=$mac). Querying BLE key...")
                 bleKey = runCatching { fetchBleBeaconKey(session, region, did) }.getOrDefault("")
+                if (bleKey.isNotBlank()) {
+                    cloudLog("Retrieved BLE beaconkey for '$name' ($mac)")
+                }
             }
 
             val resolvedToken = when {
@@ -726,17 +880,19 @@ class XiaomiCloudClient {
                     .trim()
                     .ifBlank { "CUKTECH 10 Ultra" }
 
-                credentialsList.add(
-                    CuktechDeviceCredentials(
-                        did = did,
-                        name = cleanName,
-                        model = model,
-                        mac = mac,
-                        tokenHex = resolvedToken,
-                        bleKeyHex = bleKey,
-                        region = region
-                    )
+                val cred = CuktechDeviceCredentials(
+                    did = did,
+                    name = cleanName,
+                    model = model,
+                    mac = mac,
+                    tokenHex = resolvedToken,
+                    bleKeyHex = bleKey,
+                    region = region
                 )
+                if (cred.isCuktech10Ultra && cred.hasValidToken) {
+                    cloudLog(">>> Found CUKTECH 10 Ultra! MAC: $mac, Model: $model, Token: ${resolvedToken.take(6)}... (${resolvedToken.length} hex)")
+                }
+                credentialsList.add(cred)
             }
         }
         return credentialsList
@@ -765,25 +921,23 @@ class XiaomiCloudClient {
         val params = mapOf("data" to dataObj.toString())
         val (encParams, snonce) = generateEncParams(uri, "POST", session.ssecurity, params)
 
-        val deviceId = generateDeviceId()
         val cookies = mapOf(
             "userId" to session.userId,
             "yetAnotherServiceToken" to session.serviceToken,
             "serviceToken" to session.serviceToken,
-            "locale" to "en_US",
-            "timezone" to "GMT+08:00",
-            "is_daylight" to "0",
-            "dst_offset" to "0",
-            "channel" to "MI_APP_STORE",
-            "PassportDeviceId" to deviceId
+            "locale" to "en_GB",
+            "timezone" to "GMT+02:00",
+            "is_daylight" to "1",
+            "dst_offset" to "3600000",
+            "channel" to "MI_APP_STORE"
         )
 
         val headers = mapOf(
-            "User-Agent" to USER_AGENT_MIHOME,
+            "User-Agent" to androidAgent,
             "Accept-Encoding" to "identity",
             "Accept-Language" to "en-US,en;q=0.9",
             "x-xiaomi-protocal-flag-cli" to "PROTOCAL-HTTP2",
-            "content-type" to "application/x-www-form-urlencoded",
+            "Content-Type" to "application/x-www-form-urlencoded",
             "MIOT-ENCRYPT-ALGORITHM" to "ENCRYPT-RC4",
             "Cookie" to formatCookies(cookies)
         )
@@ -791,16 +945,18 @@ class XiaomiCloudClient {
         val baseUrl = getApiBaseUrl(region)
         val queryStr = encodeForm(encParams)
         val fullUrl = "$baseUrl$uri?$queryStr"
+
+        // Execute POST matching Python requests.post(url, params=fields)
         val httpResp = httpRequest(
             urlStr = fullUrl,
             method = "POST",
             headers = headers,
-            body = queryStr,
+            body = null,
             timeoutMs = 15000
         )
 
         if (httpResp.statusCode !in 200..299) {
-            Log.w(TAG, "Xiaomi Cloud API $uri HTTP ${httpResp.statusCode}: ${httpResp.body}")
+            cloudLog("Xiaomi Cloud API $uri HTTP ${httpResp.statusCode}", isError = true)
             return JSONObject()
         }
 
@@ -814,19 +970,20 @@ class XiaomiCloudClient {
                 decryptRc4Response(session.ssecurity, snonce, trimmed)
             }
         }.getOrElse { err ->
-            Log.e(TAG, "Failed to decrypt response for $uri: ${err.message}. Raw body: $trimmed")
+            cloudLog("Failed to decrypt response for $uri: ${err.message}. Raw: ${trimmed.take(120)}", isError = true)
             trimmed
         }
 
         return runCatching {
             val json = JSONObject(decrypted)
             val code = json.optInt("code", 0)
-            if (code != 0) {
-                Log.w(TAG, "Xiaomi Cloud API $uri returned code $code: ${json.optString("message", json.optString("desc"))}")
+            val msg = json.optString("message", json.optString("desc", ""))
+            if (code != 0 || msg.equals("auth error", ignoreCase = true)) {
+                cloudLog("Xiaomi Cloud API $uri error (code=$code, message='$msg')", isError = true)
             }
             json
         }.getOrElse {
-            Log.e(TAG, "Failed to parse decrypted JSON for $uri: $decrypted")
+            cloudLog("Failed to parse JSON for $uri: ${decrypted.take(120)}", isError = true)
             JSONObject()
         }
     }

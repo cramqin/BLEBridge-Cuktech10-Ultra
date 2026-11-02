@@ -229,11 +229,14 @@ class CuktechBleManager(
         val fe95Bytes = result.scanRecord?.getServiceData(ParcelUuid(CuktechProtocol.MI_SERVICE_UUID))
         val parsedFe95 = CuktechProtocol.parseFe95Advertisement(fe95Bytes)
 
+        val gattMac = mac.uppercase().trim()
         val storedList = credentialStore.devices.value
         val matchedCred = storedList.firstOrNull {
-            it.mac.equals(mac, ignoreCase = true) ||
-                (parsedFe95?.embeddedMac != null && it.mac.equals(parsedFe95.embeddedMac, ignoreCase = true))
-        }
+            it.mac.replace(":", "").equals(gattMac.replace(":", ""), ignoreCase = true) ||
+                (parsedFe95?.embeddedMac != null && it.mac.replace(":", "").equals(parsedFe95.embeddedMac.replace(":", ""), ignoreCase = true))
+        } ?: if (storedList.size == 1 && storedList[0].hasValidToken && (parsedFe95?.isCuktech10Ultra == true || rawName.contains("CUKTECH", ignoreCase = true) || rawName.contains("AD1204", ignoreCase = true))) {
+            storedList[0]
+        } else null
 
         val isCuktech = (parsedFe95?.isCuktech10Ultra == true) ||
             (matchedCred != null) ||
@@ -381,13 +384,18 @@ class CuktechBleManager(
 
         authJob?.cancel()
         authJob = scope.launch {
+            val gattMac = gatt.device.address.uppercase().trim()
             val activeCred = credentialStore.devices.value.firstOrNull {
-                it.mac.equals(gatt.device.address, ignoreCase = true)
+                it.mac.replace(":", "").equals(gattMac.replace(":", ""), ignoreCase = true)
             } ?: credentialStore.activeDevice.value
+              ?: if (credentialStore.devices.value.size == 1 && credentialStore.devices.value[0].hasValidToken) {
+                  credentialStore.devices.value[0]
+              } else null
 
             if (activeCred == null || !activeCred.hasValidToken) {
                 _authState.value = CuktechAuthState.AUTH_FAILED
                 _statusMessage.value = "Missing valid 12-byte MiOT Token. Please log in to Xiaomi account to sync credentials."
+                BleBridgeService.refreshClientsList()
                 return@launch
             }
 
@@ -398,8 +406,10 @@ class CuktechBleManager(
                 consecutiveFailures = 0
                 startBackgroundLoops()
                 queryInitialChargerState()
+                BleBridgeService.refreshClientsList()
             } else {
                 _authState.value = CuktechAuthState.AUTH_FAILED
+                BleBridgeService.refreshClientsList()
             }
         }
     }

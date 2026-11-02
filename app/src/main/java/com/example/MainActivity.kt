@@ -770,6 +770,15 @@ fun BleBridgeDashboard(
                                         fontSize = 11.sp,
                                         color = appColors.textSecondary
                                     )
+                                    if (accountSession != null && !accountSession!!.region.equals("cn", ignoreCase = true)) {
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = "⚠️ Account region is [${accountSession!!.region.uppercase()}]. CUKTECH 10 Ultra requires Mainland China (CN) in Mi Home.",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = StatusWarning
+                                        )
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -806,9 +815,9 @@ fun BleBridgeDashboard(
                         val isCuktechConnected = (cuktechAuthState == CuktechAuthState.AUTHENTICATED || bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED)
                         if (isCuktechConnected) {
                             Surface(
-                                color = appColors.primaryContainer.copy(alpha = 0.35f),
+                                color = if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) StatusErrorContainer.copy(alpha = 0.25f) else appColors.primaryContainer.copy(alpha = 0.35f),
                                 shape = RoundedCornerShape(14.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, appColors.primary.copy(alpha = 0.5f)),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) StatusError else appColors.primary.copy(alpha = 0.5f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
@@ -824,7 +833,13 @@ fun BleBridgeDashboard(
                                                 modifier = Modifier
                                                     .size(8.dp)
                                                     .clip(RoundedCornerShape(50))
-                                                    .background(StatusSuccess)
+                                                    .background(
+                                                        when (cuktechAuthState) {
+                                                            CuktechAuthState.AUTHENTICATED -> StatusSuccess
+                                                            CuktechAuthState.AUTH_FAILED -> StatusError
+                                                            else -> StatusWarning
+                                                        }
+                                                    )
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
@@ -836,36 +851,70 @@ fun BleBridgeDashboard(
                                         }
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "MAC: ${bleAddress ?: activeCred?.mac ?: "Connected"} · Ready for telemetry",
+                                            text = when (cuktechAuthState) {
+                                                CuktechAuthState.AUTHENTICATED -> "MAC: ${bleAddress ?: activeCred?.mac ?: "Connected"} · Ready for telemetry"
+                                                CuktechAuthState.AUTH_FAILED -> "MAC: ${bleAddress ?: activeCred?.mac ?: "Connected"} · Auth Failed (Token Required)"
+                                                else -> "MAC: ${bleAddress ?: activeCred?.mac ?: "Connected"} · Authenticating Phase B..."
+                                            },
                                             fontSize = 11.sp,
                                             fontFamily = FontFamily.Monospace,
-                                            color = appColors.textSecondary
+                                            color = if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) StatusError else appColors.textSecondary
                                         )
                                     }
 
-                                    Button(
-                                        onClick = {
-                                            val isBleConn = (bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED || cuktechAuthState == CuktechAuthState.AUTHENTICATED)
-                                            val hasClient = connectedClients.any { it.isCuktechCharger }
-                                            val isXiaomiAuth = (accountSession != null || activeCred != null || savedDevices.isNotEmpty())
+                                    if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
+                                        Button(
+                                            onClick = { showXiaomiLoginDialog = true },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = StatusError,
+                                                contentColor = Color.White
+                                            ),
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text("Get Token", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    } else if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) {
+                                        Button(
+                                            onClick = {
+                                                val isBleConn = (bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED)
+                                                val isCuktechAuth = (cuktechAuthState == CuktechAuthState.AUTHENTICATED)
+                                                val hasClient = connectedClients.any { it.isCuktechCharger }
+                                                val isXiaomiAuth = (accountSession != null || activeCred != null || savedDevices.isNotEmpty())
 
-                                            if (!isRunning) {
-                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n1. \u274C Server Configuration is OFF.\nPlease turn ON the server configuration switch first."
-                                            } else if (!isBleConn) {
-                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n2. \u274C Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
-                                            } else if (!hasClient) {
-                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n3. \u274C CUKTECH 10 Ultra is not registered as an Active Client.\nPlease wait for authentication to complete."
-                                            } else if (!isXiaomiAuth) {
-                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n4. \u274C Xiaomi Account is not logged in.\nA valid Xiaomi Cloud session or 12-byte MiOT Token is required."
-                                            } else {
-                                                showTelemetryScreen = true
-                                            }
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                                        modifier = Modifier.height(32.dp)
-                                    ) {
-                                        Text("Telemetry \u2192", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                if (!isRunning) {
+                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n1. ❌ Server Configuration is OFF.\nPlease turn ON the server configuration switch first."
+                                                } else if (!isBleConn && !isCuktechAuth) {
+                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n2. ❌ Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
+                                                } else if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
+                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ Authentication Failed.\nValid 12-byte MiOT Token is required. Please log into Xiaomi Account or import credentials."
+                                                } else if (!isCuktechAuth || !hasClient) {
+                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ CUKTECH 10 Ultra is not yet authenticated.\nPlease wait for authentication to complete."
+                                                } else if (!isXiaomiAuth) {
+                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n4. ❌ Xiaomi Account is not logged in.\nA valid Xiaomi Cloud session or 12-byte MiOT Token is required."
+                                                } else {
+                                                    showTelemetryScreen = true
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Text("Telemetry →", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    } else {
+                                        FilledTonalButton(
+                                            onClick = {},
+                                            enabled = false,
+                                            shape = RoundedCornerShape(8.dp),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Auth...", fontSize = 11.sp)
+                                        }
                                     }
                                 }
                             }
@@ -991,18 +1040,21 @@ fun BleBridgeDashboard(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .clickable {
-                                                    val isBleConn = (bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED || cuktechAuthState == CuktechAuthState.AUTHENTICATED)
+                                                    val isBleConn = (bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED)
+                                                    val isCuktechAuth = (cuktechAuthState == CuktechAuthState.AUTHENTICATED)
                                                     val hasClient = connectedClients.any { it.isCuktechCharger }
                                                     val isXiaomiAuth = (accountSession != null || activeCred != null || savedDevices.isNotEmpty())
 
                                                     if (!isRunning) {
-                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n1. \u274C Server Configuration is OFF.\nPlease turn ON the server configuration switch first."
-                                                    } else if (!isBleConn) {
-                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n2. \u274C Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
-                                                    } else if (!hasClient) {
-                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n3. \u274C CUKTECH 10 Ultra is not registered as an Active Client.\nPlease wait for authentication to complete."
+                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n1. ❌ Server Configuration is OFF.\nPlease turn ON the server configuration switch first."
+                                                    } else if (!isBleConn && !isCuktechAuth) {
+                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n2. ❌ Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
+                                                    } else if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
+                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ Authentication Failed.\nValid 12-byte MiOT Token is required. Please log into Xiaomi Account or import credentials."
+                                                    } else if (!isCuktechAuth || !hasClient) {
+                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ CUKTECH 10 Ultra is not yet authenticated.\nPlease wait for authentication to complete."
                                                     } else if (!isXiaomiAuth) {
-                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n4. \u274C Xiaomi Account is not logged in.\nA valid Xiaomi Cloud session or 12-byte MiOT Token is required."
+                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n4. ❌ Xiaomi Account is not logged in.\nA valid Xiaomi Cloud session or 12-byte MiOT Token is required."
                                                     } else {
                                                         showTelemetryScreen = true
                                                     }
@@ -1082,18 +1134,21 @@ fun BleBridgeDashboard(
 
                                                     Button(
                                                         onClick = {
-                                                            val isBleConn = (bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED || cuktechAuthState == CuktechAuthState.AUTHENTICATED)
+                                                            val isBleConn = (bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED)
+                                                            val isCuktechAuth = (cuktechAuthState == CuktechAuthState.AUTHENTICATED)
                                                             val hasClient = connectedClients.any { it.isCuktechCharger }
                                                             val isXiaomiAuth = (accountSession != null || activeCred != null || savedDevices.isNotEmpty())
 
                                                             if (!isRunning) {
-                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n1. \u274C Server Configuration is OFF.\nPlease turn ON the server configuration switch first."
-                                                            } else if (!isBleConn) {
-                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n2. \u274C Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
-                                                            } else if (!hasClient) {
-                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n3. \u274C CUKTECH 10 Ultra is not registered as an Active Client.\nPlease wait for authentication to complete."
+                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n1. ❌ Server Configuration is OFF.\nPlease turn ON the server configuration switch first."
+                                                            } else if (!isBleConn && !isCuktechAuth) {
+                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n2. ❌ Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
+                                                            } else if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
+                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ Authentication Failed.\nValid 12-byte MiOT Token is required. Please log into Xiaomi Account or import credentials."
+                                                            } else if (!isCuktechAuth || !hasClient) {
+                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ CUKTECH 10 Ultra is not yet authenticated.\nPlease wait for authentication to complete."
                                                             } else if (!isXiaomiAuth) {
-                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n4. \u274C Xiaomi Account is not logged in.\nA valid Xiaomi Cloud session or 12-byte MiOT Token is required."
+                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n4. ❌ Xiaomi Account is not logged in.\nA valid Xiaomi Cloud session or 12-byte MiOT Token is required."
                                                             } else {
                                                                 showTelemetryScreen = true
                                                             }

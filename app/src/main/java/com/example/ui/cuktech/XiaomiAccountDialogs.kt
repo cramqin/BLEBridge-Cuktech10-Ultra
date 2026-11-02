@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -57,7 +58,7 @@ fun XiaomiAccountLoginDialog(
 ) {
     val scope = rememberCoroutineScope()
     var selectedTab by remember { mutableStateOf(0) } // 0 = QR Login, 1 = Password Login, 2 = Manual/JSON
-    var selectedRegion by remember { mutableStateOf(credentialStore.session.value?.region ?: "cn") }
+    var selectedRegion by remember { mutableStateOf("cn") }
 
     // QR Login state
     var qrSession by remember { mutableStateOf<QrLoginSession?>(null) }
@@ -93,11 +94,12 @@ fun XiaomiAccountLoginDialog(
                 onDevicesSynced(list)
                 onDismiss()
             } else {
-                loginStatusText = "Logged in successfully, but no BLE devices found in this account."
+                loginStatusText = "Logged in (UID: ${session.userId}), but no CUKTECH devices found in region [${session.region.uppercase()}]. Please ensure your charger was added under Mainland China ('CN') in the Mi Home app."
                 qrStatusText = loginStatusText
             }
         }.onFailure { err ->
-            loginStatusText = "Logged in, but failed to fetch devices: ${err.message}"
+            val cleanErr = XiaomiCloudClient.translateXiaomiError(err.message ?: "Failed to fetch devices")
+            loginStatusText = "Logged in, but failed to fetch devices: $cleanErr"
             qrStatusText = loginStatusText
         }
     }
@@ -194,25 +196,29 @@ fun XiaomiAccountLoginDialog(
                     }
                 }
 
-                // Region selector row with all supported regions
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("Mi Home Region (Default: CN):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                // Region warning banner if existing logged-in account is not Mainland China
+                val currentSession = credentialStore.session.value
+                if (currentSession != null && !currentSession.region.equals("cn", ignoreCase = true)) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        XiaomiCloudClient.SUPPORTED_REGIONS.forEach { reg ->
-                            FilterChip(
-                                selected = selectedRegion.equals(reg, ignoreCase = true),
-                                onClick = {
-                                    selectedRegion = reg
-                                    qrBitmap = null
-                                    qrSession = null
-                                },
-                                label = { Text(if (reg == "ph") "PH (Philippines)" else if (reg == "cn") "CN (Mainland)" else reg.uppercase(), fontSize = 11.sp) }
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Warning: Active account region is [${currentSession.region.uppercase()}]. CUKTECH 10 Ultra is a Mainland China device (requires Mainland China 'CN' region in Mi Home).",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onErrorContainer
                             )
                         }
                     }
@@ -237,7 +243,8 @@ fun XiaomiAccountLoginDialog(
                                 loginStatusText = if (r.isSuccess) {
                                     "Code sent! Please enter the 6-digit code received."
                                 } else {
-                                    r.exceptionOrNull()?.message ?: "Failed to send code. Try web verification below."
+                                    val errStr = r.exceptionOrNull()?.message ?: "Failed to send code. Try web verification below."
+                                    XiaomiCloudClient.translateXiaomiError(errStr)
                                 }
                             }
                         },
@@ -247,7 +254,7 @@ fun XiaomiAccountLoginDialog(
                                 loginStatusText = "Verifying 2FA code..."
                                 when (val res = cloudClient.verify2faCode(challenge, otpCode, useEmail2fa)) {
                                     is XiaomiLoginResult.Success -> handleAuthenticatedSession(res.session)
-                                    is XiaomiLoginResult.Error -> loginStatusText = res.message
+                                    is XiaomiLoginResult.Error -> loginStatusText = XiaomiCloudClient.translateXiaomiError(res.message)
                                     is XiaomiLoginResult.Requires2FA -> active2faChallenge = res.challenge
                                 }
                                 isLoggingIn = false
@@ -265,7 +272,7 @@ fun XiaomiAccountLoginDialog(
                                     selectedRegion
                                 )) {
                                     is XiaomiLoginResult.Success -> handleAuthenticatedSession(res.session)
-                                    is XiaomiLoginResult.Error -> loginStatusText = res.message
+                                    is XiaomiLoginResult.Error -> loginStatusText = XiaomiCloudClient.translateXiaomiError(res.message)
                                     is XiaomiLoginResult.Requires2FA -> active2faChallenge = res.challenge
                                 }
                                 isLoggingIn = false
@@ -361,12 +368,21 @@ fun XiaomiAccountLoginDialog(
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
+                                var passwordVisible by remember { mutableStateOf(false) }
                                 OutlinedTextField(
                                     value = password,
                                     onValueChange = { password = it },
                                     label = { Text("Password") },
                                     singleLine = true,
-                                    visualTransformation = PasswordVisualTransformation(),
+                                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                    trailingIcon = {
+                                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                            Icon(
+                                                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                                contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                                            )
+                                        }
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
@@ -394,7 +410,7 @@ fun XiaomiAccountLoginDialog(
                                                     loginStatusText = "2-Factor Authentication required. Please complete verification."
                                                 }
                                                 is XiaomiLoginResult.Error -> {
-                                                    loginStatusText = res.message
+                                                    loginStatusText = XiaomiCloudClient.translateXiaomiError(res.message)
                                                 }
                                             }
                                             isLoggingIn = false

@@ -1,6 +1,7 @@
 package com.example.cuktech.cloud
 
 import android.util.Base64
+import android.util.Log
 import com.example.cuktech.security.CuktechDeviceCredentials
 import com.example.cuktech.security.XiaomiAccountSession
 import kotlinx.coroutines.Dispatchers
@@ -81,7 +82,7 @@ class XiaomiCloudClient {
                 "_hasLogo" to "false",
                 "sid" to "xiaomiio",
                 "serviceParam" to "",
-                "_locale" to "zh_CN",
+                "_locale" to "en_US",
                 "_dc" to dc
             )
             val urlStr = "https://account.xiaomi.com/longPolling/loginUrl?" + encodeForm(queryParams)
@@ -196,10 +197,11 @@ class XiaomiCloudClient {
 
             // Step 1: serviceLogin to obtain _sign, qs, callback
             val step1Resp = httpRequest(
-                urlStr = "https://account.xiaomi.com/pass/serviceLogin?_json=true&sid=xiaomiio&_locale=zh_CN",
+                urlStr = "https://account.xiaomi.com/pass/serviceLogin?_json=true&sid=xiaomiio&_locale=en_US",
                 method = "GET",
                 headers = mapOf(
                     "User-Agent" to USER_AGENT_APP,
+                    "Accept-Language" to "en-US,en;q=0.9",
                     "Cookie" to formatCookies(baseCookies)
                 ),
                 timeoutMs = 15000
@@ -221,7 +223,7 @@ class XiaomiCloudClient {
                 "user" to username.trim(),
                 "hash" to passwordMd5,
                 "cc" to "",
-                "_locale" to "zh_CN"
+                "_locale" to "en_US"
             )
 
             val step2Resp = httpRequest(
@@ -229,6 +231,7 @@ class XiaomiCloudClient {
                 method = "POST",
                 headers = mapOf(
                     "User-Agent" to USER_AGENT_APP,
+                    "Accept-Language" to "en-US,en;q=0.9",
                     "Content-Type" to "application/x-www-form-urlencoded",
                     "Cookie" to formatCookies(baseCookies)
                 ),
@@ -256,7 +259,7 @@ class XiaomiCloudClient {
 
             if (code != 0 || ssecurity.isBlank() || location.isBlank()) {
                 val desc = step2Json.optString("description", step2Json.optString("desc", "Login failed (code=$code)"))
-                return@withContext XiaomiLoginResult.Error(desc)
+                return@withContext XiaomiLoginResult.Error(translateXiaomiError(desc))
             }
 
             val serviceToken = completeStsRedirect(
@@ -312,12 +315,13 @@ class XiaomiCloudClient {
             if (contextId.isNotBlank()) {
                 val listUrl = "https://account.xiaomi.com/identity/list?sid=xiaomiio&ticketType=&_json=true&context=${
                     URLEncoder.encode(contextId, "UTF-8")
-                }&_locale=zh_CN"
+                }&_locale=en_US"
                 val listResp = httpRequest(
                     urlStr = listUrl,
                     method = "GET",
                     headers = mapOf(
                         "User-Agent" to USER_AGENT_BROWSER,
+                        "Accept-Language" to "en-US,en;q=0.9",
                         "Cookie" to formatCookies(cookies)
                     ),
                     timeoutMs = 10000
@@ -361,13 +365,14 @@ class XiaomiCloudClient {
                     "ick" to (cookies["ick"] ?: ""),
                     "_json" to "true",
                     "context" to challenge.contextId,
-                    "_locale" to "zh_CN"
+                    "_locale" to "en_US"
                 )
                 val resp = httpRequest(
                     urlStr = "$endpoint?dc=${System.currentTimeMillis()}",
                     method = "POST",
                     headers = mapOf(
                         "User-Agent" to USER_AGENT_BROWSER,
+                        "Accept-Language" to "en-US,en;q=0.9",
                         "Content-Type" to "application/x-www-form-urlencoded",
                         "Cookie" to formatCookies(cookies)
                     ),
@@ -377,9 +382,8 @@ class XiaomiCloudClient {
                 val json = JSONObject(stripXiaomiPrefix(resp.body))
                 val code = json.optInt("code", -1)
                 if (code != 0) {
-                    throw IllegalStateException(
-                        json.optString("tips", json.optString("desc", "Verification code sending failed (code=$code). Please try web verification below."))
-                    )
+                    val rawMsg = json.optString("tips", json.optString("desc", "Verification code sending failed (code=$code). Please try web verification below."))
+                    throw IllegalStateException(translateXiaomiError(rawMsg))
                 }
             }
         }
@@ -406,13 +410,14 @@ class XiaomiCloudClient {
                 "_json" to "true",
                 "ick" to (cookies["ick"] ?: ""),
                 "context" to challenge.contextId,
-                "_locale" to "zh_CN"
+                "_locale" to "en_US"
             )
             val resp = httpRequest(
                 urlStr = "$endpoint?_dc=${System.currentTimeMillis()}",
                 method = "POST",
                 headers = mapOf(
                     "User-Agent" to USER_AGENT_BROWSER,
+                    "Accept-Language" to "en-US,en;q=0.9",
                     "Content-Type" to "application/x-www-form-urlencoded",
                     "Cookie" to formatCookies(cookies)
                 ),
@@ -424,8 +429,8 @@ class XiaomiCloudClient {
             val code = json.optInt("code", -1)
             val location = json.optString("location", "")
             if (code != 0 || location.isBlank()) {
-                val msg = json.optString("tips", json.optString("desc", "Verification code invalid (code=$code)"))
-                return@withContext XiaomiLoginResult.Error(msg)
+                val rawMsg = json.optString("tips", json.optString("desc", "Verification code invalid (code=$code)"))
+                return@withContext XiaomiLoginResult.Error(translateXiaomiError(rawMsg))
             }
 
             complete2faFinishRedirect(location, cookies, challenge.deviceId, challenge.region)
@@ -536,11 +541,28 @@ class XiaomiCloudClient {
 
     fun getApiBaseUrl(region: String): String {
         val r = region.lowercase().trim()
-        return if (r == "cn" || r.isEmpty()) {
-            "https://api.io.mi.com/app"
-        } else {
-            "https://$r.api.io.mi.com/app"
+        return when (r) {
+            "cn", "" -> "https://api.io.mi.com/app"
+            "ph", "sg" -> "https://sg.api.io.mi.com/app"
+            "de" -> "https://de.api.io.mi.com/app"
+            "us" -> "https://us.api.io.mi.com/app"
+            "ru" -> "https://ru.api.io.mi.com/app"
+            "tw" -> "https://tw.api.io.mi.com/app"
+            "in" -> "https://in.api.io.mi.com/app"
+            "i2" -> "https://i2.api.io.mi.com/app"
+            else -> "https://$r.api.io.mi.com/app"
         }
+    }
+
+    /**
+     * Formats raw MAC address string into standard colon-separated format (e.g. AA:BB:CC:DD:EE:FF).
+     */
+    fun formatMacAddress(raw: String): String {
+        val clean = raw.replace(":", "").replace("-", "").uppercase().trim()
+        if (clean.length == 12) {
+            return clean.chunked(2).joinToString(":")
+        }
+        return raw.uppercase().trim()
     }
 
     /**
@@ -626,6 +648,7 @@ class XiaomiCloudClient {
                         }
                     )
                     val devInfo = devResp.optJSONObject("result")?.optJSONArray("device_info")
+                        ?: devResp.optJSONObject("result")?.optJSONArray("list")
                     if (devInfo != null) {
                         for (j in 0 until devInfo.length()) {
                             val d = devInfo.getJSONObject(j)
@@ -635,6 +658,8 @@ class XiaomiCloudClient {
                     }
                 }
             }
+        }.onFailure { e ->
+            Log.w(TAG, "Error fetching homeroom devices in region $region: ${e.message}")
         }
 
         // 2. Also query /home/device_list to catch BLE devices not assigned to a specific room
@@ -651,6 +676,7 @@ class XiaomiCloudClient {
                 }
             )
             val listArr = listResp.optJSONObject("result")?.optJSONArray("list")
+                ?: listResp.optJSONObject("result")?.optJSONArray("device_info")
             if (listArr != null) {
                 for (i in 0 until listArr.length()) {
                     val d = listArr.getJSONObject(i)
@@ -660,14 +686,19 @@ class XiaomiCloudClient {
                     }
                 }
             }
+        }.onFailure { e ->
+            Log.w(TAG, "Error fetching /home/device_list in region $region: ${e.message}")
         }
+
+        Log.i(TAG, "Region [$region] retrieved ${rawDevMap.size} raw devices")
 
         val credentialsList = mutableListOf<CuktechDeviceCredentials>()
         for ((did, d) in rawDevMap) {
             val name = d.optString("name", "Mi Device")
             val model = d.optString("model", "")
-            val mac = d.optString("mac", "").uppercase()
-            val token = d.optString("token", "").lowercase()
+            val rawMac = d.optString("mac", "")
+            val mac = formatMacAddress(rawMac)
+            val token = d.optString("token", "").lowercase().trim()
 
             // Fetch BLE beaconkey for CUKTECH or BLE-capable devices
             var bleKey = ""
@@ -676,12 +707,20 @@ class XiaomiCloudClient {
                 model.contains("cuktech", ignoreCase = true) ||
                 name.contains("CUKTECH", ignoreCase = true) ||
                 name.contains("酷态科", ignoreCase = true) ||
+                name.contains("10", ignoreCase = true) ||
                 token.length == 24
             ) {
                 bleKey = runCatching { fetchBleBeaconKey(session, region, did) }.getOrDefault("")
             }
 
-            if (mac.isNotBlank() || token.isNotBlank()) {
+            val resolvedToken = when {
+                token.length == 24 -> token
+                bleKey.length == 24 -> bleKey
+                token.length == 32 -> token.substring(0, 24)
+                else -> token
+            }
+
+            if (mac.isNotBlank() || resolvedToken.isNotBlank()) {
                 val cleanName = name.replace("酷态科10号超级电能充", "CUKTECH 10 Ultra")
                     .replace("酷态科", "CUKTECH ")
                     .trim()
@@ -693,7 +732,7 @@ class XiaomiCloudClient {
                         name = cleanName,
                         model = model,
                         mac = mac,
-                        tokenHex = token,
+                        tokenHex = resolvedToken,
                         bleKeyHex = bleKey,
                         region = region
                     )
@@ -731,7 +770,7 @@ class XiaomiCloudClient {
             "userId" to session.userId,
             "yetAnotherServiceToken" to session.serviceToken,
             "serviceToken" to session.serviceToken,
-            "locale" to "zh_CN",
+            "locale" to "en_US",
             "timezone" to "GMT+08:00",
             "is_daylight" to "0",
             "dst_offset" to "0",
@@ -742,23 +781,54 @@ class XiaomiCloudClient {
         val headers = mapOf(
             "User-Agent" to USER_AGENT_MIHOME,
             "Accept-Encoding" to "identity",
+            "Accept-Language" to "en-US,en;q=0.9",
             "x-xiaomi-protocal-flag-cli" to "PROTOCAL-HTTP2",
             "content-type" to "application/x-www-form-urlencoded",
             "MIOT-ENCRYPT-ALGORITHM" to "ENCRYPT-RC4",
             "Cookie" to formatCookies(cookies)
         )
 
-        val url = getApiBaseUrl(region) + uri
+        val baseUrl = getApiBaseUrl(region)
+        val queryStr = encodeForm(encParams)
+        val fullUrl = "$baseUrl$uri?$queryStr"
         val httpResp = httpRequest(
-            urlStr = url,
+            urlStr = fullUrl,
             method = "POST",
             headers = headers,
-            body = encodeForm(encParams),
+            body = queryStr,
             timeoutMs = 15000
         )
 
-        val decrypted = decryptRc4Response(session.ssecurity, snonce, httpResp.body)
-        return JSONObject(decrypted)
+        if (httpResp.statusCode !in 200..299) {
+            Log.w(TAG, "Xiaomi Cloud API $uri HTTP ${httpResp.statusCode}: ${httpResp.body}")
+            return JSONObject()
+        }
+
+        val trimmed = httpResp.body.trim()
+        if (trimmed.isEmpty()) return JSONObject()
+
+        val decrypted = runCatching {
+            if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+                trimmed
+            } else {
+                decryptRc4Response(session.ssecurity, snonce, trimmed)
+            }
+        }.getOrElse { err ->
+            Log.e(TAG, "Failed to decrypt response for $uri: ${err.message}. Raw body: $trimmed")
+            trimmed
+        }
+
+        return runCatching {
+            val json = JSONObject(decrypted)
+            val code = json.optInt("code", 0)
+            if (code != 0) {
+                Log.w(TAG, "Xiaomi Cloud API $uri returned code $code: ${json.optString("message", json.optString("desc"))}")
+            }
+            json
+        }.getOrElse {
+            Log.e(TAG, "Failed to parse decrypted JSON for $uri: $decrypted")
+            JSONObject()
+        }
     }
 
     // =========================================================================
@@ -766,6 +836,8 @@ class XiaomiCloudClient {
     // =========================================================================
 
     companion object {
+        private const val TAG = "XiaomiCloudClient"
+
         // Supported regions: Default to Mainland China (cn), Philippines (ph), plus global regions
         val SUPPORTED_REGIONS = listOf("cn", "ph", "de", "us", "ru", "tw", "sg", "in", "i2")
 
@@ -888,10 +960,50 @@ class XiaomiCloudClient {
         }
 
         fun decryptRc4Response(ssecurity: String, snonce: String, encryptedBodyB64: String): String {
+            val trimmed = encryptedBodyB64.trim()
+            if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+                return trimmed
+            }
             val key = Base64.decode(snonce, Base64.DEFAULT)
-            val cipherBytes = Base64.decode(encryptedBodyB64.trim(), Base64.DEFAULT)
+            val cipherBytes = Base64.decode(trimmed, Base64.DEFAULT)
             val plainBytes = rc4Drop1024(key, cipherBytes)
             return String(plainBytes, Charsets.UTF_8)
+        }
+
+        fun translateXiaomiError(raw: String): String {
+            val trimmed = raw.trim()
+            if (trimmed.isEmpty()) return "Unknown error occurred"
+
+            val lower = trimmed.lowercase()
+            if (trimmed.contains("验证码错误") || trimmed.contains("验证码不正确") || lower.contains("ticket error")) {
+                return "Invalid verification code. Please check your email or SMS and try again."
+            }
+            if (trimmed.contains("验证码过期") || trimmed.contains("已失效") || lower.contains("expired")) {
+                return "Verification code has expired. Please request a new code."
+            }
+            if (trimmed.contains("用户名或密码不正确") || trimmed.contains("密码错误")) {
+                return "Invalid username or password. Please verify your Xiaomi account credentials."
+            }
+            if (trimmed.contains("账号不存在") || trimmed.contains("用户不存在")) {
+                return "Xiaomi account does not exist. Please check your email or phone number."
+            }
+            if (trimmed.contains("操作过于频繁") || trimmed.contains("频繁") || trimmed.contains("稍后再试") || lower.contains("too frequent")) {
+                return "Too many requests. Please wait a few moments before trying again."
+            }
+            if (trimmed.contains("图形验证码")) {
+                return "CAPTCHA verification required. Please use web verification."
+            }
+            if (trimmed.contains("无法获取") || trimmed.contains("获取失败")) {
+                return "Failed to retrieve account session data from Xiaomi Cloud."
+            }
+            if (trimmed.contains("auth error") || lower.contains("auth error")) {
+                return "Xiaomi Cloud authorization expired or invalid. Please sign in again."
+            }
+            val hasChinese = trimmed.any { it.code in 0x4e00..0x9fff }
+            if (hasChinese) {
+                return "Authentication error: Please check your credentials and verification code."
+            }
+            return trimmed
         }
     }
 

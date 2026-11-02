@@ -229,11 +229,10 @@ class BleBridgeService : Service() {
             ClientInfo(id = client.id, ip = client.ip, port = client.port)
         }.toMutableList()
 
-        // If Cuktech 10 Ultra is connected & authenticated, register as an active client
+        // Only register Cuktech 10 Ultra as an active client when genuinely AUTHENTICATED
         val cuktech = cuktechManager
         val bleAddr = _bleDeviceAddress.value
-        if (cuktech != null && bleAddr != null &&
-            (cuktech.authState.value == CuktechAuthState.AUTHENTICATED || _bleConnectionState.value == BleConnectionState.CONNECTED)) {
+        if (cuktech != null && bleAddr != null && cuktech.authState.value == CuktechAuthState.AUTHENTICATED) {
             val devName = cuktech.deviceInfo.value.name.ifBlank { "CUKTECH 10 Ultra" }
             list.add(
                 0,
@@ -1369,8 +1368,7 @@ class BleBridgeService : Service() {
                 val cuktech = cuktechManager
                 val bleAddr = _bleDeviceAddress.value
                 val list = mutableListOf<ClientInfo>()
-                if (cuktech != null && bleAddr != null &&
-                    (cuktech.authState.value == CuktechAuthState.AUTHENTICATED || _bleConnectionState.value == BleConnectionState.CONNECTED)) {
+                if (cuktech != null && bleAddr != null && cuktech.authState.value == CuktechAuthState.AUTHENTICATED) {
                     val devName = cuktech.deviceInfo.value.name.ifBlank { "CUKTECH 10 Ultra" }
                     list.add(
                         ClientInfo(

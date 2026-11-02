@@ -20,8 +20,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -388,6 +390,7 @@ fun BleBridgeDashboard(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -577,36 +580,85 @@ fun BleBridgeDashboard(
                             ),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Setup Python Tools", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("CLI & Automation (Shizuku / Shell)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }
 
                 if (showInstallDialog) {
+                    var selectedTab by remember { mutableStateOf(0) }
                     AlertDialog(
                         onDismissRequest = { showInstallDialog = false },
                         containerColor = appColors.surface,
                         titleContentColor = appColors.textPrimary,
                         textContentColor = appColors.textSecondary,
-                        title = { Text("Termux Setup") },
+                        title = { Text("CLI & Automation Guide", fontWeight = FontWeight.Bold) },
                         text = {
-                            Column {
-                                Text("Run this command in Termux to fetch the bridge client scripts:", fontSize = 13.sp)
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Surface(
-                                    color = Color(0xFF0F172A),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                TabRow(
+                                    selectedTabIndex = selectedTab,
+                                    containerColor = appColors.surfaceVariant,
+                                    contentColor = appColors.primary,
+                                    modifier = Modifier.clip(RoundedCornerShape(8.dp))
                                 ) {
-                                    Text(
-                                        text = "curl -L https://raw.githubusercontent.com/cramqin/BLEBridge-Cuktech10-Ultra/main/ble_tui.py -o ble_tui.py && curl -L https://raw.githubusercontent.com/cramqin/BLEBridge-Cuktech10-Ultra/main/uuids.json -o uuids.json",
-                                        color = Color(0xFF38BDF8),
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 10.sp,
-                                        modifier = Modifier.padding(12.dp)
+                                    Tab(
+                                        selected = selectedTab == 0,
+                                        onClick = { selectedTab = 0 },
+                                        text = { Text("⚡ Shizuku / Shell", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                                     )
+                                    Tab(
+                                        selected = selectedTab == 1,
+                                        onClick = { selectedTab = 1 },
+                                        text = { Text("🐍 Python Scripts", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                if (selectedTab == 0) {
+                                    Text(
+                                        "No Termux required! Control the bridge directly via Shizuku, Shevery, or ADB shell:",
+                                        fontSize = 12.sp,
+                                        color = appColors.textSecondary
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Surface(
+                                        color = Color(0xFF0F172A),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "# 1. Start server:\nam broadcast -a com.cramqin.blecuktech10.START_SERVER --ei port 8080\n\n# 2. Stop server:\nam broadcast -a com.cramqin.blecuktech10.STOP_SERVER\n\n# 3. Connect via TCP socket:\necho '{\"command\":\"scan\"}' | nc 127.0.0.1 8080",
+                                            color = Color(0xFF38BDF8),
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp,
+                                            lineHeight = 15.sp,
+                                            modifier = Modifier.padding(12.dp)
+                                        )
+                                    }
+                                } else {
+                                    Text(
+                                        "Run this command to download the interactive TUI script:",
+                                        fontSize = 12.sp,
+                                        color = appColors.textSecondary
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Surface(
+                                        color = Color(0xFF0F172A),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "curl -L https://raw.githubusercontent.com/cramqin/BLEBridge-Cuktech10-Ultra/main/ble_tui.py -o ble_tui.py && python ble_tui.py",
+                                            color = Color(0xFF38BDF8),
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp,
+                                            lineHeight = 15.sp,
+                                            modifier = Modifier.padding(12.dp)
+                                        )
+                                    }
                                 }
                             }
                         },
@@ -624,7 +676,6 @@ fun BleBridgeDashboard(
                     shape = RoundedCornerShape(24.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(0.42f)
                         .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
@@ -678,28 +729,28 @@ fun BleBridgeDashboard(
                         if (connectedClients.isEmpty()) {
                             Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
+                                    .fillMaxWidth()
                                     .background(appColors.surfaceVariant, RoundedCornerShape(12.dp))
                                     .border(1.dp, appColors.border, RoundedCornerShape(12.dp))
-                                    .padding(16.dp),
+                                    .padding(vertical = 14.dp, horizontal = 16.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (isRunning) "Ready. Connect via TCP socket:\nnc ${wifiIp ?: "127.0.0.1"} ${serverPort}"
+                                    text = if (isRunning) "Ready. Connect via TCP socket:\nnc ${wifiIp ?: "127.0.0.1"} $serverPort"
                                     else "No TCP sockets listening.\nTurn on the server to accept connections.",
                                     color = appColors.textSecondary,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                     fontFamily = FontFamily.Monospace,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    lineHeight = 16.sp
+                                    lineHeight = 18.sp
                                 )
                             }
                         } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                items(connectedClients) { client ->
+                                connectedClients.forEach { client ->
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -755,7 +806,7 @@ fun BleBridgeDashboard(
                     shape = RoundedCornerShape(24.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(0.58f)
+                        .height(300.dp)
                         .border(1.dp, if (appColors.isDark) Color(0xFF1F2937) else Color(0xFF334155), RoundedCornerShape(24.dp))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {

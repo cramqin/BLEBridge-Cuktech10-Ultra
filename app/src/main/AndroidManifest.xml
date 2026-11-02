@@ -53,6 +53,18 @@
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 
+        <receiver
+            android:name=".BleCommandReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.cramqin.blecuktech10.START_SERVER" />
+                <action android:name="com.cramqin.blecuktech10.STOP_SERVER" />
+                <action android:name="com.example.action.START_SERVER" />
+                <action android:name="com.example.action.STOP_SERVER" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

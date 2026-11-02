@@ -110,6 +110,13 @@ fun CuktechDashboardScreen(
                         .background(statusDotColor)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
+                val displayMac = if (devInfo.macAddress.isNotBlank() && devInfo.macAddress != "--") {
+                    devInfo.macAddress
+                } else if (!activeCred?.mac.isNullOrBlank()) {
+                    activeCred?.mac ?: ""
+                } else {
+                    "Disconnected"
+                }
                 Column {
                     Text(
                         text = devInfo.name.ifBlank { "CUKTECH 10 Ultra" },
@@ -118,7 +125,7 @@ fun CuktechDashboardScreen(
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "${devInfo.mac.ifBlank { activeCred?.mac ?: "Disconnected" }} · ${authState.label}",
+                        text = "$displayMac · ${authState.label}",
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

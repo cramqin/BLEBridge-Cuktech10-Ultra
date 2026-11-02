@@ -76,7 +76,9 @@ data class ChargerDeviceInfo(
     val macAddress: String = "--",
     val rssi: Int = -65,
     val connectionQualityScore: Int = 100
-)
+) {
+    val mac: String get() = macAddress
+}
 
 /**
  * Native Kotlin BLE Manager for CUKTECH 10 Ultra operating directly over

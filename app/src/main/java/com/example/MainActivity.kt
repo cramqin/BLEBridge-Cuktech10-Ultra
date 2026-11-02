@@ -83,8 +83,8 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BleBridgeDashboard(
-    currentTheme: ThemeMode,
-    onThemeChanged: (ThemeMode) -> Unit
+    currentTheme: ThemeMode = ThemeMode.SYSTEM,
+    onThemeChanged: (ThemeMode) -> Unit = {}
 ) {
     val context = LocalContext.current
     val appColors = LocalAppColors.current

@@ -408,11 +408,7 @@ fun BleBridgeDashboard(
                         }
                     },
                     actions = {
-                        if (showTelemetryScreen) {
-                            TextButton(onClick = { showTelemetryScreen = false }) {
-                                Text("GATEWAY", color = appColors.primary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            }
-                        } else if (updateAvailable) {
+                        if (!showTelemetryScreen && updateAvailable) {
                             IconButton(onClick = {
                                 val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/cramqin/BLEBridge-Cuktech10-Ultra/releases/latest"))
                                 context.startActivity(intent)
@@ -811,159 +807,82 @@ fun BleBridgeDashboard(
 
                         Spacer(modifier = Modifier.height(14.dp))
 
-                        // Bluetooth Search & Pair
-                        val isCuktechConnected = (cuktechAuthState == CuktechAuthState.AUTHENTICATED || bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED)
-                        if (isCuktechConnected) {
+                        // If authentication failed, show a helpful alert banner with Sync / Login actions
+                        if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
                             Surface(
-                                color = if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) StatusErrorContainer.copy(alpha = 0.25f) else appColors.primaryContainer.copy(alpha = 0.35f),
-                                shape = RoundedCornerShape(14.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) StatusError else appColors.primary.copy(alpha = 0.5f)),
+                                color = StatusErrorContainer.copy(alpha = 0.25f),
+                                shape = RoundedCornerShape(12.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, StatusError),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(14.dp),
+                                        .padding(12.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(8.dp)
-                                                    .clip(RoundedCornerShape(50))
-                                                    .background(
-                                                        when (cuktechAuthState) {
-                                                            CuktechAuthState.AUTHENTICATED -> StatusSuccess
-                                                            CuktechAuthState.AUTH_FAILED -> StatusError
-                                                            else -> StatusWarning
-                                                        }
-                                                    )
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = cuktechDevInfo.name.ifBlank { "CUKTECH 10 Ultra" },
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp,
-                                                color = appColors.textPrimary
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = when (cuktechAuthState) {
-                                                CuktechAuthState.AUTHENTICATED -> "MAC: ${bleAddress ?: activeCred?.mac ?: "Connected"} · Ready for telemetry"
-                                                CuktechAuthState.AUTH_FAILED -> "MAC: ${bleAddress ?: activeCred?.mac ?: "Connected"} · Auth Failed (Token Required)"
-                                                else -> "MAC: ${bleAddress ?: activeCred?.mac ?: "Connected"} · Authenticating Phase B..."
-                                            },
+                                            text = "Authentication Failed",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp,
+                                            color = StatusError
+                                        )
+                                        Text(
+                                            text = "MiOT token required for handshake. Sync or log into Xiaomi account.",
                                             fontSize = 11.sp,
-                                            fontFamily = FontFamily.Monospace,
-                                            maxLines = 1,
-                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                            color = if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) StatusError else appColors.textSecondary
+                                            color = appColors.textSecondary
                                         )
                                     }
-
                                     Spacer(modifier = Modifier.width(8.dp))
-
-                                    if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            if (accountSession != null) {
-                                                Button(
-                                                    onClick = { cuktechManager.syncCredentialsAndRetryAuth() },
-                                                    colors = ButtonDefaults.buttonColors(
-                                                        containerColor = appColors.primary,
-                                                        contentColor = Color.White
-                                                    ),
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                                    modifier = Modifier.height(32.dp)
-                                                ) {
-                                                    Text("Sync Token", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                }
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                            }
-                                            OutlinedButton(
-                                                onClick = { showXiaomiLoginDialog = true },
-                                                shape = RoundedCornerShape(8.dp),
-                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                                modifier = Modifier.height(32.dp)
-                                            ) {
-                                                Text(if (accountSession != null) "Re-Login" else "Get Token", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                    } else if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) {
+                                    if (accountSession != null) {
                                         Button(
-                                            onClick = {
-                                                val isBleConn = (bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED)
-                                                val isCuktechAuth = (cuktechAuthState == CuktechAuthState.AUTHENTICATED)
-                                                val hasClient = connectedClients.any { it.isCuktechCharger }
-                                                val isXiaomiAuth = (accountSession != null || activeCred != null || savedDevices.isNotEmpty())
-
-                                                if (!isRunning) {
-                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n1. ❌ Server Configuration is OFF.\nPlease turn ON the server configuration switch first."
-                                                } else if (!isBleConn && !isCuktechAuth) {
-                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n2. ❌ Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
-                                                } else if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
-                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ Authentication Failed.\nValid 12-byte MiOT Token is required. Please log into Xiaomi Account or import credentials."
-                                                } else if (!isCuktechAuth || !hasClient) {
-                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ CUKTECH 10 Ultra is not yet authenticated.\nPlease wait for authentication to complete."
-                                                } else if (!isXiaomiAuth) {
-                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n4. ❌ Xiaomi Account is not logged in.\nA valid Xiaomi Cloud session or 12-byte MiOT Token is required."
-                                                } else {
-                                                    showTelemetryScreen = true
-                                                }
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                                            modifier = Modifier.height(32.dp)
-                                        ) {
-                                            Text("Telemetry →", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    } else {
-                                        FilledTonalButton(
-                                            onClick = {},
-                                            enabled = false,
+                                            onClick = { cuktechManager.syncCredentialsAndRetryAuth() },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = appColors.primary,
+                                                contentColor = Color.White
+                                            ),
                                             shape = RoundedCornerShape(8.dp),
                                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                                             modifier = Modifier.height(32.dp)
                                         ) {
-                                            CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Auth...", fontSize = 11.sp)
+                                            Text("Sync Token", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
                             }
-                        } else {
-                            Button(
-                                onClick = {
-                                    if (!isRunning) {
-                                        prerequisiteWarning = "Prerequisite Required:\n\nServer Configuration must be turned ON first before searching and pairing."
-                                    } else {
-                                        ensureBleServiceStartedAndPermissions {
-                                            showPairingDialog = true
-                                        }
+                            Spacer(modifier = Modifier.height(10.dp))
+                        }
+
+                        // Search & Pair Button (ALWAYS visible & accessible)
+                        Button(
+                            onClick = {
+                                if (!isRunning) {
+                                    prerequisiteWarning = "Prerequisite Required:\n\nServer Configuration must be turned ON first before searching and pairing."
+                                } else {
+                                    ensureBleServiceStartedAndPermissions {
+                                        showPairingDialog = true
                                     }
-                                },
-                                enabled = isRunning,
-                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = appColors.primary,
-                                    contentColor = Color.White,
-                                    disabledContainerColor = appColors.surfaceVariant,
-                                    disabledContentColor = appColors.textSecondary
-                                )
-                            ) {
-                                Icon(Icons.Default.BluetoothSearching, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (isRunning) "Search & Pair CUKTECH 10 Ultra" else "Search & Pair (Turn ON Server First)",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
-                            }
+                                }
+                            },
+                            enabled = isRunning,
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = appColors.primary,
+                                contentColor = Color.White,
+                                disabledContainerColor = appColors.surfaceVariant,
+                                disabledContentColor = appColors.textSecondary
+                            )
+                        ) {
+                            Icon(Icons.Default.BluetoothSearching, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isRunning) "Search & Pair CUKTECH 10 Ultra" else "Search & Pair (Turn ON Server First)",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
                         }
                     }
                 }
@@ -1102,19 +1021,19 @@ fun BleBridgeDashboard(
                                                             )
                                                         }
                                                         Spacer(modifier = Modifier.width(10.dp))
-                                                        Column {
+                                                        Column(modifier = Modifier.weight(1f)) {
                                                             Text(
-                                                                text = client.id,
+                                                                text = cuktechDevInfo.name.ifBlank { "CUKTECH 10 Ultra" },
                                                                 fontWeight = FontWeight.Bold,
                                                                 color = appColors.textPrimary,
-                                                                fontSize = 13.sp,
-                                                                fontFamily = FontFamily.Monospace
+                                                                fontSize = 14.sp
                                                             )
                                                             Text(
-                                                                text = "\u25CF Active Client \u00B7 Click to Open Telemetry",
+                                                                text = "MAC: ${client.id} · Connected",
                                                                 color = StatusSuccess,
-                                                                fontWeight = FontWeight.Bold,
-                                                                fontSize = 11.sp
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                fontSize = 11.sp,
+                                                                fontFamily = FontFamily.Monospace
                                                             )
                                                         }
                                                     }

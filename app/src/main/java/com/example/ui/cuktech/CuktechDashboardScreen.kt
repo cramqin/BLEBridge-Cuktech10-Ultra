@@ -89,188 +89,65 @@ fun CuktechDashboardScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         // =====================================================================
-        // Navigation Back Button (when embedded from Gateway)
+        // COMPACT CONNECTION STATUS BAR
         // =====================================================================
-        if (onNavigateBack != null) {
-            OutlinedButton(
-                onClick = onNavigateBack,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(42.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("← Back to BLE Bridge Gateway", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            }
-        }
-
-        // =====================================================================
-        // 1. PROMINENT SEARCH & PAIR BUTTON + CONNECTION HEADER CARD
-        // =====================================================================
-        Button(
-            onClick = {
-                onRequestBlePermissions {
-                    showPairingDialog = true
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
-        ) {
-            Icon(Icons.Default.BluetoothSearching, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "SEARCH & PAIR CUKTECH 10 ULTRA",
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 14.sp,
-                letterSpacing = 0.5.sp
-            )
-        }
-
-        // Xiaomi Account & Stored Credentials Bar
-        Card(
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                val statusDotColor = when (authState) {
+                    CuktechAuthState.AUTHENTICATED -> Color(0xFF10B981)
+                    CuktechAuthState.AUTH_FAILED -> Color(0xFFEF4444)
+                    CuktechAuthState.DISCONNECTED -> Color.Gray
+                    else -> Color(0xFFF59E0B)
+                }
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(statusDotColor)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = devInfo.name.ifBlank { "CUKTECH 10 Ultra" },
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "${devInfo.mac.ifBlank { activeCred?.mac ?: "Disconnected" }} · ${authState.label}",
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { bleManager.refreshAllTelemetryNow() },
+                    modifier = Modifier.size(32.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.VerifiedUser,
-                            contentDescription = null,
-                            tint = if (activeCred?.hasValidToken == true) Color(0xFF10B981) else MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (accountSession != null) {
-                                    "Xiaomi Cloud (${accountSession!!.userId})"
-                                } else if (activeCred != null) {
-                                    "Key: ${activeCred!!.name}"
-                                } else {
-                                    "Xiaomi Cloud Not Logged In"
-                                },
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = if (activeCred != null) {
-                                    "${activeCred!!.mac} · ${if (activeCred!!.hasValidToken) "Ready" else "No Token"}"
-                                } else {
-                                    "Sign in to auto-retrieve charger keys"
-                                },
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    FilledTonalButton(
-                        onClick = { showXiaomiLoginDialog = true },
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Refresh Telemetry",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                if (authState == CuktechAuthState.AUTHENTICATED) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    OutlinedButton(
+                        onClick = { bleManager.disconnectCharger() },
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(32.dp)
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        modifier = Modifier.height(28.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (accountSession != null || activeCred != null) "Account" else "Sign In", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-
-                if (savedDevices.size > 1) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        savedDevices.forEach { dev ->
-                            FilterChip(
-                                selected = activeCred?.mac.equals(dev.mac, ignoreCase = true),
-                                onClick = { bleManager.credentialStore.selectActiveDevice(dev.mac) },
-                                label = { Text("${dev.name} (${dev.mac.takeLast(5)})", fontSize = 11.sp) }
-                            )
-                        }
-                    }
-                }
-
-                if (accountSession != null || activeCred != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (activeCred != null) {
-                            val isConnected = authState == CuktechAuthState.AUTHENTICATED ||
-                                authState == CuktechAuthState.CONNECTING_GATT ||
-                                authState == CuktechAuthState.PHASE_A_INIT_A4 ||
-                                authState == CuktechAuthState.PHASE_B_HANDSHAKE
-
-                            Button(
-                                onClick = {
-                                    if (isConnected) {
-                                        bleManager.disconnectCharger()
-                                    } else {
-                                        onRequestBlePermissions {
-                                            bleManager.connectToCharger(activeCred!!.mac)
-                                        }
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isConnected) MaterialTheme.colorScheme.error else Color(0xFF10B981)
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(34.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
-                            ) {
-                                Icon(
-                                    imageVector = if (isConnected) Icons.Default.LinkOff else Icons.Default.Bolt,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(if (isConnected) "Disconnect" else "Connect", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-
-                        OutlinedButton(
-                            onClick = { bleManager.refreshAllTelemetryNow() },
-                            enabled = authState == CuktechAuthState.AUTHENTICATED,
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(34.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Refresh", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                        }
+                        Text("Disconnect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -742,6 +619,117 @@ fun CuktechDashboardScreen(
                 // TAB 3: CLOUD, TASKER & AUTOMATION INTEGRATIONS
                 // =============================================================
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Search & Pair Cuktech 10 Ultra button
+                    Button(
+                        onClick = {
+                            onRequestBlePermissions {
+                                showPairingDialog = true
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(Icons.Default.BluetoothSearching, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "SEARCH & PAIR CUKTECH 10 ULTRA",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    // Xiaomi Account & Stored Credentials Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.VerifiedUser,
+                                        contentDescription = null,
+                                        tint = if (activeCred?.hasValidToken == true) Color(0xFF10B981) else MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = if (accountSession != null) {
+                                                "Xiaomi Cloud (${accountSession!!.userId})"
+                                            } else if (activeCred != null) {
+                                                "Key: ${activeCred!!.name}"
+                                            } else {
+                                                "Xiaomi Cloud Not Logged In"
+                                            },
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = if (activeCred != null) {
+                                                "${activeCred!!.mac} · ${if (activeCred!!.hasValidToken) "Ready" else "No Token"}"
+                                            } else {
+                                                "Sign in to auto-retrieve charger keys"
+                                            },
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                FilledTonalButton(
+                                    onClick = { showXiaomiLoginDialog = true },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.height(32.dp)
+                                ) {
+                                    Icon(Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (accountSession != null || activeCred != null) "Account" else "Sign In", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+
+                            if (savedDevices.size > 1) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    savedDevices.forEach { dev ->
+                                        FilterChip(
+                                            selected = activeCred?.mac.equals(dev.mac, ignoreCase = true),
+                                            onClick = { bleManager.credentialStore.selectActiveDevice(dev.mac) },
+                                            label = { Text("${dev.name} (${dev.mac.takeLast(5)})", fontSize = 11.sp) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),

@@ -35,6 +35,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.security.SecureRandom
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -93,8 +95,9 @@ class CuktechBleManager(
     // Incoming notification channels during handshake
     private val authCtrlQueue = Channel<ByteArray>(Channel.UNLIMITED)
     private val authDataQueue = Channel<ByteArray>(Channel.UNLIMITED)
+    private val cmdSendQueue = Channel<ByteArray>(Channel.UNLIMITED)
 
-    // Pending MiOT command responses keyed by reqId
+    // Pending MiOT command responses keyed by seq
     private val pendingMiotResponses = ConcurrentHashMap<Int, CompletableDeferred<DecodedMiotFrame>>()
 
     // Session state
@@ -102,6 +105,7 @@ class CuktechBleManager(
     private var appItCounter: Long = 1L
     private var devItHi: Long = 0L
     private var lastDevItLo: Int = 0
+    private var miotSeq: Int = 1
     private var reqCounter: Int = 0x0300
 
     private var authJob: Job? = null
@@ -1012,6 +1016,9 @@ class CuktechBleManager(
             CuktechProtocol.CHAR_AUTH_DATA -> {
                 authDataQueue.trySend(value.copyOf())
             }
+            CuktechProtocol.CHAR_CMD_SEND -> {
+                cmdSendQueue.trySend(value.copyOf())
+            }
             CuktechProtocol.CHAR_DEVICE_INFO -> {
                 val info = PortTelemetryDecoder.decodeAsciiInfo(value)
                 if (info.isNotBlank()) {
@@ -1089,21 +1096,34 @@ class CuktechBleManager(
             }
         }
 
-        val decrypted = plaintext ?: return
+        if (plaintext == null) {
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL3,
+                "[Cuktech] Failed to decrypt cmd_recv payload (${payloadToDecrypt.size}B, itLo=$itLo)"
+            )
+            return
+        }
+
+        val decrypted = plaintext
         val b4 = if (decrypted.size > 4) decrypted[4].toInt() and 0xFF else -1
         val siid = if (decrypted.size > 6) decrypted[6].toInt() and 0xFF else -1
-        val piid = if (decrypted.size > 7) decrypted[7].toInt() and 0xFF else -1
-        val reqId = (decrypted[0].toInt() and 0xFF) or ((decrypted[1].toInt() and 0xFF) shl 8)
+        val piid = if (decrypted.size > 8) {
+            (decrypted[7].toInt() and 0xFF) or ((decrypted[8].toInt() and 0xFF) shl 8)
+        } else if (decrypted.size > 7) {
+            decrypted[7].toInt() and 0xFF
+        } else {
+            -1
+        }
+        val seq = if (decrypted.size > 2) decrypted[2].toInt() and 0xFF else -1
 
-        // Live Port Push notification (b4 == 0x04, siid == 2, piid in 1..4)
-        if (b4 == 0x04 && siid == CuktechProtocol.SIID_CHARGER && piid in 1..4) {
+        // Live Port Push notification (b4 == 0x04) OR GET response (b4 == 0x03) for ports 1..4
+        if ((b4 == 0x04 || b4 == 0x03) && siid == CuktechProtocol.SIID_CHARGER && piid in 1..4) {
             val curPorts = _ports.value
             val existing = curPorts[piid]
             val decoded = PortTelemetryDecoder.decodePortV2(piid, decrypted, existing)
             if (decoded != null) {
                 updatePortTelemetry(piid, decoded)
             }
-            return
         }
 
         // Hardware protocol push (b4 == 0x04, siid == 2, piid in 17..18)
@@ -1115,16 +1135,15 @@ class CuktechBleManager(
                     ((decrypted[15].toLong() and 0xFF) shl 24)
                 handleHwProtocolPush(piid, val32)
             }
-            return
         }
 
-        val frame = PortTelemetryDecoder.parseMiotFrame(decrypted) ?: return
-
-        // Complete any awaiting command deferred
-        pendingMiotResponses.remove(frame.reqId)?.complete(frame)
-
-        // Apply state update
-        applyDecodedMiotFrame(frame)
+        val frame = PortTelemetryDecoder.parseMiotFrame(decrypted)
+        if (frame != null) {
+            // Complete any awaiting command deferred
+            pendingMiotResponses.remove(frame.reqId)?.complete(frame)
+            // Apply state update
+            applyDecodedMiotFrame(frame)
+        }
     }
 
     private fun handleHwProtocolPush(piid: Int, val32: Long) {
@@ -1406,46 +1425,87 @@ class CuktechBleManager(
         val keys = sessionKeys ?: return@withLock null
         val svc = BleBridgeService.getInstance() ?: return@withLock null
 
-        val reqId = reqCounter and 0xFFFF
-        reqCounter = (reqCounter + 1) and 0xFFFF
-        if (reqCounter < 0x0100) reqCounter = 0x0300
+        drainChannel(cmdSendQueue)
+
+        val seq = miotSeq and 0xFF
+        miotSeq = (miotSeq + 1) and 0xFF
 
         val currentCounter = appItCounter
         appItCounter++
 
-        val tlvPlain = CuktechProtocol.buildMiotTlv(
-            reqId = reqId,
-            siid = siid,
-            piid = piid,
-            isSet = isSet,
-            valueBytes = valueBytes,
-            fmtOverride = fmtOverride
-        )
-        val packet = CuktechProtocol.buildEncryptedCmdPacket(
-            appKey = keys.appKey,
-            appIv = keys.appIv,
-            appItCounter = currentCounter,
-            tlvPlaintext = tlvPlain
-        )
+        val tlvPlain = if (isSet || valueBytes.isNotEmpty()) {
+            if (valueBytes.size > 4) {
+                CuktechProtocol.buildMiotTlv(seq = seq, siid = siid, piid = piid, rawBytes = valueBytes)
+            } else if (valueBytes.size == 1) {
+                CuktechProtocol.buildMiotTlv(seq = seq, siid = siid, piid = piid, value = valueBytes[0].toLong() and 0xFFL)
+            } else if (valueBytes.size == 4) {
+                val v = (valueBytes[0].toLong() and 0xFFL) or
+                    ((valueBytes[1].toLong() and 0xFFL) shl 8) or
+                    ((valueBytes[2].toLong() and 0xFFL) shl 16) or
+                    ((valueBytes[3].toLong() and 0xFFL) shl 24)
+                CuktechProtocol.buildMiotTlv(seq = seq, siid = siid, piid = piid, value = v)
+            } else {
+                CuktechProtocol.buildMiotTlv(seq = seq, siid = siid, piid = piid, rawBytes = valueBytes)
+            }
+        } else {
+            CuktechProtocol.buildMiotTlv(seq = seq, siid = siid, piid = piid)
+        }
+
+        val nonce = CuktechProtocol.buildNonce(keys.appIv, currentCounter)
+        val ciphertextWithTag = CuktechProtocol.aesCcmEncrypt(keys.appKey, nonce, tlvPlain, aad = ByteArray(0))
+        val itBytes = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt((currentCounter and 0xFFFFFFFFL).toInt()).array()
+        val encryptedData = itBytes.copyOfRange(0, 2) + ciphertextWithTag
 
         val deferred = CompletableDeferred<DecodedMiotFrame>()
-        pendingMiotResponses[reqId] = deferred
+        pendingMiotResponses[seq] = deferred
         totalTxCommands++
 
-        val writeOk = svc.enqueueBleWrite(
+        // Step 1: Write header [00 00 00 00 01 00] (1 frame) to CHAR_CMD_SEND
+        val header = byteArrayOf(0x00, 0x00, 0x00, 0x00, 0x01, 0x00)
+        val hOk = svc.enqueueBleWrite(
             CuktechProtocol.MI_SERVICE_UUID,
             CuktechProtocol.CHAR_CMD_SEND,
-            packet,
+            header,
             withResponse = false
         )
-        if (!writeOk) {
-            pendingMiotResponses.remove(reqId)
+        if (!hOk) {
+            pendingMiotResponses.remove(seq)
+            consecutiveFailures++
+            return@withLock null
+        }
+
+        // Step 2: Wait for RCV_RDY [00 00 01 01] on CHAR_CMD_SEND
+        val rdy = withTimeoutOrNull(2500L) { cmdSendQueue.receive() }
+        if (rdy == null || !rdy.contentEquals(CuktechProtocol.RCV_RDY)) {
+            pendingMiotResponses.remove(seq)
+            consecutiveFailures++
+            return@withLock null
+        }
+
+        // Step 3: Write frame [01 00] + encryptedData to CHAR_CMD_SEND
+        val frame = byteArrayOf(0x01, 0x00) + encryptedData
+        val fOk = svc.enqueueBleWrite(
+            CuktechProtocol.MI_SERVICE_UUID,
+            CuktechProtocol.CHAR_CMD_SEND,
+            frame,
+            withResponse = false
+        )
+        if (!fOk) {
+            pendingMiotResponses.remove(seq)
+            consecutiveFailures++
+            return@withLock null
+        }
+
+        // Step 4: Wait for RCV_OK [00 00 01 00] on CHAR_CMD_SEND
+        val ok = withTimeoutOrNull(2500L) { cmdSendQueue.receive() }
+        if (ok == null || !ok.contentEquals(CuktechProtocol.RCV_OK)) {
+            pendingMiotResponses.remove(seq)
             consecutiveFailures++
             return@withLock null
         }
 
         val resp = withTimeoutOrNull(timeoutMs) { deferred.await() }
-        pendingMiotResponses.remove(reqId)
+        pendingMiotResponses.remove(seq)
         if (resp != null) {
             successfulTxCommands++
             consecutiveFailures = 0

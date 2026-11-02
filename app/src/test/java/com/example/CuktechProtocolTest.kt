@@ -40,11 +40,10 @@ class CuktechProtocolTest {
         assertEquals(12, nonce.size)
 
         val tlvPlain = CuktechProtocol.buildMiotTlv(
-            reqId = 0x0305,
+            seq = 1,
             siid = CuktechProtocol.SIID_CHARGER,
             piid = CuktechProtocol.PIID_PORT_SW_BITMAP,
-            isSet = true,
-            valueBytes = byteArrayOf(0x0F)
+            value = 0x0FL
         )
 
         val encrypted = CuktechProtocol.aesCcmEncrypt(key, nonce, tlvPlain)
@@ -63,6 +62,23 @@ class CuktechProtocolTest {
             threw = true
         }
         assertTrue("Tampered tag must throw SecurityException", threw)
+    }
+
+    @Test
+    fun `test buildMiotTlv matches Mijia Spec format`() {
+        val result = CuktechProtocol.buildMiotTlv(seq = 1, siid = 2, piid = 5, value = 3L)
+        val tl = (1 shl 12) or 1
+        val expected = byteArrayOf(
+            12, 0x20,
+            1, 0x00,
+            0x00, 0x01,
+            2,
+            5, 0x00,
+            (tl and 0xFF).toByte(), ((tl ushr 8) and 0xFF).toByte(),
+            3
+        )
+        assertArrayEquals(expected, result)
+        assertEquals(12, result.size)
     }
 
     @Test

@@ -108,23 +108,30 @@ object PortTelemetryDecoder {
 
     /**
      * Parses a decrypted MiOT TLV response or push notification from `CHAR_CMD_RECV`.
+     * Standard layout: [totalLen:1B][0x20:1B][seq:1B][0x00:1B][opcode:1B][cnt:1B][siid:1B][piid:2B LE]...
      */
     fun parseMiotFrame(plaintext: ByteArray): DecodedMiotFrame? {
-        if (plaintext.size < 10) return null
-        val reqId = (plaintext[0].toInt() and 0xFF) or ((plaintext[1].toInt() and 0xFF) shl 8)
-        val b2 = plaintext[2].toInt() and 0xFF
-        val b4 = plaintext[4].toInt() and 0xFF
-        val siid = plaintext[6].toInt() and 0xFF
-        val piid = (plaintext[7].toInt() and 0xFF) or ((plaintext[8].toInt() and 0xFF) shl 8)
-        val fmt = plaintext[9].toInt() and 0xFF
-        val value = if (plaintext.size > 10) plaintext.copyOfRange(10, plaintext.size) else ByteArray(0)
+        if (plaintext.size < 8) return null
+        val frameType = plaintext[1].toInt() and 0xFF
+        val seq = plaintext[2].toInt() and 0xFF
+        val opcode = plaintext[4].toInt() and 0xFF
+        val siid = if (plaintext.size > 6) plaintext[6].toInt() and 0xFF else -1
+        val piid = if (plaintext.size > 8) (plaintext[7].toInt() and 0xFF) or ((plaintext[8].toInt() and 0xFF) shl 8) else -1
+        val valLen = if (plaintext.size > 11) plaintext[11].toInt() and 0xFF else 0
+        val value = if (plaintext.size >= 14) {
+            plaintext.copyOfRange(13, plaintext.size)
+        } else if (plaintext.size > 12) {
+            plaintext.copyOfRange(12, plaintext.size)
+        } else {
+            ByteArray(0)
+        }
         return DecodedMiotFrame(
-            reqId = reqId,
-            b2 = b2,
-            b4 = b4,
+            reqId = seq,
+            b2 = frameType,
+            b4 = opcode,
             siid = siid,
             piid = piid,
-            fmt = fmt,
+            fmt = valLen,
             payload = value
         )
     }

@@ -365,40 +365,59 @@ object CuktechProtocol {
     // =========================================================================
 
     /**
-     * Builds the unencrypted 10-byte + value MiOT TLV payload:
-     * `[reqId_lo, reqId_hi, b2, b3, b4, count, siid, piid_lo, piid_hi, fmt, ...valueBytes]`
-     *
-     * Exact match with `protocol.py::build_miot_tlv`:
-     * - GET: `b2=0x03, b4=0x03, fmt=0x00, value=empty`
-     * - SET: `b2=0x01, b4=0x01, fmt=0x01 (uint8) or 0x09 (bytes)`
+     * Builds the standard MiOT TLV frame (aligned with Mijia SpecWriteChannelManager / controller.py):
+     * [total_len:1B][0x20:1B][seq:1B][0x00:1B][opcode:1B][cnt:1B][siid:1B][piid:2B LE][tl:2B LE][value:NB]
+     * tl = (type_id << 12) | byte_length
+     * opcode: 0x02 = GET, 0x00 = SET
      */
     fun buildMiotTlv(
-        reqId: Int,
+        seq: Int,
         siid: Int,
         piid: Int,
-        isSet: Boolean = false,
-        valueBytes: ByteArray = ByteArray(0),
-        fmtOverride: Int? = null
+        value: Long? = null,
+        rawBytes: ByteArray? = null
     ): ByteArray {
-        val b2 = if (isSet) 0x01 else 0x03
-        val b3 = 0x00
-        val b4 = if (isSet) 0x01 else 0x03
-        val count = 0x01
-        val fmt = fmtOverride ?: if (!isSet) 0x00 else if (valueBytes.size == 1) 0x01 else 0x09
+        val opcode: Byte
+        val typeId: Int
+        val valueBytes: ByteArray
 
-        val header = byteArrayOf(
-            (reqId and 0xFF).toByte(),
-            ((reqId ushr 8) and 0xFF).toByte(),
-            b2.toByte(),
-            b3.toByte(),
-            b4.toByte(),
-            count.toByte(),
-            (siid and 0xFF).toByte(),
-            (piid and 0xFF).toByte(),
-            ((piid ushr 8) and 0xFF).toByte(),
-            (fmt and 0xFF).toByte()
-        )
-        return header + valueBytes
+        if (rawBytes != null && rawBytes.isNotEmpty()) {
+            opcode = 0x00.toByte() // SET
+            typeId = 1
+            valueBytes = rawBytes
+        } else if (value != null) {
+            opcode = 0x00.toByte() // SET
+            if (value <= 0xFFL) {
+                typeId = 1 // UINT8
+                valueBytes = byteArrayOf((value and 0xFFL).toByte())
+            } else {
+                typeId = 5 // UINT32
+                val buf = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
+                buf.putInt((value and 0xFFFFFFFFL).toInt())
+                valueBytes = buf.array()
+            }
+        } else {
+            opcode = 0x02.toByte() // GET
+            typeId = 1 // UINT8 dummy placeholder
+            valueBytes = byteArrayOf(0x00)
+        }
+
+        val byteLen = valueBytes.size
+        val tl = (typeId shl 12) or byteLen
+        val totalLen = 11 + byteLen
+
+        val buf = ByteBuffer.allocate(totalLen).order(ByteOrder.LITTLE_ENDIAN)
+        buf.put((totalLen and 0xFF).toByte())
+        buf.put(0x20.toByte())
+        buf.put((seq and 0xFF).toByte())
+        buf.put(0x00.toByte())
+        buf.put(opcode)
+        buf.put(0x01.toByte()) // cnt
+        buf.put((siid and 0xFF).toByte())
+        buf.putShort((piid and 0xFFFF).toShort())
+        buf.putShort((tl and 0xFFFF).toShort())
+        buf.put(valueBytes)
+        return buf.array()
     }
 
     /**

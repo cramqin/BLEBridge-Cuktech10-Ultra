@@ -1616,7 +1616,7 @@ class CuktechBleManager(
                 b4 = 0x01,
                 siid = siid,
                 piid = piid,
-                status = 0,
+                fmt = 1,
                 payload = valueBytes
             )
         }

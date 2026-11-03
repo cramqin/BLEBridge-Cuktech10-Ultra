@@ -145,14 +145,16 @@ fun CuktechDashboardScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
         // =====================================================================
         // PINNED CONNECTION STATUS BAR & CATEGORIZATION TABS (Never scrolls off)
         // =====================================================================
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 14.dp, vertical = if (isLandscape) 2.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isLandscape) 2.dp else 8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -180,12 +182,14 @@ fun CuktechDashboardScreen(
                     } else {
                         "Disconnected"
                     }
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                         Text(
                             text = devInfo.name.ifBlank { "CUKTECH 10 Ultra" },
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onBackground
+                            fontSize = if (isLandscape) 13.sp else 14.sp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = if (statusMsg.isNotBlank() && authState != CuktechAuthState.AUTHENTICATED) {
@@ -270,6 +274,7 @@ fun CuktechDashboardScreen(
                 contentColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(if (isLandscape) 36.dp else 48.dp)
                     .clip(RoundedCornerShape(12.dp))
             ) {
                 tabItems.forEach { (label, icon, idx) ->
@@ -283,11 +288,11 @@ fun CuktechDashboardScreen(
                         text = {
                             Text(
                                 text = label,
-                                fontSize = 12.sp,
+                                fontSize = if (isLandscape) 11.sp else 12.sp,
                                 fontWeight = if (pagerState.currentPage == idx) FontWeight.Bold else FontWeight.Medium
                             )
                         },
-                        icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(16.dp)) }
+                        icon = if (isLandscape) null else { { Icon(icon, contentDescription = label, modifier = Modifier.size(16.dp)) } }
                     )
                 }
             }
@@ -1106,104 +1111,6 @@ fun CuktechDashboardScreen(
                 ) {
 
 
-                    val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
-                    var isBatteryIgnored by remember {
-                        mutableStateOf(
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
-                            } else true
-                        )
-                    }
-
-                    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-                    DisposableEffect(lifecycleOwner) {
-                        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-                            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                                isBatteryIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                    powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
-                                } else true
-                            }
-                        }
-                        lifecycleOwner.lifecycle.addObserver(observer)
-                        onDispose {
-                            lifecycleOwner.lifecycle.removeObserver(observer)
-                        }
-                    }
-
-                    // 1. Background Keepalive & Battery Optimization Card
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                text = "Background Keepalive & System Integration",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                            Text(
-                                text = "Keeps BLE gateway connected when screen turns off or when you switch apps.",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            Surface(
-                                color = if (isBatteryIgnored) Color(0xFF10B981).copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = if (isBatteryIgnored) Icons.Default.CheckCircle else Icons.Default.Warning,
-                                        contentDescription = null,
-                                        tint = if (isBatteryIgnored) Color(0xFF10B981) else Color(0xFFF59E0B),
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = if (isBatteryIgnored) {
-                                            "Battery optimizations ignored (Keepalive active)"
-                                        } else {
-                                            "Battery optimization active (May be throttled by OS)"
-                                        },
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = if (isBatteryIgnored) Color(0xFF10B981) else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            Button(
-                                onClick = {
-                                    if (isBatteryIgnored) {
-                                        Toast.makeText(context, "Battery optimizations are already disabled for this app.", Toast.LENGTH_SHORT).show()
-                                    }
-                                    bleDiagnostics.requestIgnoreBatteryOptimizations()
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Icon(Icons.Default.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = if (isBatteryIgnored) "Battery Settings (Already Set)" else "Ignore Battery Optimization",
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                    }
-
-
-
                     // 3. Tasker & Automation Integration Card
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -1624,33 +1531,6 @@ fun CuktechDashboardScreen(
                                 }
                             }
 
-                            // Explanatory note regarding ADC
-                            Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Info,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp).padding(top = 1.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Note: Adaptive Dynamic Current (ADC) is an autonomous MCU algorithm built directly into the charger hardware. It constantly balances power without cutting connection. To view live ADC power allocation on the charger screen, switch to Page 2 in the Display Screen Page selector above.",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        lineHeight = 15.sp
-                                    )
-                                }
-                            }
-
                             Button(
                                 onClick = { showSoftRestartDialog = true },
                                 modifier = Modifier.fillMaxWidth(),
@@ -1736,7 +1616,9 @@ fun CuktechDashboardScreen(
             icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFF59E0B)) },
             title = { Text("Switch to Xiaomi Mi Home?") },
             text = {
-                Text("Xiaomi Mi Home requires exclusive Bluetooth access to check for and install official charger firmware updates.\n\nOpening Mi Home will safely disconnect the BLE Bridge gateway and stop background server tasks.\n\nWhen you return to this app, you can start the server and reconnect with 1 tap.")
+                Box(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text("Xiaomi Mi Home requires exclusive Bluetooth access to check for and install official charger firmware updates.\n\nOpening Mi Home will safely disconnect the BLE Bridge gateway and stop background server tasks.\n\nWhen you return to this app, you can start the server and reconnect with 1 tap.")
+                }
             },
             confirmButton = {
                 Button(
@@ -2363,38 +2245,8 @@ private fun SmoothWheelPicker(
     }
 }
 
-private fun detectDeviceType(port: PortTelemetry): String? {
-    if (port.powerW < 0.2 && port.voltageV < 1.0) return null
-    val proto = port.protocolName
-    val w = port.powerW
-    val v = port.voltageV
-    val code = port.mijiaProtocolCode ?: 0
-
-    return when {
-        // Xiaomi proprietary HyperCharge / Fast Charge (67W, 90W, 120W) detected by charger
-        code in listOf(17, 18, 19) || proto.contains("Xiaomi", ignoreCase = true) ->
-            "Xiaomi HyperCharge Device"
-        // Apple 2.4A detected by charger hardware divider
-        code == 12 || proto.contains("Apple", ignoreCase = true) ->
-            "Apple Device (iPhone / iPad)"
-        // PPS (Programmable Power Supply) negotiated
-        code in listOf(7, 9) || proto.contains("PPS", ignoreCase = true) ->
-            "PPS Fast Charge Device"
-        // High-power USB-PD (Laptop / MacBook)
-        proto.contains("PD", ignoreCase = true) && (w >= 45.0 || v >= 19.0) ->
-            "USB-PD High Power (Laptop / MacBook)"
-        // Standard USB-PD
-        proto.contains("PD", ignoreCase = true) ->
-            "USB-PD Fast Charge"
-        // UFCS (Universal Fast Charging Spec)
-        code == 20 || proto.contains("UFCS", ignoreCase = true) ->
-            "UFCS Fast Charge"
-        // General active protocol reported by charger
-        port.isCharging && proto.isNotBlank() && proto != "Idle" && proto != "Normal" ->
-            "$proto Device"
-        else -> null
-    }
-}
+private fun detectDeviceType(port: PortTelemetry): String? =
+    com.example.cuktech.protocol.PortTelemetryDecoder.detectDeviceBrandAndProtocol(port)
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable

@@ -53,7 +53,7 @@ enum class CuktechAuthState(val label: String) {
     DISCOVERING_SERVICES("Discovering GATT services..."),
     PHASE_A_INIT_A4("Phase A: 0xA4 Handshake init..."),
     PHASE_B_HANDSHAKE("Phase B: MiOT Key exchange..."),
-    AUTHENTICATED("Authenticated · Live Telemetry"),
+    AUTHENTICATED("Connected"),
     AUTH_FAILED("Authentication Failed")
 }
 
@@ -1362,7 +1362,8 @@ class CuktechBleManager(
         val cumulativeWh = integrator.totalWh
 
         val detector = sessionDetectors[portId]!!
-        val finishedSession = detector.onSample(decoded.powerW, deltaWh, decoded.protocolName, nowSec)
+        val brandOrProto = com.example.cuktech.protocol.PortTelemetryDecoder.detectDeviceBrandAndProtocol(decoded) ?: decoded.protocolName
+        val finishedSession = detector.onSample(decoded.powerW, deltaWh, brandOrProto, nowSec)
         if (finishedSession != null) {
             persistence.insertCompletedSession(finishedSession)
             _completedSessions.value = persistence.getRecentSessions(300)
@@ -1980,8 +1981,13 @@ class CuktechBleManager(
             }
 
             val portWatts = if (activePorts.isNotEmpty()) {
-                activePorts.joinToString(" · ") {
-                    String.format(java.util.Locale.US, "%s: %.1fW", it.portLabel, it.powerW)
+                activePorts.joinToString(" · ") { port ->
+                    val brand = com.example.cuktech.protocol.PortTelemetryDecoder.detectDeviceBrandShort(port)
+                    if (!brand.isNullOrBlank()) {
+                        String.format(java.util.Locale.US, "%s: %.1fW (%s)", port.portLabel, port.powerW, brand)
+                    } else {
+                        String.format(java.util.Locale.US, "%s: %.1fW", port.portLabel, port.powerW)
+                    }
                 }
             } else {
                 "All ports idle"

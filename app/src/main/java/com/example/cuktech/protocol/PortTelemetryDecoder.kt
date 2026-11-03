@@ -379,4 +379,86 @@ object PortTelemetryDecoder {
     }
 
     private fun round2(value: Double): Double = (value * 100.0).roundToInt() / 100.0
+
+    /**
+     * Identifies the connected device brand and protocol based on negotiated voltage, power,
+     * Xiaomi/CUKTECH protocol codes, and PPS profiles.
+     */
+    fun detectDeviceBrandAndProtocol(port: PortTelemetry): String? {
+        if (port.powerW < 0.2 && port.voltageV < 1.0) return null
+        val proto = port.protocolName
+        val v = port.voltageV
+        val w = port.powerW
+        val a = port.currentA
+        val code = port.mijiaProtocolCode ?: 0
+
+        return when {
+            // Xiaomi / Redmi / POCO (120W / 90W / 67W / Mi Turbo Charge)
+            // High-voltage PPS (14V-20V, e.g. 17.2V) or Xiaomi protocol code or Mi Turbo in name
+            code in listOf(17, 18, 19) ||
+            proto.contains("Xiaomi", ignoreCase = true) ||
+            proto.contains("Mi Turbo", ignoreCase = true) ||
+            (proto.contains("PPS", ignoreCase = true) && v >= 14.0) -> {
+                when {
+                    w >= 100.0 -> "Xiaomi (120W HyperCharge)"
+                    w >= 75.0 -> "Xiaomi (90W HyperCharge)"
+                    w >= 50.0 -> "Xiaomi (67W HyperCharge)"
+                    v >= 14.0 -> "Xiaomi (Mi Turbo / HyperCharge)"
+                    else -> "Xiaomi Fast Charge"
+                }
+            }
+
+            // Samsung Galaxy Super Fast Charging (SFC / SFC 2.0)
+            (code in listOf(7, 9) || proto.contains("PPS", ignoreCase = true)) && (v in 8.0..12.5) -> {
+                if (w >= 30.0 || a >= 3.5) "Samsung Galaxy (Super Fast Charging 2.0)"
+                else "Samsung Galaxy (Super Fast Charging)"
+            }
+
+            // Apple (iPhone / iPad / Mac)
+            code == 12 || proto.contains("Apple", ignoreCase = true) -> "Apple Device (iPhone / iPad)"
+            proto.contains("PD", ignoreCase = true) && !proto.contains("PPS", ignoreCase = true) && (v in 8.5..9.5) && (w in 15.0..29.0) ->
+                "Apple iPhone (USB-PD)"
+            proto.contains("PD", ignoreCase = true) && !proto.contains("PPS", ignoreCase = true) && (v in 14.5..15.5) && (w in 25.0..36.0) ->
+                "Apple iPad (USB-PD)"
+
+            // Laptop / MacBook / Steam Deck (Fixed PD 20V / 28V high power)
+            proto.contains("PD", ignoreCase = true) && !proto.contains("PPS", ignoreCase = true) && (v >= 19.0 || w >= 45.0) ->
+                "Laptop / MacBook (USB-PD High Power)"
+
+            // UFCS (Universal Fast Charging Spec - Vivo / iQOO / OPPO / OnePlus / Huawei)
+            code == 20 || proto.contains("UFCS", ignoreCase = true) ->
+                "UFCS Device (Vivo / OPPO / Huawei)"
+
+            // Generic PPS
+            code in listOf(7, 9) || proto.contains("PPS", ignoreCase = true) ->
+                "PPS Fast Charge Device"
+
+            // Generic USB-PD
+            proto.contains("PD", ignoreCase = true) ->
+                "USB-PD Device"
+
+            port.isCharging && proto.isNotBlank() && proto != "Idle" && proto != "Normal" ->
+                "$proto Device"
+
+            else -> null
+        }
+    }
+
+    /**
+     * Compact brand name for status notifications and compact summary tables.
+     */
+    fun detectDeviceBrandShort(port: PortTelemetry): String? {
+        val full = detectDeviceBrandAndProtocol(port) ?: return null
+        return when {
+            full.startsWith("Xiaomi") -> "Xiaomi"
+            full.startsWith("Samsung") -> "Samsung"
+            full.startsWith("Apple iPhone") -> "iPhone"
+            full.startsWith("Apple iPad") -> "iPad"
+            full.startsWith("Apple") -> "Apple"
+            full.startsWith("Laptop") -> "Laptop"
+            full.startsWith("UFCS") -> "UFCS"
+            full.startsWith("PPS") -> "PPS"
+            else -> full.split(" ").firstOrNull() ?: full
+        }
+    }
 }

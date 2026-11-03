@@ -9,8 +9,10 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
+import androidx.compose.runtime.saveable.rememberSaveable
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -111,8 +113,8 @@ fun BleBridgeDashboard(
     val bleDiagnostics = remember { BleBridgeService.bleDiagnostics!! }
     val cloudIntegrations = remember { BleBridgeService.cloudIntegrations!! }
 
-    var showTelemetryScreen by remember { mutableStateOf(false) }
-    var dashboardCurrentTab by remember { mutableStateOf(0) }
+    var showTelemetryScreen by rememberSaveable { mutableStateOf(false) }
+    var dashboardCurrentTab by rememberSaveable { mutableStateOf(0) }
     var showPairingDialog by remember { mutableStateOf(false) }
     var showXiaomiLoginDialog by remember { mutableStateOf(false) }
     var showMiHomeDialogInSettings by remember { mutableStateOf(false) }
@@ -241,13 +243,18 @@ fun BleBridgeDashboard(
                 drawerContentColor = appColors.textPrimary,
                 modifier = Modifier.width(300.dp)
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
                 ) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -360,7 +367,7 @@ fun BleBridgeDashboard(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
 
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 HorizontalDivider(color = appColors.border, modifier = Modifier.padding(horizontal = 20.dp))
                 Column(
@@ -380,6 +387,7 @@ fun BleBridgeDashboard(
                 }
             }
         }
+    }
     ) {
         Scaffold(
             containerColor = appColors.background,
@@ -491,15 +499,17 @@ fun BleBridgeDashboard(
                 )
             },
             bottomBar = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(appColors.surface)
-                        .border(width = 1.dp, color = appColors.border, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                        .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
+                val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                if (!isLandscape || !showTelemetryScreen) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(appColors.surface)
+                            .border(width = 1.dp, color = appColors.border, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                            .padding(horizontal = 20.dp, vertical = if (isLandscape) 6.dp else 12.dp),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -545,6 +555,7 @@ fun BleBridgeDashboard(
                     }
                 }
             }
+        }
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -777,6 +788,109 @@ fun BleBridgeDashboard(
                             }
                         }
 
+                    }
+                }
+
+                // --- Background Keepalive & Battery Optimization Section ---
+                val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
+                var isBatteryIgnored by remember {
+                    mutableStateOf(
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+                        } else true
+                    )
+                }
+                val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                        if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                            isBatteryIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+                            } else true
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                }
+
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = appColors.surface),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "BACKGROUND KEEPALIVE & SYSTEM INTEGRATION",
+                            fontWeight = FontWeight.Bold,
+                            color = appColors.textSecondary,
+                            fontSize = 10.sp,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "Keeps the background BLE bridge and TCP server active when screen turns off or when switching apps.",
+                            fontSize = 12.sp,
+                            color = appColors.textSecondary,
+                            lineHeight = 16.sp
+                        )
+
+                        Surface(
+                            color = if (isBatteryIgnored) Color(0xFF10B981).copy(alpha = 0.12f) else appColors.surfaceVariant,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isBatteryIgnored) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = if (isBatteryIgnored) Color(0xFF10B981) else Color(0xFFF59E0B),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isBatteryIgnored) {
+                                        "Battery optimizations ignored (Keepalive active)"
+                                    } else {
+                                        "Battery optimization active (May be throttled by OS)"
+                                    },
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (isBatteryIgnored) Color(0xFF10B981) else appColors.textPrimary
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                if (isBatteryIgnored) {
+                                    Toast.makeText(context, "Battery optimizations are already disabled for this app.", Toast.LENGTH_SHORT).show()
+                                }
+                                bleDiagnostics.requestIgnoreBatteryOptimizations()
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isBatteryIgnored) appColors.surfaceVariant else appColors.primary,
+                                contentColor = if (isBatteryIgnored) appColors.textPrimary else Color.White
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(44.dp)
+                        ) {
+                            Icon(Icons.Default.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isBatteryIgnored) "Battery Settings (Already Set)" else "Ignore Battery Optimization",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 
@@ -1393,13 +1507,15 @@ fun BleBridgeDashboard(
                 icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFF59E0B)) },
                 title = { Text("Switch to Xiaomi Mi Home?") },
                 text = {
-                    Text(
-                        if (isConnected) {
-                            "Xiaomi Mi Home requires exclusive Bluetooth access to check for and install official charger firmware updates.\n\nOpening Mi Home will safely disconnect the BLE Bridge gateway and release the charger handle.\n\nWhen you return to this app, you will be on the Gateway screen ready to reconnect."
-                        } else {
-                            "Launch Xiaomi Mi Home to check for charger firmware updates or configure official MiOT settings.\n\nMake sure the charger is within Bluetooth range."
-                        }
-                    )
+                    Box(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        Text(
+                            if (isConnected) {
+                                "Xiaomi Mi Home requires exclusive Bluetooth access to check for and install official charger firmware updates.\n\nOpening Mi Home will safely disconnect the BLE Bridge gateway and release the charger handle.\n\nWhen you return to this app, you will be on the Gateway screen ready to reconnect."
+                            } else {
+                                "Launch Xiaomi Mi Home to check for charger firmware updates or configure official MiOT settings.\n\nMake sure the charger is within Bluetooth range."
+                            }
+                        )
+                    }
                 },
                 confirmButton = {
                     Button(

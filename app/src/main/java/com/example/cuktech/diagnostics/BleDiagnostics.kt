@@ -104,18 +104,17 @@ class BleDiagnostics(private val context: Context) {
         // === 3. CHARGER HARDWARE & CAPABILITY SPECIFICATIONS ===
         sb.appendLine("\n=== CUKTECH CHARGER HARDWARE SPECS ===")
         val devInfo = mgr?.deviceInfo?.value
-        val isConnected = mgr?.authState?.value == CuktechAuthState.AUTHENTICATED
-        val fw = if (devInfo?.firmwareVersion.isNullOrBlank() || devInfo?.firmwareVersion == "--") {
-            if (isConnected) "Unknown / Not reported over BLE" else "Available once connected"
-        } else devInfo?.firmwareVersion
-        val sn = if (devInfo?.serialNumber.isNullOrBlank() || devInfo?.serialNumber == "--") {
-            if (isConnected) "Unknown / Not reported over BLE" else "Available once connected"
-        } else devInfo?.serialNumber
+        val fw = devInfo?.firmwareVersion
+        val sn = devInfo?.serialNumber
 
         sb.appendLine("Model: CUKTECH 10 Ultra (AD1204 / AD1204U)")
         sb.appendLine("MiOT Model: njcuk.fitting.ad1204")
-        sb.appendLine("Firmware: $fw")
-        sb.appendLine("Serial Number: $sn")
+        if (!fw.isNullOrBlank() && fw != "--" && !fw.contains("Unknown", ignoreCase = true) && fw != "1.0") {
+            sb.appendLine("Firmware: $fw")
+        }
+        if (!sn.isNullOrBlank() && sn != "--" && !sn.contains("Unknown", ignoreCase = true)) {
+            sb.appendLine("Serial Number: $sn")
+        }
         sb.appendLine("Smart Screen: 1.57\" TFT Vientiane Multi-Color Display")
         sb.appendLine("Protocol Engine: MiOT Spec v5 + CUKTECH Extended v2 (8-byte payload)")
         sb.appendLine("Rated Power Ceiling:")

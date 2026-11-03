@@ -278,24 +278,29 @@ fun CuktechDashboardScreen(
                     .clip(RoundedCornerShape(12.dp))
             ) {
                 tabItems.forEach { (label, icon, idx) ->
+                    val isSelected = (pagerState.currentPage == idx)
                     Tab(
-                        selected = pagerState.currentPage == idx,
+                        selected = isSelected,
                         onClick = {
                             scope.launch {
                                 pagerState.animateScrollToPage(idx)
                             }
                         },
+                        selectedContentColor = Color(0xFF00E5FF),
+                        unselectedContentColor = Color(0xFF64748B),
                         text = {
                             Text(
                                 text = label,
                                 fontSize = if (isLandscape) 11.sp else 12.sp,
-                                fontWeight = if (pagerState.currentPage == idx) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                             )
                         },
                         icon = if (isLandscape) null else { { Icon(icon, contentDescription = label, modifier = Modifier.size(16.dp)) } }
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             if (authState != CuktechAuthState.AUTHENTICATED) {
                 val hasReadyCredentials = savedDevices.any { it.hasValidToken } || activeCred?.hasValidToken == true
@@ -2210,7 +2215,11 @@ private fun PortTelemetryCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 16.dp)
+                    ) {
                         Text(
                             text = "Delay Poweroff",
                             fontSize = 14.sp,
@@ -2423,7 +2432,7 @@ private fun ProtocolSwitchRow(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(end = 8.dp)
+                .padding(end = 16.dp)
         ) {
             Text(
                 text = title,
@@ -2473,9 +2482,16 @@ private fun SettingSwitchRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 16.dp)
+        ) {
             Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (subtitle.isNotBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         Switch(
             checked = checked,
@@ -2973,7 +2989,11 @@ private fun CloudIntegrationConfigPanel(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 16.dp)
+                    ) {
                         Text("Home Assistant Webhook", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Text("Pushes live wattage & energy telemetry", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }

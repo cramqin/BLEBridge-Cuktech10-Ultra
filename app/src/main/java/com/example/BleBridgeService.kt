@@ -217,7 +217,7 @@ class BleBridgeService : Service() {
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
             .setContentTitle("BLE to Network Bridge")
             .setContentText("Listening socket & BLE state engines active")
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_cuktech)
             .setContentIntent(openPendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -289,7 +289,7 @@ class BleBridgeService : Service() {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
                 )
                 builder = NotificationCompat.Builder(this, "BleBridgeServiceChannel")
-                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setSmallIcon(R.drawable.ic_stat_cuktech)
                     .setContentIntent(openPendingIntent)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)

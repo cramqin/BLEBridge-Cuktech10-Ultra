@@ -21,7 +21,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.pager.HorizontalPager
@@ -1270,11 +1269,10 @@ fun CuktechDashboardScreen(
                                 ) {
                                     CuktechProtocol.LANGUAGE_OPTIONS.forEach { (code, name) ->
                                         val isSelected = (localLanguage == code)
-                                        val isDark = isSystemInDarkTheme()
                                         Surface(
                                             shape = RoundedCornerShape(10.dp),
                                             color = if (isSelected) {
-                                                if (isDark) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                                             } else {
                                                 MaterialTheme.colorScheme.surfaceVariant
                                             },
@@ -1906,16 +1904,15 @@ fun CuktechDashboardScreen(
                     options.forEach { (code, pair) ->
                         val (label, desc) = pair
                         val isSelected = (pendingScreenTimeoutCode == code)
-                        val isDark = isSystemInDarkTheme()
                         Surface(
                             onClick = { pendingScreenTimeoutCode = code },
                             shape = RoundedCornerShape(10.dp),
                             color = if (isSelected) {
-                                if (isDark) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                             } else {
-                                if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                             },
-                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (isDark) 0.25f else 0.4f)),
+                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -2054,22 +2051,20 @@ fun CuktechDashboardScreen(
 
 @Composable
 private fun cuktechSwitchColors(): SwitchColors {
-    val dark = isSystemInDarkTheme()
     return SwitchDefaults.colors(
         checkedThumbColor = Color.White,
         checkedTrackColor = MaterialTheme.colorScheme.primary,
-        uncheckedThumbColor = if (dark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.outline,
-        uncheckedTrackColor = if (dark) Color(0xFF1E2430) else MaterialTheme.colorScheme.surfaceVariant,
-        uncheckedBorderColor = if (dark) Color(0xFF475569) else MaterialTheme.colorScheme.outline
+        uncheckedThumbColor = Color(0xFF94A3B8),
+        uncheckedTrackColor = Color(0xFF1E2430),
+        uncheckedBorderColor = Color(0xFF475569)
     )
 }
 
 @Composable
 private fun cuktechRadioButtonColors(): RadioButtonColors {
-    val dark = isSystemInDarkTheme()
     return RadioButtonDefaults.colors(
         selectedColor = MaterialTheme.colorScheme.primary,
-        unselectedColor = if (dark) Color(0xFF64748B) else MaterialTheme.colorScheme.outline
+        unselectedColor = Color(0xFF64748B)
     )
 }
 
@@ -2177,21 +2172,11 @@ private fun PortTelemetryCard(
     onOpenChargeLimit: () -> Unit,
     onOpenClosureTimeDialog: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
-    val accentColor = if (isDark) {
-        when (port.portId) {
-            1 -> Color(0xFF38BDF8)
-            2 -> Color(0xFF818CF8)
-            3 -> Color(0xFF34D399)
-            else -> Color(0xFFFBBF24)
-        }
-    } else {
-        when (port.portId) {
-            1 -> Color(0xFF0284C7) // Sky 600 - crisp on white
-            2 -> Color(0xFF6366F1) // Indigo 500 - crisp on white
-            3 -> Color(0xFF059669) // Emerald 600 - crisp on white
-            else -> Color(0xFFD97706) // Amber 600 - crisp on white
-        }
+    val accentColor = when (port.portId) {
+        1 -> Color(0xFF38BDF8)
+        2 -> Color(0xFF818CF8)
+        3 -> Color(0xFF34D399)
+        else -> Color(0xFFFBBF24)
     }
 
     val cardModifier = if (bringIntoViewRequester != null) {

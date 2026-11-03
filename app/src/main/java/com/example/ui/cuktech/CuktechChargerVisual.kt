@@ -221,7 +221,7 @@ fun CuktechChargerVisual(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = topPadding, start = 12.dp, end = 0.dp),
+                        .padding(top = topPadding),
                     verticalArrangement = Arrangement.spacedBy(rowSpacing)
                 ) {
                     for (portId in 1..4) {
@@ -237,25 +237,32 @@ fun CuktechChargerVisual(
                                 .clickable { onPortClick?.invoke(portId) },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = label,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                color = if (isCharging) Color(0xFF00E5FF) else Color(0xFF8E99A8),
-                                modifier = Modifier.width(22.dp)
-                            )
+                            // Left Wing: Silkscreen Port Label (Right-aligned next to centered slot)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 8.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = if (isCharging) Color(0xFF00E5FF) else Color(0xFF8E99A8)
+                                )
+                            }
 
-                            // Port Slot Geometry
+                            // Centered Port Slot Geometry
                             if (isC) {
-                                // Type-C Oval Pill Slot
+                                // Type-C Oval Pill Slot (Precisely Centered)
                                 Box(
                                     modifier = Modifier
-                                        .width(42.dp)
+                                        .width(44.dp)
                                         .height(12.dp)
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(
-                                            if (isCharging) Color(0xFF00E5FF).copy(alpha = 0.25f * pulseAlpha) else Color(0xFF0B0D11)
+                                            if (isCharging) Color(0xFF00E5FF).copy(alpha = 0.35f * pulseAlpha) else Color(0xFF0B0D11)
                                         )
                                         .border(
                                             width = if (isCharging) 1.5.dp else 1.dp,
@@ -266,21 +273,21 @@ fun CuktechChargerVisual(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .width(24.dp)
-                                            .height(3.dp)
+                                            .width(26.dp)
+                                            .height(3.5.dp)
                                             .clip(RoundedCornerShape(2.dp))
                                             .background(if (isCharging) Color(0xFF00E5FF) else Color(0xFF1E222A))
                                     )
                                 }
                             } else {
-                                // USB-A Rectangular Slot
+                                // USB-A Rectangular Slot (Precisely Centered)
                                 Box(
                                     modifier = Modifier
-                                        .width(46.dp)
+                                        .width(48.dp)
                                         .height(16.dp)
                                         .clip(RoundedCornerShape(3.dp))
                                         .background(
-                                            if (isCharging) Color(0xFF00E5FF).copy(alpha = 0.25f * pulseAlpha) else Color(0xFF0B0D11)
+                                            if (isCharging) Color(0xFF00E5FF).copy(alpha = 0.35f * pulseAlpha) else Color(0xFF0B0D11)
                                         )
                                         .border(
                                             width = if (isCharging) 1.5.dp else 1.dp,
@@ -292,32 +299,33 @@ fun CuktechChargerVisual(
                                     // Internal Blue Tongue
                                     Box(
                                         modifier = Modifier
-                                            .width(26.dp)
-                                            .height(5.dp)
+                                            .width(28.dp)
+                                            .height(5.5.dp)
                                             .clip(RoundedCornerShape(1.dp))
                                             .background(if (isCharging) Color(0xFF00E5FF) else Color(0xFF1E5BB5))
                                     )
                                 }
                             }
 
-                            if (isCharging) {
-                                // Soft, translucent glowing light beam shooting out of port slot to charger edge
-                                Canvas(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(14.dp)
-                                ) {
-                                    drawRect(
-                                        brush = Brush.horizontalGradient(
-                                            listOf(
-                                                Color(0xFF00E5FF).copy(alpha = 0.15f * pulseAlpha),
-                                                Color(0xFF00E5FF).copy(alpha = 0.28f * pulseAlpha)
+                            // Right Wing: Internal Laser Beam extending from slot to charger edge
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(if (isC) 12.dp else 16.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                if (isCharging) {
+                                    Canvas(modifier = Modifier.fillMaxSize()) {
+                                        drawRect(
+                                            brush = Brush.horizontalGradient(
+                                                listOf(
+                                                    Color(0xFF00E5FF).copy(alpha = 0.20f * pulseAlpha),
+                                                    Color(0xFF00E5FF).copy(alpha = 0.38f * pulseAlpha)
+                                                )
                                             )
                                         )
-                                    )
+                                    }
                                 }
-                            } else {
-                                Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }

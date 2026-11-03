@@ -274,7 +274,7 @@ fun CuktechDashboardScreen(
                 contentColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(if (isLandscape) 36.dp else 48.dp)
+                    .height(if (isLandscape) 38.dp else 50.dp)
                     .clip(RoundedCornerShape(12.dp))
             ) {
                 tabItems.forEach { (label, icon, idx) ->
@@ -287,20 +287,34 @@ fun CuktechDashboardScreen(
                             }
                         },
                         selectedContentColor = Color(0xFF00E5FF),
-                        unselectedContentColor = Color(0xFF64748B),
-                        text = {
+                        unselectedContentColor = Color(0xFF64748B)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(vertical = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            if (!isLandscape) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = label,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                            }
                             Text(
                                 text = label,
                                 fontSize = if (isLandscape) 11.sp else 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                             )
-                        },
-                        icon = if (isLandscape) null else { { Icon(icon, contentDescription = label, modifier = Modifier.size(16.dp)) } }
-                    )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             if (authState != CuktechAuthState.AUTHENTICATED) {
                 val hasReadyCredentials = savedDevices.any { it.hasValidToken } || activeCred?.hasValidToken == true
@@ -3145,7 +3159,7 @@ private fun ConsolidatedSessionsTableDialog(
             ) {
                 Column {
                     Text("Consolidated Charging History (${allSessions.size})", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("Rolling history: up to 300 sessions retained (oldest deleted upon exceeding 300)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Rolling history: up to 300 sessions retained (FIFO auto-prune)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },
@@ -3179,9 +3193,9 @@ private fun ConsolidatedSessionsTableDialog(
                                     .padding(vertical = 4.dp, horizontal = 4.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Port / Proto", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.3f))
+                                Text("Port / Proto", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.5f))
                                 Text("Energy", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.9f))
-                                Text("Dur", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f))
+                                Text("Dur", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.6f))
                                 Text("Peak", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f))
                                 Text("Time", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.0f))
                             }
@@ -3189,6 +3203,10 @@ private fun ConsolidatedSessionsTableDialog(
 
                             pageSessions.forEachIndexed { idx, s ->
                                 val bg = if (idx % 2 == 0) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                val cleanProto = s.protocolUsed
+                                    .replace(Regex("\\s*\\([0-9.]+V\\)"), "")
+                                    .trim()
+                                val shortPort = s.portLabel.replace("USB-", "")
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -3197,12 +3215,18 @@ private fun ConsolidatedSessionsTableDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1.3f)) {
-                                        Text(s.portLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                        Text(s.protocolUsed.take(12), fontSize = 9.sp, color = Color(0xFF00E5FF), maxLines = 1)
+                                    Column(modifier = Modifier.weight(1.5f)) {
+                                        Text(shortPort, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = cleanProto,
+                                            fontSize = 9.sp,
+                                            color = Color(0xFF00E5FF),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
                                     Text("${"%.2f".format(s.whAccumulated)}Wh", fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(0.9f))
-                                    Text("${s.durationSeconds / 60}m", fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(0.8f))
+                                    Text("${s.durationSeconds / 60}m", fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(0.6f))
                                     Text("${"%.1f".format(s.peakWatts)}W", fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(0.8f))
                                     val startStr = timeFormat.format(java.util.Date((s.startTimeSec * 1000).toLong()))
                                     Text(startStr, fontSize = 9.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1.0f))

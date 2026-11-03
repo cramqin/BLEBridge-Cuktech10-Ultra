@@ -1,6 +1,8 @@
 package com.example
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -115,6 +117,7 @@ fun BleBridgeDashboard(
     val activeCred by cuktechManager.credentialStore.activeDevice.collectAsState()
     val cuktechAuthState by cuktechManager.authState.collectAsState()
     val cuktechDevInfo by cuktechManager.deviceInfo.collectAsState()
+    val diagStatus by bleDiagnostics.status.collectAsState()
 
     BackHandler(enabled = showTelemetryScreen) {
         showTelemetryScreen = false
@@ -1217,6 +1220,91 @@ fun BleBridgeDashboard(
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+
+                // --- Bluetooth Low Energy & Adapter Diagnostics Section ---
+                val hasDiagOutput = diagStatus.lastDiagnosticOutput.isNotBlank()
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = appColors.surface),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            text = "BLUETOOTH & ADAPTER DIAGNOSTICS",
+                            fontWeight = FontWeight.Bold,
+                            color = appColors.textSecondary,
+                            fontSize = 10.sp,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Inspect hardware Bluetooth adapter status, scanning subsystem, and connection parameters.",
+                            color = appColors.textSecondary,
+                            fontSize = 11.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        bleDiagnostics.runBluetoothStackDiagnostics()
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = appColors.primary,
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Run Diagnostics", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            if (hasDiagOutput) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                        val clip = ClipData.newPlainText("BLE Diagnostics", diagStatus.lastDiagnosticOutput)
+                                        clipboard?.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Diagnostics copied to clipboard", Toast.LENGTH_SHORT).show()
+                                    },
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Copy Logs", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        if (hasDiagOutput) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Surface(
+                                color = appColors.surfaceVariant,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = diagStatus.lastDiagnosticOutput,
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = appColors.textPrimary,
+                                    modifier = Modifier.padding(12.dp)
+                                )
                             }
                         }
                     }

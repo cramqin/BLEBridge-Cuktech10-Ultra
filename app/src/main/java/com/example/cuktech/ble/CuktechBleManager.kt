@@ -1435,7 +1435,10 @@ class CuktechBleManager(
 
             CuktechProtocol.PIID_LANGUAGE -> {
                 if (frame.payload.isNotEmpty()) {
-                    _settings.value = _settings.value.copy(language = frame.payload[0].toInt() and 0xFF)
+                    val raw = frame.payload[0].toInt() and 0xFF
+                    if (raw in 0..1) {
+                        _settings.value = _settings.value.copy(language = raw)
+                    }
                 }
             }
 
@@ -1851,6 +1854,40 @@ class CuktechBleManager(
                 piid = CuktechProtocol.PIID_GOTO_SCREEN,
                 isSet = true,
                 valueBytes = byteArrayOf(screenIndex.toByte())
+            )
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL1,
+                "[Cuktech] Sent LCD Goto Page $screenIndex (PIID 14)"
+            )
+        }
+    }
+
+    fun rotateScreen180() {
+        scope.launch {
+            val curDeg = _settings.value.orientationDegrees
+            val targetDeg = if (curDeg == 180) 0 else 180
+            _settings.value = _settings.value.copy(
+                orientationLock = true,
+                orientationDegrees = targetDeg
+            )
+            // 1. Lock orientation (PIID 20)
+            sendMiotCommand(
+                siid = CuktechProtocol.SIID_CHARGER,
+                piid = CuktechProtocol.PIID_ORIENTATION_LOCK,
+                isSet = true,
+                valueBytes = byteArrayOf(1.toByte())
+            )
+            // 2. Direct inverted screen direction command (PIID 14: 2 for 180° inverted, 1 for normal)
+            val dirCode = if (targetDeg == 180) 2 else 1
+            sendMiotCommand(
+                siid = CuktechProtocol.SIID_CHARGER,
+                piid = CuktechProtocol.PIID_GOTO_SCREEN,
+                isSet = true,
+                valueBytes = byteArrayOf(dirCode.toByte())
+            )
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL1,
+                "[Cuktech] Rotated screen to ${targetDeg}° (PIID 20=1, PIID 14=$dirCode)"
             )
         }
     }

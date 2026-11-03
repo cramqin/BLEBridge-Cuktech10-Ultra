@@ -1,5 +1,7 @@
 package com.example.ui.cuktech
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -1204,65 +1206,49 @@ fun CuktechDashboardScreen(
                         }
                     }
 
-                    // 2. Bluetooth Low Energy Diagnostics Card
-                    val hasDiagOutput = diagStatus.lastDiagnosticOutput.isNotBlank()
+                    // 2. BLE Activity & Communication Logs Card
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Bluetooth Low Energy Diagnostics",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                            Text(
-                                text = "Inspect hardware adapter state, BLE connection parameters, and MiOT protocol status.",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            Button(
-                                onClick = {
-                                    if (hasDiagOutput) {
-                                        bleDiagnostics.clearDiagnosticOutput()
-                                    } else {
-                                        scope.launch {
-                                            bleDiagnostics.runBluetoothStackDiagnostics()
-                                        }
-                                    }
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = if (hasDiagOutput) ButtonDefaults.filledTonalButtonColors() else ButtonDefaults.buttonColors()
-                            ) {
-                                Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (hasDiagOutput) "Hide BLE Diagnostics" else "Run BLE Diagnostics",
-                                    fontSize = 12.sp
+                                    text = "BLE Activity Logs",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "Copy live GATT frames and MiOT commands to clipboard for diagnostics.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-
-                            if (hasDiagOutput) {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = diagStatus.lastDiagnosticOutput,
-                                        fontSize = 11.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.padding(10.dp)
-                                    )
-                                }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Button(
+                                onClick = {
+                                    val logs = BleBridgeService.getLogMessages().joinToString("\n") { it.message }
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                    val clip = ClipData.newPlainText("CUKTECH BLE Logs", logs)
+                                    clipboard?.setPrimaryClip(clip)
+                                    Toast.makeText(context, "BLE logs copied to clipboard", Toast.LENGTH_SHORT).show()
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF00E5FF),
+                                    contentColor = Color(0xFF0A0E1A)
+                                )
+                            ) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Copy Logs", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1488,63 +1474,58 @@ fun CuktechDashboardScreen(
 
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                            // C. Screen Orientation Lock (PIID 20)
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                    text = "Screen Orientation (Gravity Sensor)",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
+                            // C. Screen Orientation & Rotation Control (PIID 20 & 180° Flip)
+                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                SettingSwitchRow(
+                                    title = "Screen Lock",
+                                    subtitle = "Lock screen orientation (disables gravity sensor auto-rotate)",
+                                    checked = settings.orientationLock,
+                                    onCheckedChange = { bleManager.setOrientationLock(it) }
                                 )
-                                Text(
-                                    text = "Auto-rotates with internal G-sensor when plugged into wall outlets, or lock orientation",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    val isAuto = !settings.orientationLock
-                                    FilterChip(
-                                        selected = isAuto,
-                                        onClick = { bleManager.setOrientationLock(false) },
-                                        label = {
-                                            Text(
-                                                text = "🔄 Auto-Rotate (G-Sensor)",
-                                                fontWeight = if (isAuto) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 11.sp
-                                            )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Rotate Display 180°",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = "Manually invert charger LCD orientation via software control",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Button(
+                                        onClick = {
+                                            bleManager.rotateScreen180()
+                                            Toast.makeText(context, "Inverting charger LCD (180°)...", Toast.LENGTH_SHORT).show()
                                         },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = Color(0xFF00E5FF),
-                                            selectedLabelColor = Color(0xFF0A0E1A)
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFF00E5FF),
+                                            contentColor = Color(0xFF0A0E1A)
                                         ),
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    val isLocked = settings.orientationLock
-                                    FilterChip(
-                                        selected = isLocked,
-                                        onClick = { bleManager.setOrientationLock(true) },
-                                        label = {
-                                            Text(
-                                                text = "🔒 Direction Locked",
-                                                fontWeight = if (isLocked) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 11.sp
-                                            )
-                                        },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = Color(0xFF00E5FF),
-                                            selectedLabelColor = Color(0xFF0A0E1A)
-                                        ),
-                                        modifier = Modifier.weight(1f)
-                                    )
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.ScreenRotation, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Flip 180°", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
 
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
                             // D. Physical LCD Screen Page Quick-Switch (PIID 14)
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            var localActivePage by remember(settings.activeLcdPage) {
+                                mutableStateOf(if (settings.activeLcdPage in 1..5) settings.activeLcdPage else 1)
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
                                     text = "Physical LCD Screen Navigation",
                                     fontSize = 12.sp,
@@ -1559,7 +1540,7 @@ fun CuktechDashboardScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     val lcdPages = listOf(
                                         1 to "⚡ Total Power (P1)",
@@ -1569,25 +1550,28 @@ fun CuktechDashboardScreen(
                                         5 to "ℹ️ System Info (P5)"
                                     )
                                     lcdPages.forEach { (page, label) ->
-                                        val isSelected = (settings.activeLcdPage == page)
-                                        FilterChip(
-                                            selected = isSelected,
-                                            onClick = {
+                                        val isSelected = (localActivePage == page)
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (isSelected) Color(0xFF00E5FF) else Color(0xFF141923),
+                                            border = BorderStroke(
+                                                width = if (isSelected) 1.5.dp else 1.dp,
+                                                color = if (isSelected) Color(0xFF00E5FF) else Color.White.copy(alpha = 0.15f)
+                                            ),
+                                            modifier = Modifier.clickable {
+                                                localActivePage = page
                                                 bleManager.gotoScreen(page)
                                                 Toast.makeText(context, "Switched charger LCD to $label", Toast.LENGTH_SHORT).show()
-                                            },
-                                            label = {
-                                                Text(
-                                                    text = label,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                                )
-                                            },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = Color(0xFF00E5FF),
-                                                selectedLabelColor = Color(0xFF0A0E1A)
+                                            }
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                color = if (isSelected) Color(0xFF0A0E1A) else Color.White,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 11.sp,
+                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                                             )
-                                        )
+                                        }
                                     }
                                 }
                             }
@@ -1595,7 +1579,10 @@ fun CuktechDashboardScreen(
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
                             // E. Physical Screen Language (PIID 13)
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            var localLanguage by remember(settings.language) {
+                                mutableStateOf(if (settings.language in 0..1) settings.language else 0)
+                            }
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
                                     text = "Physical Screen Language",
                                     fontSize = 12.sp,
@@ -1606,26 +1593,44 @@ fun CuktechDashboardScreen(
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     CuktechProtocol.LANGUAGE_OPTIONS.forEach { (code, name) ->
-                                        val isSelected = (settings.language == code)
-                                        FilterChip(
-                                            selected = isSelected,
-                                            onClick = {
-                                                bleManager.setLanguage(code)
-                                                Toast.makeText(context, "Charger language set to $name", Toast.LENGTH_SHORT).show()
-                                            },
-                                            label = {
+                                        val isSelected = (localLanguage == code)
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isSelected) Color(0xFF00E5FF) else Color(0xFF141923),
+                                            border = BorderStroke(
+                                                width = if (isSelected) 1.5.dp else 1.dp,
+                                                color = if (isSelected) Color(0xFF00E5FF) else Color.White.copy(alpha = 0.15f)
+                                            ),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .clickable {
+                                                    localLanguage = code
+                                                    bleManager.setLanguage(code)
+                                                    Toast.makeText(context, "Charger language set to $name", Toast.LENGTH_SHORT).show()
+                                                }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 16.dp),
+                                                horizontalArrangement = Arrangement.Center,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                if (isSelected) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Check,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF0A0E1A),
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(Modifier.width(6.dp))
+                                                }
                                                 Text(
                                                     text = name,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                    fontSize = 12.sp
+                                                    color = if (isSelected) Color(0xFF0A0E1A) else Color.White,
+                                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                                    fontSize = 13.sp
                                                 )
-                                            },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = Color(0xFF00E5FF),
-                                                selectedLabelColor = Color(0xFF0A0E1A)
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        )
+                                            }
+                                        }
                                     }
                                 }
                             }

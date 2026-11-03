@@ -40,90 +40,82 @@ fun MyApplicationTheme(
     palette: DarkThemePalette = DarkThemePalette.CUKTECH_CYAN,
     content: @Composable () -> Unit
 ) {
-    val (bg, surf, surfVar, bord, prim, primCont, onPrimCont) = when (palette) {
-        DarkThemePalette.CUKTECH_CYAN -> {
-            listOf(
-                CuktechGunmetalBackground,
-                CuktechGunmetalSurface,
-                CuktechGunmetalSurfaceVariant,
-                CuktechGunmetalBorder,
-                CuktechGunmetalPrimary,
-                CuktechGunmetalPrimaryContainer,
-                CuktechGunmetalOnPrimaryContainer
-            )
-        }
-        DarkThemePalette.AMOLED_BLACK -> {
-            listOf(
-                AmoledBackground,
-                AmoledSurface,
-                AmoledSurfaceVariant,
-                AmoledBorder,
-                AmoledPrimary,
-                AmoledPrimaryContainer,
-                AmoledOnPrimaryContainer
-            )
-        }
-        DarkThemePalette.CYBERPUNK_NEON -> {
-            listOf(
-                CyberpunkBackground,
-                CyberpunkSurface,
-                CyberpunkSurfaceVariant,
-                CyberpunkBorder,
-                CyberpunkPrimary,
-                CyberpunkPrimaryContainer,
-                CyberpunkOnPrimaryContainer
-            )
-        }
-        DarkThemePalette.TITANIUM_AMBER -> {
-            listOf(
-                TitaniumBackground,
-                TitaniumSurface,
-                TitaniumSurfaceVariant,
-                TitaniumBorder,
-                TitaniumPrimary,
-                TitaniumPrimaryContainer,
-                TitaniumOnPrimaryContainer
-            )
-        }
-        DarkThemePalette.DEEP_OCEAN_BLUE -> {
-            listOf(
-                OceanBackground,
-                OceanSurface,
-                OceanSurfaceVariant,
-                OceanBorder,
-                OceanPrimary,
-                OceanPrimaryContainer,
-                OceanOnPrimaryContainer
-            )
-        }
+    val customColors = when (palette) {
+        DarkThemePalette.CUKTECH_CYAN -> AppColors(
+            background = CuktechGunmetalBackground,
+            surface = CuktechGunmetalSurface,
+            surfaceVariant = CuktechGunmetalSurfaceVariant,
+            border = CuktechGunmetalBorder,
+            textPrimary = DarkTextPrimary,
+            textSecondary = DarkTextSecondary,
+            primary = CuktechGunmetalPrimary,
+            primaryContainer = CuktechGunmetalPrimaryContainer,
+            onPrimaryContainer = CuktechGunmetalOnPrimaryContainer,
+            isDark = true
+        )
+        DarkThemePalette.AMOLED_BLACK -> AppColors(
+            background = AmoledBackground,
+            surface = AmoledSurface,
+            surfaceVariant = AmoledSurfaceVariant,
+            border = AmoledBorder,
+            textPrimary = DarkTextPrimary,
+            textSecondary = DarkTextSecondary,
+            primary = AmoledPrimary,
+            primaryContainer = AmoledPrimaryContainer,
+            onPrimaryContainer = AmoledOnPrimaryContainer,
+            isDark = true
+        )
+        DarkThemePalette.CYBERPUNK_NEON -> AppColors(
+            background = CyberpunkBackground,
+            surface = CyberpunkSurface,
+            surfaceVariant = CyberpunkSurfaceVariant,
+            border = CyberpunkBorder,
+            textPrimary = DarkTextPrimary,
+            textSecondary = DarkTextSecondary,
+            primary = CyberpunkPrimary,
+            primaryContainer = CyberpunkPrimaryContainer,
+            onPrimaryContainer = CyberpunkOnPrimaryContainer,
+            isDark = true
+        )
+        DarkThemePalette.TITANIUM_AMBER -> AppColors(
+            background = TitaniumBackground,
+            surface = TitaniumSurface,
+            surfaceVariant = TitaniumSurfaceVariant,
+            border = TitaniumBorder,
+            textPrimary = DarkTextPrimary,
+            textSecondary = DarkTextSecondary,
+            primary = TitaniumPrimary,
+            primaryContainer = TitaniumPrimaryContainer,
+            onPrimaryContainer = TitaniumOnPrimaryContainer,
+            isDark = true
+        )
+        DarkThemePalette.DEEP_OCEAN_BLUE -> AppColors(
+            background = OceanBackground,
+            surface = OceanSurface,
+            surfaceVariant = OceanSurfaceVariant,
+            border = OceanBorder,
+            textPrimary = DarkTextPrimary,
+            textSecondary = DarkTextSecondary,
+            primary = OceanPrimary,
+            primaryContainer = OceanPrimaryContainer,
+            onPrimaryContainer = OceanOnPrimaryContainer,
+            isDark = true
+        )
     }
 
-    val customColors = AppColors(
-        background = bg,
-        surface = surf,
-        surfaceVariant = surfVar,
-        border = bord,
-        textPrimary = DarkTextPrimary,
-        textSecondary = DarkTextSecondary,
-        primary = prim,
-        primaryContainer = primCont,
-        onPrimaryContainer = onPrimCont,
-        isDark = true
-    )
-
     val colorScheme = darkColorScheme(
-        primary = prim,
+        primary = customColors.primary,
         onPrimary = Color(0xFF0A0E1A),
-        primaryContainer = primCont,
-        onPrimaryContainer = onPrimCont,
-        background = bg,
-        surface = surf,
-        surfaceVariant = surfVar,
+        primaryContainer = customColors.primaryContainer,
+        onPrimaryContainer = customColors.onPrimaryContainer,
+        background = customColors.background,
+        surface = customColors.surface,
+        surfaceVariant = customColors.surfaceVariant,
         onBackground = DarkTextPrimary,
         onSurface = DarkTextPrimary,
         onSurfaceVariant = DarkTextSecondary,
-        outline = bord,
-        outlineVariant = bord.copy(alpha = 0.5f)
+        outline = customColors.border,
+        outlineVariant = customColors.border.copy(alpha = 0.5f)
     )
 
     CompositionLocalProvider(LocalAppColors provides customColors) {

@@ -2388,7 +2388,7 @@ private fun PortTelemetryCard(
 
                     ProtocolSwitchRow(
                         title = "PD",
-                        subtitle = "USB Power Delivery (100W/140W). Disabling PD also disables PPS.",
+                        subtitle = "USB Power Delivery (up to 100W). Disabling PD also disables PPS.",
                         checked = pdChecked,
                         onCheckedChange = { onSetProtocol("pd", it) }
                     )

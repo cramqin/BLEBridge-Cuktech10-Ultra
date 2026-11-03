@@ -1993,7 +1993,7 @@ class CuktechBleManager(
                 portWatts
             }
 
-            BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content)
+            BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content, totalW)
         } else {
             val isServerRunning = BleBridgeService.isServerRunning.value
             if (!isServerRunning && _authState.value == CuktechAuthState.DISCONNECTED) {
@@ -2007,7 +2007,7 @@ class CuktechBleManager(
                 CuktechAuthState.AUTH_FAILED -> "Auth failed · Check credentials"
                 else -> if (isServerRunning) "TCP Server Active · Listening" else "Ready"
             }
-            BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content)
+            BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content, -1.0)
         }
     }
 
@@ -2068,16 +2068,6 @@ class CuktechBleManager(
                 BleBridgeService.Companion.LogLevel.LEVEL1,
                 "[Cuktech] Rotated screen to ${targetDeg}° (PIID 20=1, PIID 14=$dirCode)"
             )
-        }
-    }
-
-    fun invokeAdcAssistant(onComplete: (() -> Unit)? = null) {
-        scope.launch {
-            setSceneMode(1)
-            gotoScreen(2)
-            forceSoftRestart {
-                onComplete?.invoke()
-            }
         }
     }
 

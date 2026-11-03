@@ -181,6 +181,11 @@ class BleBridgeService : Service() {
 
     // --- Foreground Service Notification ---
 
+    private val serviceStartTimeMs = System.currentTimeMillis()
+    private var lastNotifTitle: String = ""
+    private var lastNotifContent: String = ""
+    private var notificationBuilderInstance: NotificationCompat.Builder? = null
+
     private fun createNotificationChannelAndStartForeground() {
         acquireWakeLock()
         val channelId = "BleBridgeServiceChannel"
@@ -205,7 +210,14 @@ class BleBridgeService : Service() {
             .setContentText("Listening socket & BLE state engines active")
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setWhen(serviceStartTimeMs)
+            .setShowWhen(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setLocalOnly(true)
+            .setSortKey("cuktech_gateway")
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Gateway", stopPendingIntent)
+        notificationBuilderInstance = notificationBuilder
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -233,52 +245,54 @@ class BleBridgeService : Service() {
         }
     }
 
-    private var lastNotifTitle: String = ""
-    private var lastNotifContent: String = ""
-    private var lastNotifPostMs: Long = 0L
-
     /**
      * Updates the ongoing foreground service notification with live CUKTECH charger telemetry,
-     * per-port wattage, and active delay poweroff countdown timers.
-     * Throttles updates and sets setShowWhen(false) to prevent jumping/flickering with other apps (e.g. Scene).
+     * per-port wattage, and active countdown timers.
+     * Reuses the builder instance with a fixed serviceStartTimeMs and setOnlyAlertOnce(true).
+     * This performs in-place content updates like FDE.AI without resetting the notification post timestamp,
+     * permanently preventing the notification from jumping or interchanging with other monitoring apps (e.g. Scene).
      */
-    fun updateNotificationTelemetry(title: String, content: String) {
-        val now = System.currentTimeMillis()
+    fun updateNotificationTelemetry(title: String, content: String, totalWatts: Double = -1.0) {
         if (title == lastNotifTitle && content == lastNotifContent) {
             return
         }
-        // Throttle updates: don't re-post more often than every 3 seconds unless title (status) changed
-        if (title == lastNotifTitle && (now - lastNotifPostMs) < 3000L) {
-            return
-        }
+
         lastNotifTitle = title
         lastNotifContent = content
-        lastNotifPostMs = now
 
         runCatching {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-            val openIntent = packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            var builder = notificationBuilderInstance
+            if (builder == null) {
+                val openIntent = packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+                val openPendingIntent = PendingIntent.getActivity(
+                    this, 0, openIntent,
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
+                )
+                val stopIntent = Intent(this, BleBridgeService::class.java).apply { action = ACTION_STOP_SERVER }
+                val stopPendingIntent = PendingIntent.getService(
+                    this, 0, stopIntent,
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
+                )
+                builder = NotificationCompat.Builder(this, "BleBridgeServiceChannel")
+                    .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+                    .setContentIntent(openPendingIntent)
+                    .setOngoing(true)
+                    .setOnlyAlertOnce(true)
+                    .setWhen(serviceStartTimeMs)
+                    .setShowWhen(true)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setLocalOnly(true)
+                    .setSortKey("cuktech_gateway")
+                    .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Gateway", stopPendingIntent)
+                notificationBuilderInstance = builder
             }
-            val openPendingIntent = PendingIntent.getActivity(
-                this, 0, openIntent,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            val stopIntent = Intent(this, BleBridgeService::class.java).apply { action = ACTION_STOP_SERVER }
-            val stopPendingIntent = PendingIntent.getService(
-                this, 0, stopIntent,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            val notif = NotificationCompat.Builder(this, "BleBridgeServiceChannel")
+
+            val notif = builder
                 .setContentTitle(title)
                 .setContentText(content)
-                .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-                .setContentIntent(openPendingIntent)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .setShowWhen(false)
-                .setSortKey("cuktech_gateway")
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Gateway", stopPendingIntent)
                 .build()
             nm.notify(NOTIFICATION_ID, notif)
         }

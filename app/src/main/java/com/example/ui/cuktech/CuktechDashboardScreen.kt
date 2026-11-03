@@ -117,7 +117,6 @@ fun CuktechDashboardScreen(
     var selectedClearHistoryOption by remember { mutableStateOf(CuktechPersistence.ClearHistoryOption.KEEP_ACTIVE) }
     var showScreenOnTimeoutDialog by remember { mutableStateOf(false) }
     var pendingScreenTimeoutCode by remember { mutableStateOf(4) }
-    var isAdcRunning by remember { mutableStateOf(false) }
     var selectedSessionDetail by remember { mutableStateOf<com.example.cuktech.energy.ChargeSessionRecord?>(null) }
     var showConsolidatedTable by remember { mutableStateOf(false) }
 
@@ -1589,7 +1588,7 @@ fun CuktechDashboardScreen(
                         }
                     }
 
-                    // 6. Force Soft Port Reset & ADC Assistant Card
+                    // 6. Force Soft Port Reset Card
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
@@ -1613,19 +1612,19 @@ fun CuktechDashboardScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Port Reset & ADC Assistant",
+                                        text = "Soft Port Reset",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
                                     )
                                     Text(
-                                        text = "Re-negotiates USB-PD contracts and optimizes load distribution across active ports",
+                                        text = "Power-cycles all ports to force USB-PD contract re-negotiation",
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
 
-                            // Explanatory ADC Information Callout
+                            // Explanatory note regarding ADC
                             Surface(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                                 shape = RoundedCornerShape(8.dp),
@@ -1644,7 +1643,7 @@ fun CuktechDashboardScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "What is ADC? Adaptive Dynamic Current (ADC) intelligently balances real-time wattage across all active ports based on each device's charging curve. Unlike standard chargers that briefly cut power to renegotiate, ADC seamlessly adjusts power contracts and displays dynamic allocation on Screen Page 2 without disconnecting devices.",
+                                        text = "Note: Adaptive Dynamic Current (ADC) is an autonomous MCU algorithm built directly into the charger hardware. It constantly balances power without cutting connection. To view live ADC power allocation on the charger screen, switch to Page 2 in the Display Screen Page selector above.",
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         lineHeight = 15.sp
@@ -1652,60 +1651,15 @@ fun CuktechDashboardScreen(
                                 }
                             }
 
-                            if (isAdcRunning) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    LinearProgressIndicator(
-                                        modifier = Modifier.fillMaxWidth().height(4.dp),
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = "Configuring ADC Assistant & re-negotiating USB-PD contracts...",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-
-                            Row(
+                            Button(
+                                onClick = { showSoftRestartDialog = true },
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {
-                                Button(
-                                    onClick = {
-                                        isAdcRunning = true
-                                        bleManager.invokeAdcAssistant {
-                                            isAdcRunning = false
-                                            scope.launch {
-                                                Toast.makeText(context, "ADC Assistant activated on charger LCD & ports re-negotiated.", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    },
-                                    enabled = !isAdcRunning,
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.filledTonalButtonColors()
-                                ) {
-                                    Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(if (isAdcRunning) "Running..." else "Run ADC Setup", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-
-                                Button(
-                                    onClick = { showSoftRestartDialog = true },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                                ) {
-                                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Soft Reset", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
+                                Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Re-negotiate Ports (Soft Reset)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

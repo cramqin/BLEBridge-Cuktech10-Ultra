@@ -2118,14 +2118,14 @@ private fun SmoothWheelPicker(
                     fontSize = if (isSelected) 28.sp else 16.sp,
                     fontWeight = if (isSelected) FontWeight.Black else FontWeight.Normal,
                     fontFamily = FontFamily.Monospace,
-                    color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
                 )
                 if (isSelected) {
                     Text(
                         text = " $unit",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF00E5FF),
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = 2.dp, top = 4.dp)
                     )
                 }
@@ -2176,7 +2176,7 @@ private fun PortTelemetryCard(
         modifier = cardModifier
             .border(
                 width = if (isHighlighted) 2.dp else if (port.isCharging) 1.5.dp else 0.5.dp,
-                color = if (isHighlighted) Color(0xFF00E5FF) else if (port.isCharging) accentColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                color = if (isHighlighted) MaterialTheme.colorScheme.primary else if (port.isCharging) accentColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
                 shape = RoundedCornerShape(16.dp)
             ),
         shape = RoundedCornerShape(16.dp),

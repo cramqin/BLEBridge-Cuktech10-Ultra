@@ -68,29 +68,30 @@ class MainActivity : ComponentActivity() {
         BleBridgeService.ensureCuktechManagersInitialized(applicationContext)
 
         val prefs = getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
-        val initialTheme = when (prefs.getString("theme_mode", "SYSTEM")) {
-            "LIGHT" -> ThemeMode.LIGHT
-            "DARK" -> ThemeMode.DARK
-            else -> ThemeMode.SYSTEM
+        val initialPaletteName = prefs.getString("dark_palette", DarkThemePalette.CUKTECH_CYAN.name) ?: DarkThemePalette.CUKTECH_CYAN.name
+        val initialPalette = try {
+            DarkThemePalette.valueOf(initialPaletteName)
+        } catch (_: Exception) {
+            DarkThemePalette.CUKTECH_CYAN
         }
 
         setContent {
-            var themeMode by remember { mutableStateOf(initialTheme) }
+            var selectedPalette by remember { mutableStateOf(initialPalette) }
 
-            fun updateTheme(newMode: ThemeMode) {
-                themeMode = newMode
-                prefs.edit().putString("theme_mode", newMode.name).apply()
+            fun updatePalette(newPalette: DarkThemePalette) {
+                selectedPalette = newPalette
+                prefs.edit().putString("dark_palette", newPalette.name).apply()
             }
 
-            MyApplicationTheme(themeMode = themeMode) {
+            MyApplicationTheme(palette = selectedPalette) {
                 val appColors = LocalAppColors.current
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = appColors.background
                 ) {
                     BleBridgeDashboard(
-                        currentTheme = themeMode,
-                        onThemeChanged = { updateTheme(it) }
+                        currentPalette = selectedPalette,
+                        onPaletteChanged = { updatePalette(it) }
                     )
                 }
             }
@@ -101,8 +102,8 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BleBridgeDashboard(
-    currentTheme: ThemeMode = ThemeMode.SYSTEM,
-    onThemeChanged: (ThemeMode) -> Unit = {}
+    currentPalette: DarkThemePalette = DarkThemePalette.CUKTECH_CYAN,
+    onPaletteChanged: (DarkThemePalette) -> Unit = {}
 ) {
     val context = LocalContext.current
     val appColors = LocalAppColors.current
@@ -281,45 +282,55 @@ fun BleBridgeDashboard(
                 HorizontalDivider(color = appColors.border, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
 
                 Text(
-                    text = "APPEARANCE",
+                    text = "DARK PALETTES & ACCENTS",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
                     color = appColors.textSecondary,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                 )
 
-                // Theme Mode options: System, Light, Dark
-                listOf(
-                    Triple(ThemeMode.SYSTEM, "System Default", Icons.Default.Settings),
-                    Triple(ThemeMode.LIGHT, "Light Mode", Icons.Default.Brightness7),
-                    Triple(ThemeMode.DARK, "Dark Mode", Icons.Default.Brightness4)
-                ).forEach { (mode, label, icon) ->
-                    val selected = currentTheme == mode
+                DarkThemePalette.values().forEach { palette ->
+                    val selected = currentPalette == palette
                     NavigationDrawerItem(
                         icon = {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = label,
-                                tint = if (selected) appColors.primary else appColors.textSecondary
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(palette.primaryColor)
+                                    .border(
+                                        width = if (selected) 2.dp else 1.dp,
+                                        color = if (selected) Color.White else Color.Transparent,
+                                        shape = CircleShape
+                                    )
                             )
                         },
                         label = {
-                            Text(
-                                text = label,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (selected) appColors.textPrimary else appColors.textSecondary
-                            )
+                            Column {
+                                Text(
+                                    text = palette.label,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 13.sp,
+                                    color = if (selected) appColors.textPrimary else appColors.textSecondary
+                                )
+                                Text(
+                                    text = palette.description,
+                                    fontSize = 10.sp,
+                                    lineHeight = 12.sp,
+                                    color = if (selected) appColors.textPrimary.copy(alpha = 0.7f) else appColors.textSecondary.copy(alpha = 0.7f)
+                                )
+                            }
                         },
                         selected = selected,
                         onClick = {
-                            onThemeChanged(mode)
+                            onPaletteChanged(palette)
                         },
                         colors = NavigationDrawerItemDefaults.colors(
                             selectedContainerColor = appColors.primaryContainer.copy(alpha = 0.5f),
                             unselectedContainerColor = Color.Transparent
                         ),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
                     )
                 }
 
@@ -995,7 +1006,7 @@ fun BleBridgeDashboard(
                             Surface(
                                 color = appColors.surfaceVariant.copy(alpha = 0.5f),
                                 shape = RoundedCornerShape(14.dp),
-                                border = BorderStroke(1.dp, Color(0xFF00E5FF)),
+                                border = BorderStroke(1.dp, appColors.primary.copy(alpha = 0.6f)),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { showTelemetryScreen = true }
@@ -1010,7 +1021,7 @@ fun BleBridgeDashboard(
                                             modifier = Modifier
                                                 .size(38.dp)
                                                 .clip(RoundedCornerShape(10.dp))
-                                                .background(Color(0xFF00E5FF)),
+                                                .background(appColors.primary),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
@@ -1040,7 +1051,7 @@ fun BleBridgeDashboard(
                                     Button(
                                         onClick = { showTelemetryScreen = true },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color(0xFF00E5FF),
+                                            containerColor = appColors.primary,
                                             contentColor = Color(0xFF0A0E1A)
                                         ),
                                         shape = RoundedCornerShape(10.dp),
@@ -1465,7 +1476,7 @@ fun BleBridgeDashboard(
                 containerColor = appColors.surface,
                 titleContentColor = appColors.textPrimary,
                 textContentColor = appColors.textSecondary,
-                icon = { Icon(Icons.Default.BluetoothDisabled, contentDescription = null, tint = Color(0xFF00E5FF)) },
+                icon = { Icon(Icons.Default.BluetoothDisabled, contentDescription = null, tint = appColors.primary) },
                 title = { Text("Turn On Bluetooth", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
                 text = {
                     Text(
@@ -1486,7 +1497,7 @@ fun BleBridgeDashboard(
                                 context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF), contentColor = Color(0xFF0A0E1A))
+                        colors = ButtonDefaults.buttonColors(containerColor = appColors.primary, contentColor = Color(0xFF0A0E1A))
                     ) {
                         Text("Turn On Bluetooth", fontWeight = FontWeight.Bold)
                     }

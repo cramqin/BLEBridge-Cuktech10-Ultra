@@ -103,6 +103,38 @@
             </intent-filter>
         </receiver>
 
+        <!-- HyperOS Soft Glass 4x2 Control Center Widget -->
+        <receiver
+            android:name=".widget.CuktechWidget4x2Provider"
+            android:label="CUKTECH 10 · 4x2 Soft Glass"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.cramqin.blecuktech10.WIDGET_TOGGLE_PORT_1" />
+                <action android:name="com.cramqin.blecuktech10.WIDGET_TOGGLE_PORT_2" />
+                <action android:name="com.cramqin.blecuktech10.WIDGET_TOGGLE_PORT_3" />
+                <action android:name="com.cramqin.blecuktech10.WIDGET_TOGGLE_PORT_4" />
+                <action android:name="com.cramqin.blecuktech10.WIDGET_CYCLE_SCENE" />
+                <action android:name="com.cramqin.blecuktech10.WIDGET_CONNECT_OR_OPEN" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_cuktech_4x2_info" />
+        </receiver>
+
+        <!-- HyperOS Soft Glass 2x2 Compact Tile Widget -->
+        <receiver
+            android:name=".widget.CuktechWidget2x2Provider"
+            android:label="CUKTECH 10 · 2x2 Soft Glass"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_cuktech_2x2_info" />
+        </receiver>
+
     </application>
 
 </manifest>

@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">BLE Cuktech10</string>
+    <string name="widget_4x2_desc">HyperOS Soft Glass 4x2 Control Center: Live wattage, scenario switch &amp; 1-tap port toggles</string>
+    <string name="widget_2x2_desc">HyperOS Soft Glass 2x2 Compact Tile: Total wattage, scenario &amp; 4-port status</string>
 </resources>

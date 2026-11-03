@@ -1400,6 +1400,7 @@ class BleBridgeService : Service() {
                 createdMgr.onTelemetryUpdated = { portsMap, totalWatts, devInfo ->
                     integrations.onTelemetryUpdate(portsMap, totalWatts)
                     broadcastTaskerTelemetry(appCtx, portsMap, totalWatts, devInfo.macAddress)
+                    com.example.widget.CuktechWidgetProvider.updateAllWidgets(appCtx)
                 }
 
                 val syncScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -1434,6 +1435,13 @@ class BleBridgeService : Service() {
                             }
                             else -> {}
                         }
+                        com.example.widget.CuktechWidgetProvider.updateAllWidgets(appCtx)
+                    }
+                }
+
+                syncScope.launch {
+                    createdMgr.settings.collect {
+                        com.example.widget.CuktechWidgetProvider.updateAllWidgets(appCtx)
                     }
                 }
 

@@ -6,8 +6,8 @@ import android.content.Intent
 import android.os.Build
 
 /**
- * BroadcastReceiver enabling Tasker, Shizuku / Shevery, and ADB automation without Termux.
- *
+ * BroadcastReceiver enabling Tasker and ADB automation without Termux.
+ */
  * Supported Actions:
  * 1. `com.cramqin.blecuktech10.CONNECT_CHARGER` (optional `--es mac "AA:BB:CC:DD:EE:FF"`)
  * 2. `com.cramqin.blecuktech10.DISCONNECT_CHARGER`

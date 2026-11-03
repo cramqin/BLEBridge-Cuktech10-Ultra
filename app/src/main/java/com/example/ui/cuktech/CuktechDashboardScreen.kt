@@ -39,10 +39,10 @@ import com.example.cuktech.ble.CuktechAuthState
 import com.example.cuktech.ble.CuktechBleManager
 import com.example.cuktech.cloud.XiaomiCloudClient
 import com.example.cuktech.db.PowerChartPoint
+import com.example.cuktech.diagnostics.BleDiagnostics
 import com.example.cuktech.energy.PortChargeLimit
 import com.example.cuktech.integrations.CloudIntegrations
 import com.example.cuktech.integrations.IntegrationConfig
-import com.example.cuktech.integrations.ShizukuCompanion
 import com.example.cuktech.protocol.CuktechProtocol
 import com.example.cuktech.protocol.PortTelemetry
 import kotlinx.coroutines.launch
@@ -52,7 +52,7 @@ import kotlin.math.max
 fun CuktechDashboardScreen(
     bleManager: CuktechBleManager,
     cloudClient: XiaomiCloudClient,
-    shizukuCompanion: ShizukuCompanion,
+    bleDiagnostics: BleDiagnostics,
     cloudIntegrations: CloudIntegrations,
     onRequestBlePermissions: (() -> Unit) -> Unit,
     onNavigateBack: (() -> Unit)? = null
@@ -75,7 +75,7 @@ fun CuktechDashboardScreen(
     val savedDevices by bleManager.credentialStore.devices.collectAsState()
     val activeCred by bleManager.credentialStore.activeDevice.collectAsState()
 
-    val shizukuStatus by shizukuCompanion.status.collectAsState()
+    val diagStatus by bleDiagnostics.status.collectAsState()
     val integrationCfg by cloudIntegrations.config.collectAsState()
     val bemfaConnected by cloudIntegrations.bemfaConnected.collectAsState()
 
@@ -981,7 +981,7 @@ fun CuktechDashboardScreen(
                     }
 
                     val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
-                    val isBatteryIgnored = remember(shizukuStatus) {
+                    val isBatteryIgnored = remember(diagStatus) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                             powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
                         } else true
@@ -1044,7 +1044,7 @@ fun CuktechDashboardScreen(
                                     if (isBatteryIgnored) {
                                         Toast.makeText(context, "Battery optimizations are already disabled for this app.", Toast.LENGTH_SHORT).show()
                                     }
-                                    shizukuCompanion.requestIgnoreBatteryOptimizations()
+                                    bleDiagnostics.requestIgnoreBatteryOptimizations()
                                 },
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
@@ -1060,7 +1060,7 @@ fun CuktechDashboardScreen(
                     }
 
                     // 2. Bluetooth Low Energy Diagnostics Card
-                    val hasDiagOutput = shizukuStatus.lastDiagnosticOutput.isNotBlank()
+                    val hasDiagOutput = diagStatus.lastDiagnosticOutput.isNotBlank()
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
@@ -1086,10 +1086,10 @@ fun CuktechDashboardScreen(
                             Button(
                                 onClick = {
                                     if (hasDiagOutput) {
-                                        shizukuCompanion.clearDiagnosticOutput()
+                                        bleDiagnostics.clearDiagnosticOutput()
                                     } else {
                                         scope.launch {
-                                            shizukuCompanion.runBluetoothStackDiagnostics()
+                                            bleDiagnostics.runBluetoothStackDiagnostics()
                                         }
                                     }
                                 },
@@ -1112,7 +1112,7 @@ fun CuktechDashboardScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Text(
-                                        text = shizukuStatus.lastDiagnosticOutput,
+                                        text = diagStatus.lastDiagnosticOutput,
                                         fontSize = 11.sp,
                                         fontFamily = FontFamily.Monospace,
                                         modifier = Modifier.padding(10.dp)

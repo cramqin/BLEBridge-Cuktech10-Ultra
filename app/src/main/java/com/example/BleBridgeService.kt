@@ -34,7 +34,7 @@ import com.example.cuktech.ble.CuktechBleManager
 import com.example.cuktech.cloud.XiaomiCloudClient
 import com.example.cuktech.db.CuktechPersistence
 import com.example.cuktech.integrations.CloudIntegrations
-import com.example.cuktech.integrations.ShizukuCompanion
+import com.example.cuktech.diagnostics.BleDiagnostics
 import com.example.cuktech.security.SecureCredentialStore
 
 class BleBridgeService : Service() {
@@ -1240,7 +1240,7 @@ class BleBridgeService : Service() {
             private set
 
         @Volatile
-        var shizukuCompanion: ShizukuCompanion? = null
+        var bleDiagnostics: BleDiagnostics? = null
             private set
 
         @Volatile
@@ -1258,7 +1258,7 @@ class BleBridgeService : Service() {
             val appCtx = context.applicationContext
             val store = credentialStore ?: SecureCredentialStore(appCtx).also { credentialStore = it }
             val db = persistence ?: CuktechPersistence(appCtx).also { persistence = it }
-            val shizuku = shizukuCompanion ?: ShizukuCompanion(appCtx).also { shizukuCompanion = it }
+            val diag = bleDiagnostics ?: BleDiagnostics(appCtx).also { bleDiagnostics = it }
             val mgr = cuktechManager ?: CuktechBleManager(appCtx, store, db).also { createdMgr ->
                 cuktechManager = createdMgr
                 val integrations = CloudIntegrations(appCtx) { portId, enabled ->

@@ -100,7 +100,7 @@ fun BleBridgeDashboard(
     val scope = rememberCoroutineScope()
 
     val cuktechManager = remember { BleBridgeService.ensureCuktechManagersInitialized(context) }
-    val shizukuCompanion = remember { BleBridgeService.shizukuCompanion!! }
+    val bleDiagnostics = remember { BleBridgeService.bleDiagnostics!! }
     val cloudIntegrations = remember { BleBridgeService.cloudIntegrations!! }
 
     var showTelemetryScreen by remember { mutableStateOf(false) }
@@ -488,7 +488,7 @@ fun BleBridgeDashboard(
                     CuktechDashboardScreen(
                         bleManager = cuktechManager,
                         cloudClient = BleBridgeService.xiaomiCloudClient,
-                        shizukuCompanion = shizukuCompanion,
+                        bleDiagnostics = bleDiagnostics,
                         cloudIntegrations = cloudIntegrations,
                         onRequestBlePermissions = { onReady ->
                             ensureBleServiceStartedAndPermissions(onReady)

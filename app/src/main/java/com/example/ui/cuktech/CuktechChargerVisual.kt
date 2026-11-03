@@ -62,7 +62,7 @@ fun CuktechChargerVisual(
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
             shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.6f)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
             modifier = Modifier.padding(bottom = 12.dp)
         ) {
             Row(
@@ -70,10 +70,10 @@ fun CuktechChargerVisual(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (modeLabel.startsWith("AI", ignoreCase = true)) modeLabel else "AI $modeLabel",
+                    text = modeLabel,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF00B0FF)
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }

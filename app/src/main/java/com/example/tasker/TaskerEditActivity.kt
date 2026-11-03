@@ -135,7 +135,7 @@ fun TaskerEditScreen(
                                 "CUKTECH 10: $portLabel Timer ($tLabel)"
                             }
                             "SOFT_RESET" -> "CUKTECH 10: Force Soft Port Reset"
-                            "SET_SCREEN_POWER" -> "CUKTECH 10: Display ${if (selectedPortState) "Wake ON" else "Sleep OFF"}"
+                            "SET_IDLE_SCREEN_OFF" -> "CUKTECH 10: Idle Screen-Off ${if (selectedPortState) "ON" else "OFF"}"
                             else -> "CUKTECH 10: Action"
                         }
                         onSave(selectedAction, selectedPort, selectedPortState, selectedMode, selectedTimeout, selectedTimerMins, blurb)
@@ -162,7 +162,7 @@ fun TaskerEditScreen(
                 "SET_PORT" to "Switch Port Power (On/Off)",
                 "SET_MODE" to "Set Power Allocation Scenario",
                 "SET_TIMEOUT" to "Set Screen Timeout",
-                "SET_SCREEN_POWER" to "Wake or Sleep Charger Display",
+                "SET_IDLE_SCREEN_OFF" to "Idle Screen-Off (Sleep LCD when idle)",
                 "SET_LOW_CURRENT" to "USB-A Low Current Mode (4h)",
                 "SET_PORT_TIMER" to "Set Port Delay Poweroff Timer",
                 "SOFT_RESET" to "Force Soft Port Reset (Renegotiate PD)"
@@ -271,18 +271,23 @@ fun TaskerEditScreen(
                 }
             }
 
-            if (selectedAction == "SET_SCREEN_POWER") {
-                Text("Charger Display State", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            if (selectedAction == "SET_IDLE_SCREEN_OFF") {
+                Text("Idle Screen-Off", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    "Turns off the charger's color LCD when all ports are idle.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     FilterChip(
                         selected = selectedPortState,
                         onClick = { selectedPortState = true },
-                        label = { Text("Wake Screen ON") }
+                        label = { Text("Enable") }
                     )
                     FilterChip(
                         selected = !selectedPortState,
                         onClick = { selectedPortState = false },
-                        label = { Text("Turn Screen OFF") }
+                        label = { Text("Disable") }
                     )
                 }
             }

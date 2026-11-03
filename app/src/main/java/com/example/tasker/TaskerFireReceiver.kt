@@ -44,9 +44,9 @@ class TaskerFireReceiver : BroadcastReceiver() {
                 val timeout = bundle.getInt("TIMEOUT", 4)
                 mgr.setScreenTimeout(timeout)
             }
-            "SET_SCREEN_POWER" -> {
+            "SET_IDLE_SCREEN_OFF" -> {
                 val state = bundle.getBoolean("STATE", true)
-                mgr.forceScreenPower(state, 4)
+                mgr.setIdleScreenOff(state)
             }
             "SET_LOW_CURRENT" -> {
                 val state = bundle.getBoolean("STATE", true)

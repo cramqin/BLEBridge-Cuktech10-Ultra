@@ -100,7 +100,6 @@ fun CuktechDashboardScreen(
 
     val diagStatus by bleDiagnostics.status.collectAsState()
     val integrationCfg by cloudIntegrations.config.collectAsState()
-    val bemfaConnected by cloudIntegrations.bemfaConnected.collectAsState()
 
     var showXiaomiLoginDialog by remember { mutableStateOf(false) }
     var showPairingDialog by remember { mutableStateOf(false) }
@@ -1142,12 +1141,12 @@ fun CuktechDashboardScreen(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Cloud Voice & Automation Bridges",
+                                        text = "Home Assistant Webhook Integration",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
                                     )
                                     Text(
-                                        text = "Bemfa (XiaoAI/Siri) & Home Assistant webhooks",
+                                        text = "Pushes real-time telemetry to Home Assistant server",
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1160,7 +1159,6 @@ fun CuktechDashboardScreen(
                             if (showCloudConfig) {
                                 CloudIntegrationConfigPanel(
                                     config = integrationCfg,
-                                    bemfaConnected = bemfaConnected,
                                     onSave = { cloudIntegrations.updateConfig(it) }
                                 )
                             }
@@ -2983,74 +2981,12 @@ private fun PortChargeLimitDialog(
 @Composable
 private fun CloudIntegrationConfigPanel(
     config: IntegrationConfig,
-    bemfaConnected: Boolean,
     onSave: (IntegrationConfig) -> Unit
 ) {
-    var bemfaEn by remember(config) { mutableStateOf(config.bemfaEnabled) }
-    var bemfaUid by remember(config) { mutableStateOf(config.bemfaUid) }
-    var bemfaTopic by remember(config) { mutableStateOf(config.bemfaTopic) }
     var haEn by remember(config) { mutableStateOf(config.haWebhookEnabled) }
     var haUrl by remember(config) { mutableStateOf(config.haWebhookUrl) }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Bemfa Section
-        Card(
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Bemfa Cloud Voice Bridge", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("XiaoAI & Siri Control", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Surface(
-                                color = if (bemfaConnected) Color(0xFF10B981).copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    text = if (bemfaConnected) "Connected" else "Disconnected",
-                                    fontSize = 10.sp,
-                                    color = if (bemfaConnected) Color(0xFF10B981) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-                    Switch(
-                        checked = bemfaEn,
-                        colors = cuktechSwitchColors(),
-                        onCheckedChange = { bemfaEn = it }
-                    )
-                }
-                if (bemfaEn) {
-                    OutlinedTextField(
-                        value = bemfaUid,
-                        onValueChange = { bemfaUid = it },
-                        label = { Text("Bemfa Secret UID") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = bemfaTopic,
-                        onValueChange = { bemfaTopic = it },
-                        label = { Text("Bemfa Topic (e.g. cuktech10002)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-
         // Home Assistant Section
         Card(
             shape = RoundedCornerShape(10.dp),
@@ -3073,7 +3009,7 @@ private fun CloudIntegrationConfigPanel(
                             .padding(end = 16.dp)
                     ) {
                         Text("Home Assistant Webhook", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Text("Pushes live wattage & energy telemetry", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Pushes live wattage & energy telemetry every 10s", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Switch(
                         checked = haEn,
@@ -3097,9 +3033,6 @@ private fun CloudIntegrationConfigPanel(
             onClick = {
                 onSave(
                     IntegrationConfig(
-                        bemfaEnabled = bemfaEn,
-                        bemfaUid = bemfaUid,
-                        bemfaTopic = bemfaTopic,
                         haWebhookEnabled = haEn,
                         haWebhookUrl = haUrl
                     )
@@ -3108,7 +3041,7 @@ private fun CloudIntegrationConfigPanel(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp)
         ) {
-            Text("Save Cloud Settings")
+            Text("Save Integration Settings")
         }
     }
 }

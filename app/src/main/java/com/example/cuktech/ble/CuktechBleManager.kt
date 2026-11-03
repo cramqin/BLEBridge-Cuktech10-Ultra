@@ -1362,8 +1362,7 @@ class CuktechBleManager(
         val cumulativeWh = integrator.totalWh
 
         val detector = sessionDetectors[portId]!!
-        val brandOrProto = com.example.cuktech.protocol.PortTelemetryDecoder.detectDeviceBrandAndProtocol(decoded) ?: decoded.protocolName
-        val finishedSession = detector.onSample(decoded.powerW, deltaWh, brandOrProto, nowSec)
+        val finishedSession = detector.onSample(decoded.powerW, deltaWh, decoded.protocolName, nowSec)
         if (finishedSession != null) {
             persistence.insertCompletedSession(finishedSession)
             _completedSessions.value = persistence.getRecentSessions(300)
@@ -1982,9 +1981,8 @@ class CuktechBleManager(
 
             val portWatts = if (activePorts.isNotEmpty()) {
                 activePorts.joinToString(" · ") { port ->
-                    val brand = com.example.cuktech.protocol.PortTelemetryDecoder.detectDeviceBrandShort(port)
-                    if (!brand.isNullOrBlank()) {
-                        String.format(java.util.Locale.US, "%s: %.1fW (%s)", port.portLabel, port.powerW, brand)
+                    if (port.protocolName.isNotBlank() && port.protocolName != "Normal" && port.protocolName != "Idle") {
+                        String.format(java.util.Locale.US, "%s: %.1fW (%s)", port.portLabel, port.powerW, port.protocolName)
                     } else {
                         String.format(java.util.Locale.US, "%s: %.1fW", port.portLabel, port.powerW)
                     }

@@ -682,59 +682,6 @@ fun CuktechDashboardScreen(
                                     Text("C3 $c3Str", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
                                     Text("A $aStr", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
                                 }
-
-                                Spacer(Modifier.height(2.dp))
-
-                                // AI Temperature Control Screen Shortcut
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            bleManager.gotoScreen(3)
-                                            Toast.makeText(context, "Switching charger LCD to AI Temperature Control screen (Page 3)", Toast.LENGTH_SHORT).show()
-                                        }
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Thermostat,
-                                            contentDescription = null,
-                                            tint = Color(0xFF00E5FF),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(
-                                            text = "AI Temperature Control",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Surface(
-                                            color = Color(0xFF10B981).copy(alpha = 0.15f),
-                                            shape = RoundedCornerShape(4.dp)
-                                        ) {
-                                            Text(
-                                                text = if (totalWatts > 100) "OPTIMAL" else "EXCELLENT",
-                                                color = Color(0xFF10B981),
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(
-                                            text = "Show on LCD ➔",
-                                            fontSize = 10.sp,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -1332,111 +1279,7 @@ fun CuktechDashboardScreen(
 
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                            // C. Screen Orientation & Rotation Control (PIID 20 & 180° Flip)
-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                SettingSwitchRow(
-                                    title = "Screen Lock",
-                                    subtitle = "Lock screen orientation (disables gravity sensor auto-rotate)",
-                                    checked = settings.orientationLock,
-                                    onCheckedChange = { bleManager.setOrientationLock(it) }
-                                )
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Rotate Display 180°",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = "Manually invert charger LCD orientation via software control",
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Button(
-                                        onClick = {
-                                            bleManager.rotateScreen180()
-                                            Toast.makeText(context, "Inverting charger LCD (180°)...", Toast.LENGTH_SHORT).show()
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color(0xFF00E5FF),
-                                            contentColor = Color(0xFF0A0E1A)
-                                        ),
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Icon(Icons.Default.ScreenRotation, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(Modifier.width(6.dp))
-                                        Text("Flip 180°", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-
-                            // D. Physical LCD Screen Page Quick-Switch (PIID 14)
-                            var localActivePage by remember(settings.activeLcdPage) {
-                                mutableStateOf(if (settings.activeLcdPage in 1..5) settings.activeLcdPage else 1)
-                            }
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text = "Physical LCD Screen Navigation",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "Select view to display on charger's 1.57-inch color screen",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    val lcdPages = listOf(
-                                        1 to "⚡ Total Power (P1)",
-                                        2 to "🤖 ADC Assistant (P2)",
-                                        3 to "🌡️ AI Temp (P3)",
-                                        4 to "📊 Ports Detail (P4)",
-                                        5 to "ℹ️ System Info (P5)"
-                                    )
-                                    lcdPages.forEach { (page, label) ->
-                                        val isSelected = (localActivePage == page)
-                                        Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.surfaceVariant,
-                                            border = BorderStroke(
-                                                width = if (isSelected) 1.5.dp else 1.dp,
-                                                color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
-                                            ),
-                                            modifier = Modifier.clickable {
-                                                localActivePage = page
-                                                bleManager.gotoScreen(page)
-                                                Toast.makeText(context, "Switched charger LCD to $label", Toast.LENGTH_SHORT).show()
-                                            }
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                color = if (isSelected) Color(0xFF0A0E1A) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 11.sp,
-                                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-
-                            // E. Physical Screen Language (PIID 13)
+                            // C. Physical Screen Language (PIID 13)
                             var localLanguage by remember(settings.language) {
                                 mutableStateOf(if (settings.language in 0..1) settings.language else 0)
                             }
@@ -2245,9 +2088,6 @@ private fun SmoothWheelPicker(
     }
 }
 
-private fun detectDeviceType(port: PortTelemetry): String? =
-    com.example.cuktech.protocol.PortTelemetryDecoder.detectDeviceBrandAndProtocol(port)
-
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun PortTelemetryCard(
@@ -2329,34 +2169,6 @@ private fun PortTelemetryCard(
                             color = accentColor,
                             modifier = Modifier.padding(start = 18.dp, top = 2.dp)
                         )
-                    }
-                    val detectedDevice = detectDeviceType(port)
-                    if (detectedDevice != null) {
-                        Surface(
-                            color = accentColor.copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(4.dp),
-                            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
-                            modifier = Modifier.padding(start = 18.dp, top = 3.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Devices,
-                                    contentDescription = null,
-                                    tint = accentColor,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = detectedDevice,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = accentColor
-                                )
-                            }
-                        }
                     }
                 }
 

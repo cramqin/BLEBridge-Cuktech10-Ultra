@@ -1918,8 +1918,8 @@ class CuktechBleManager(
         }
         _countdownRemainingSeconds.value = remMap
 
-        if (_connectionState.value == CuktechConnectionState.READY) {
-            val totalW = _totalPowerW.value
+        if (_authState.value == CuktechAuthState.AUTHENTICATED) {
+            val totalW = _totalPowerWatts.value
             val ports = _ports.value
             val activePorts = ports.values.filter { it.powerW >= 0.1 }
 

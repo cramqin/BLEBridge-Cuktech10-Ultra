@@ -1995,7 +1995,7 @@ class CuktechBleManager(
 
             BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content)
         } else {
-            val isServerRunning = BleBridgeService.getInstance()?.isServerRunning?.value == true
+            val isServerRunning = BleBridgeService.isServerRunning.value
             if (!isServerRunning && _authState.value == CuktechAuthState.DISCONNECTED) {
                 BleBridgeService.getInstance()?.dismissForegroundNotificationIfIdle()
                 return

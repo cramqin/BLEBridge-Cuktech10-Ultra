@@ -63,6 +63,9 @@ class BleBridgeService : Service() {
     private val companionBleState: Companion.BleConnectionState
         get() = _bleConnectionState.value
 
+    val isServerRunning: Boolean
+        get() = Companion.isServerRunning.value
+
     private val companionBleAddress: String?
         get() = _bleDeviceAddress.value
 

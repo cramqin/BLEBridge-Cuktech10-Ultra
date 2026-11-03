@@ -308,6 +308,15 @@ class CuktechBleManager(
             return
         }
 
+        if (targetCred != null && !targetCred.isCuktech10Ultra) {
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL1,
+                "[Cuktech] Cannot connect to '$targetMac' (${targetCred.name}, model: ${targetCred.model}): Not a CUKTECH 10 Ultra charger. Only CUKTECH 10 Ultra (Model: AD1204) is supported."
+            )
+            _statusMessage.value = "Unsupported device (${targetCred.name}). Only CUKTECH 10 Ultra is supported."
+            return
+        }
+
         if (targetCred != null && targetCred.mac.equals(targetMac, ignoreCase = true)) {
             credentialStore.selectActiveDevice(targetMac)
         }
@@ -387,7 +396,14 @@ class CuktechBleManager(
         }
         val miService = gatt.getService(CuktechProtocol.MI_SERVICE_UUID)
         if (miService == null) {
-            // Connected device is a generic BLE peripheral (not a MiOT 0xFE95 device)
+            val gattMac = gatt.device.address?.uppercase()?.trim() ?: "Unknown"
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL1,
+                "[Cuktech] Device $gattMac does not support MiOT Service (0xFE95). BLEBridge only supports CUKTECH 10 Ultra (Model: AD1204, Product ID: 0x660E)."
+            )
+            _authState.value = CuktechAuthState.AUTH_FAILED
+            _statusMessage.value = "Unsupported device ($gattMac). Only CUKTECH 10 Ultra is supported."
+            disconnectCharger()
             return
         }
 
@@ -422,14 +438,30 @@ class CuktechBleManager(
                 }
             }
 
-            if (activeCred == null || !activeCred.hasValidToken) {
+            val currentCred = activeCred
+            if (currentCred != null && !currentCred.isCuktech10Ultra) {
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Connected peripheral '$gattMac' (${currentCred.name}, model: ${currentCred.model}) is not a CUKTECH 10 Ultra charger. Only CUKTECH 10 Ultra (Model: AD1204, Product ID: 0x660E) is supported."
+                )
                 _authState.value = CuktechAuthState.AUTH_FAILED
-                _statusMessage.value = "Missing valid 12-byte MiOT Token. Tap 'Sync Token' or log in to Xiaomi account."
+                _statusMessage.value = "Unsupported device (${currentCred.name}). Only CUKTECH 10 Ultra is supported."
+                disconnectCharger()
+                return@launch
+            }
+
+            if (currentCred == null || !currentCred.hasValidToken) {
+                _authState.value = CuktechAuthState.AUTH_FAILED
+                _statusMessage.value = "Missing valid 12-byte MiOT Token for $gattMac. Only paired CUKTECH 10 Ultra chargers are supported."
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL1,
+                    "[Cuktech] Device $gattMac has no valid CUKTECH 10 Ultra credentials in Xiaomi account. Only CUKTECH 10 Ultra (Model: AD1204) is supported."
+                )
                 BleBridgeService.refreshClientsList()
                 return@launch
             }
 
-            val ok = runAuthenticationHandshake(activeCred!!.tokenBytes())
+            val ok = runAuthenticationHandshake(currentCred.tokenBytes())
             if (ok) {
                 _authState.value = CuktechAuthState.AUTHENTICATED
                 _statusMessage.value = "CUKTECH 10 Ultra authenticated successfully! Live telemetry active."
@@ -1711,6 +1743,28 @@ class CuktechBleManager(
                 isSet = true,
                 valueBytes = byteArrayOf(langCode.toByte())
             )
+        }
+    }
+
+    fun gotoScreen(screenIndex: Int) {
+        if (screenIndex !in 1..5) return
+        scope.launch {
+            sendMiotCommand(
+                siid = CuktechProtocol.SIID_CHARGER,
+                piid = CuktechProtocol.PIID_GOTO_SCREEN,
+                isSet = true,
+                valueBytes = byteArrayOf(screenIndex.toByte())
+            )
+        }
+    }
+
+    fun invokeAdcAssistant(onComplete: (() -> Unit)? = null) {
+        scope.launch {
+            setScenarioMode(1)
+            gotoScreen(2)
+            forceSoftRestart {
+                onComplete?.invoke()
+            }
         }
     }
 

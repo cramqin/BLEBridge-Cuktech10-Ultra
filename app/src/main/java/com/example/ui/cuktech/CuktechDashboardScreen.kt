@@ -7,6 +7,10 @@ import android.os.Build
 import android.os.PowerManager
 import android.widget.Toast
 import com.example.BleBridgeService
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.example.R
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -90,6 +94,8 @@ fun CuktechDashboardScreen(
     var showExportDialog by remember { mutableStateOf(false) }
     var selectedExportTimeframe by remember { mutableStateOf(CuktechPersistence.ExportTimeframe.ALL_TIME) }
     var selectedExportScope by remember { mutableStateOf(CuktechPersistence.ExportScope.ALL) }
+    var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var selectedClearHistoryOption by remember { mutableStateOf(CuktechPersistence.ClearHistoryOption.KEEP_ACTIVE) }
 
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     val tabItems = listOf(
@@ -277,12 +283,12 @@ fun CuktechDashboardScreen(
                                     horizontalArrangement = Arrangement.SpaceEvenly
                                 ) {
                                     val modes = listOf(
-                                        Triple(1, "AI", "AI Mode"),
-                                        Triple(2, "Laptop", "Hybrid"),
-                                        Triple(3, "Bolt", "Single"),
-                                        Triple(4, "Dual", "Dual")
+                                        Triple(1, R.drawable.main_card_scene_icon_ai, "AI Mode"),
+                                        Triple(2, R.drawable.main_card_scene_icon_apple, "Hybrid"),
+                                        Triple(3, R.drawable.main_card_scene_icon_single, "Single"),
+                                        Triple(4, R.drawable.main_card_scene_icon_balance, "Dual")
                                     )
-                                    modes.forEach { (code, iconType, label) ->
+                                    modes.forEach { (code, iconRes, label) ->
                                         val isSelected = settings.sceneMode == code
                                         Column(
                                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -290,10 +296,10 @@ fun CuktechDashboardScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(48.dp)
+                                                    .size(52.dp)
                                                     .clip(CircleShape)
                                                     .background(
-                                                        if (isSelected) Color(0xFF00E5FF).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant
+                                                        if (isSelected) Color(0xFF00E5FF).copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant
                                                     )
                                                     .border(
                                                         width = if (isSelected) 1.5.dp else 0.dp,
@@ -302,12 +308,11 @@ fun CuktechDashboardScreen(
                                                     ),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                when (iconType) {
-                                                    "AI" -> Text("AI", fontWeight = FontWeight.Black, fontSize = 14.sp, color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant)
-                                                    "Laptop" -> Icon(Icons.Default.Laptop, contentDescription = null, tint = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                                                    "Bolt" -> Icon(Icons.Default.Bolt, contentDescription = null, tint = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                                                    "Dual" -> Icon(Icons.Default.Tune, contentDescription = null, tint = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-                                                }
+                                                Image(
+                                                    painter = painterResource(id = iconRes),
+                                                    contentDescription = label,
+                                                    modifier = Modifier.size(34.dp)
+                                                )
                                             }
                                             Spacer(Modifier.height(4.dp))
                                             Text(
@@ -455,6 +460,58 @@ fun CuktechDashboardScreen(
                                         if (f4 > 0f) Box(Modifier.fillMaxHeight().weight(f4).background(Color(0xFFFBBF24)))
                                     }
                                 }
+
+                                Spacer(Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable {
+                                            bleManager.gotoScreen(3)
+                                            Toast.makeText(context, "Switching charger LCD to AI Temperature Control screen (Page 3)", Toast.LENGTH_SHORT).show()
+                                        }
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Thermostat,
+                                            contentDescription = null,
+                                            tint = Color(0xFF00E5FF),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            text = "AI Temperature Control",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            color = Color(0xFF10B981).copy(alpha = 0.15f),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = if (totalWatts > 100) "OPTIMAL" else "EXCELLENT",
+                                                color = Color(0xFF10B981),
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            text = "Show on LCD ➔",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
                             }
                         }
 
@@ -508,56 +565,6 @@ fun CuktechDashboardScreen(
                         .padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Force Soft Port Reset Card
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.RestartAlt,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
-                                        Text(
-                                            text = "Force Soft Port Reset",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
-                                        )
-                                        Text(
-                                            text = "Re-negotiates USB-PD / PPS / UFCS without unplugging",
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                                Button(
-                                    onClick = { showSoftRestartDialog = true },
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text("Reset Ports", fontSize = 12.sp)
-                                }
-                            }
-                        }
-                    }
 
                     Text(
                         text = "Individual Port Controls & Protocols",
@@ -653,7 +660,7 @@ fun CuktechDashboardScreen(
 
                             HorizontalDivider()
 
-                            // 2. Screen Sleep Timeout (PIID 6) - 4-segment equal Row
+                            // 2. Screen Sleep Timeout (PIID 6)
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(
                                     text = "Screen Sleep Timeout",
@@ -662,23 +669,23 @@ fun CuktechDashboardScreen(
                                 )
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    val timeoutLabels = mapOf(
-                                        1 to "Always On",
-                                        2 to "60s",
-                                        3 to "5 min",
-                                        4 to "60 min"
+                                    val timeoutList = listOf(
+                                        5 to "1 min",
+                                        1 to "5 min",
+                                        2 to "10 min",
+                                        3 to "30 min",
+                                        4 to "Always On"
                                     )
-                                    CuktechProtocol.SCREEN_TIMEOUTS.forEach { (code, _) ->
-                                        val shortLabel = timeoutLabels[code] ?: code.toString()
+                                    timeoutList.forEach { (code, label) ->
                                         FilterChip(
                                             selected = settings.screenTimeout == code,
                                             onClick = { bleManager.setScreenTimeout(code) },
                                             label = {
                                                 Text(
-                                                    text = shortLabel,
-                                                    fontSize = 11.sp,
+                                                    text = label,
+                                                    fontSize = 10.sp,
                                                     fontWeight = if (settings.screenTimeout == code) FontWeight.Bold else FontWeight.Normal,
                                                     modifier = Modifier.fillMaxWidth(),
                                                     maxLines = 1
@@ -739,8 +746,8 @@ fun CuktechDashboardScreen(
 
                             // 4. Boolean Switches
                             SettingSwitchRow(
-                                title = "USB-A Low Current Mode",
-                                subtitle = "Prevents auto-cutoff for earbuds, fitness bands and smartwatches",
+                                title = "USB-A Low Current (Keep On 2-4 Hours)",
+                                subtitle = "Prevents auto-cutoff for low-draw devices (earbuds, fitness bands, smartwatches)",
                                 checked = settings.usbALowCurrent,
                                 onCheckedChange = { bleManager.setUsbALowCurrent(it) }
                             )
@@ -752,7 +759,7 @@ fun CuktechDashboardScreen(
                             )
                             SettingSwitchRow(
                                 title = "Screen Orientation Lock",
-                                subtitle = "Locks the charger's physical screen orientation",
+                                subtitle = "Locks orientation in place; disable to let charger's built-in G-sensor auto-rotate 180°",
                                 checked = settings.orientationLock,
                                 onCheckedChange = { bleManager.setOrientationLock(it) }
                             )
@@ -812,10 +819,7 @@ fun CuktechDashboardScreen(
                                         Text("Export CSV", fontSize = 11.sp)
                                     }
                                     TextButton(
-                                        onClick = {
-                                            bleManager.persistence.clearSessions()
-                                            Toast.makeText(context, "Cleared session history", Toast.LENGTH_SHORT).show()
-                                        },
+                                        onClick = { showClearHistoryDialog = true },
                                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text("Clear", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
@@ -1302,7 +1306,247 @@ fun CuktechDashboardScreen(
                         }
                     }
 
-                    // 5. Charger Firmware & Xiaomi Mi Home Updates Card
+                    // 5. Charger Physical LCD Language & Screen Orientation Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Charger Display Language",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "Physical LCD screen language on the CUKTECH 10 Ultra",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                CuktechProtocol.LANGUAGE_OPTIONS.forEach { (code, name) ->
+                                    val isSelected = (settings.language == code)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { bleManager.setLanguage(code) },
+                                        label = {
+                                            Text(
+                                                text = name,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 12.sp
+                                            )
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ScreenRotation,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Screen Orientation (Gravity Sensor)",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "Auto-rotates 180° when upside-down in wall outlets",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                FilterChip(
+                                    selected = !settings.orientationLock,
+                                    onClick = { bleManager.setOrientationLock(false) },
+                                    label = {
+                                        Text(
+                                            text = "🔄 Auto-Rotate",
+                                            fontWeight = if (!settings.orientationLock) FontWeight.Bold else FontWeight.Normal,
+                                            fontSize = 12.sp
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FilterChip(
+                                    selected = settings.orientationLock,
+                                    onClick = { bleManager.setOrientationLock(true) },
+                                    label = {
+                                        Text(
+                                            text = "🔒 Fixed / Locked",
+                                            fontWeight = if (settings.orientationLock) FontWeight.Bold else FontWeight.Normal,
+                                            fontSize = 12.sp
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+
+                    // 6. Force Soft Port Reset & ADC Assistant Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.RestartAlt,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Port Reset & ADC Assistant",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "Re-negotiates USB-PD contracts or switches physical LCD to ADC load distribution screen",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = "PHYSICAL LCD SCREEN QUICK-SWITCH",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                FilterChip(
+                                    selected = false,
+                                    onClick = {
+                                        bleManager.gotoScreen(1)
+                                        Toast.makeText(context, "Switched charger LCD to Total Power (Page 1)", Toast.LENGTH_SHORT).show()
+                                    },
+                                    label = { Text("⚡ Total Power (P1)", fontSize = 11.sp) }
+                                )
+                                FilterChip(
+                                    selected = false,
+                                    onClick = {
+                                        bleManager.gotoScreen(2)
+                                        Toast.makeText(context, "Switched charger LCD to ADC Assistant (Page 2)", Toast.LENGTH_SHORT).show()
+                                    },
+                                    label = { Text("🤖 ADC Assistant (P2)", fontSize = 11.sp) }
+                                )
+                                FilterChip(
+                                    selected = false,
+                                    onClick = {
+                                        bleManager.gotoScreen(3)
+                                        Toast.makeText(context, "Switched charger LCD to AI Temp Control (Page 3)", Toast.LENGTH_SHORT).show()
+                                    },
+                                    label = { Text("🌡️ AI Temp (P3)", fontSize = 11.sp) }
+                                )
+                                FilterChip(
+                                    selected = false,
+                                    onClick = {
+                                        bleManager.gotoScreen(4)
+                                        Toast.makeText(context, "Switched charger LCD to Ports Breakdown (Page 4)", Toast.LENGTH_SHORT).show()
+                                    },
+                                    label = { Text("📊 Ports Detail (P4)", fontSize = 11.sp) }
+                                )
+                                FilterChip(
+                                    selected = false,
+                                    onClick = {
+                                        bleManager.gotoScreen(5)
+                                        Toast.makeText(context, "Switched charger LCD to System Info (Page 5)", Toast.LENGTH_SHORT).show()
+                                    },
+                                    label = { Text("ℹ️ System Info (P5)", fontSize = 11.sp) }
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        bleManager.invokeAdcAssistant {
+                                            scope.launch {
+                                                Toast.makeText(context, "ADC Assistant activated on charger LCD & ports re-negotiated.", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.filledTonalButtonColors()
+                                ) {
+                                    Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Run ADC Setup", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Button(
+                                    onClick = { showSoftRestartDialog = true },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Soft Reset", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    // 6. Charger Firmware & Xiaomi Mi Home Updates Card
                     val miHomePkg = "com.xiaomi.smarthome"
                     val miHomeLaunchIntent = remember { context.packageManager.getLaunchIntentForPackage(miHomePkg) }
                     val isMiHomeInstalled = (miHomeLaunchIntent != null)
@@ -1374,7 +1618,7 @@ fun CuktechDashboardScreen(
             icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFF59E0B)) },
             title = { Text("Switch to Xiaomi Mi Home?") },
             text = {
-                Text("Xiaomi Mi Home requires exclusive Bluetooth access to check for and install official charger firmware updates.\n\nOpening Mi Home will safely disconnect the BLE Bridge gateway and release the charger handle.\n\nWhen you return to this app, you will be on the Gateway screen ready to reconnect.")
+                Text("Xiaomi Mi Home requires exclusive Bluetooth access to check for and install official charger firmware updates.\n\nOpening Mi Home will safely disconnect the BLE Bridge gateway and stop background server tasks.\n\nWhen you return to this app, you can start the server and reconnect with 1 tap.")
             },
             confirmButton = {
                 Button(
@@ -1382,6 +1626,10 @@ fun CuktechDashboardScreen(
                         showMiHomeWarningDialog = false
                         bleManager.disconnectCharger()
                         BleBridgeService.getInstance()?.closeGattClean()
+                        val stopIntent = Intent(context, BleBridgeService::class.java).apply {
+                            action = BleBridgeService.ACTION_STOP_SERVER
+                        }
+                        context.startService(stopIntent)
                         onNavigateBack?.invoke()
                         val intent = miHomeLaunchIntent ?: context.packageManager.getLaunchIntentForPackage(miHomePkg)
                         if (intent != null) {
@@ -1551,6 +1799,80 @@ fun CuktechDashboardScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showExportDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    if (showClearHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryDialog = false },
+            icon = { Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Clear Charging Records") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Choose which charging records and telemetry data to delete:",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    CuktechPersistence.ClearHistoryOption.values().forEach { option ->
+                        val isSelected = (selectedClearHistoryOption == option)
+                        Surface(
+                            onClick = { selectedClearHistoryOption = option },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.error) else null,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { selectedClearHistoryOption = option },
+                                    colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.error)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = option.label,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = option.description,
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showClearHistoryDialog = false
+                        bleManager.persistence.clearHistory(selectedClearHistoryOption)
+                        Toast.makeText(context, "History cleared: ${selectedClearHistoryOption.label}", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Clear Records")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryDialog = false }) {
                     Text("Cancel")
                 }
             }

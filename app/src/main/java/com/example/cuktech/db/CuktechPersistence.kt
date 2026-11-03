@@ -145,10 +145,50 @@ class CuktechPersistence(private val context: Context) :
         return result
     }
 
+    enum class ClearHistoryOption(val label: String, val description: String) {
+        KEEP_ACTIVE("Inactive Sessions Only", "Clear finished sessions; keep currently active charging session"),
+        OLDER_24H("Older than 24 Hours", "Clear telemetry and sessions older than 24 hours"),
+        OLDER_7D("Older than 7 Days", "Clear telemetry and sessions older than 7 days"),
+        CLEAR_ALL("Clear Everything", "Completely wipe all saved charging sessions and telemetry points")
+    }
+
     fun clearSessions() {
+        clearHistory(ClearHistoryOption.CLEAR_ALL)
+    }
+
+    fun clearHistory(option: ClearHistoryOption) {
         runCatching {
-            writableDatabase.delete("charge_sessions", null, null)
-            writableDatabase.delete("port_history", null, null)
+            val now = System.currentTimeMillis()
+            when (option) {
+                ClearHistoryOption.KEEP_ACTIVE -> {
+                    writableDatabase.delete("charge_sessions", "is_active = 0", null)
+                    val activeMinStart = getActiveSessionMinStartTime() ?: now
+                    writableDatabase.delete("port_history", "timestamp_ms < ?", arrayOf(activeMinStart.toString()))
+                }
+                ClearHistoryOption.OLDER_24H -> {
+                    val cutoff = now - 24 * 3600 * 1000L
+                    writableDatabase.delete("charge_sessions", "end_time_ms < ? AND is_active = 0", arrayOf(cutoff.toString()))
+                    writableDatabase.delete("port_history", "timestamp_ms < ?", arrayOf(cutoff.toString()))
+                }
+                ClearHistoryOption.OLDER_7D -> {
+                    val cutoff = now - 7 * 24 * 3600 * 1000L
+                    writableDatabase.delete("charge_sessions", "end_time_ms < ? AND is_active = 0", arrayOf(cutoff.toString()))
+                    writableDatabase.delete("port_history", "timestamp_ms < ?", arrayOf(cutoff.toString()))
+                }
+                ClearHistoryOption.CLEAR_ALL -> {
+                    writableDatabase.delete("charge_sessions", null, null)
+                    writableDatabase.delete("port_history", null, null)
+                }
+            }
+        }
+    }
+
+    private fun getActiveSessionMinStartTime(): Long? {
+        return readableDatabase.rawQuery(
+            "SELECT MIN(start_time_ms) FROM charge_sessions WHERE is_active = 1",
+            null
+        ).use { cursor ->
+            if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
         }
     }
 

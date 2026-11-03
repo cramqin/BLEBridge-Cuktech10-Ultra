@@ -1038,7 +1038,12 @@ fun BleBridgeDashboard(
                                                     if (!isRunning) {
                                                         prerequisiteWarning = "Prerequisite Check Failed:\n\n1. ❌ Server Configuration is OFF.\nPlease turn ON the server configuration switch first."
                                                     } else if (!isBleConn && !isCuktechAuth) {
-                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n2. ❌ Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
+                                                        if (activeCred != null) {
+                                                            cuktechManager.connectToCharger(activeCred?.mac)
+                                                            showTelemetryScreen = true
+                                                        } else {
+                                                            prerequisiteWarning = "Prerequisite Check Failed:\n\n2. ❌ Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
+                                                        }
                                                     } else if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
                                                         prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ Authentication Failed.\nValid 12-byte MiOT Token is required. Please log into Xiaomi Account or import credentials."
                                                     } else if (!isCuktechAuth || !hasClient) {
@@ -1137,7 +1142,12 @@ fun BleBridgeDashboard(
                                                             if (!isRunning) {
                                                                 prerequisiteWarning = "Prerequisite Check Failed:\n\n1. ❌ Server Configuration is OFF.\nPlease turn ON the server configuration switch first."
                                                             } else if (!isBleConn && !isCuktechAuth) {
-                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n2. ❌ Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
+                                                                if (activeCred != null) {
+                                                                    cuktechManager.connectToCharger(activeCred?.mac)
+                                                                    showTelemetryScreen = true
+                                                                } else {
+                                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n2. ❌ Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
+                                                                }
                                                             } else if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
                                                                 prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ Authentication Failed.\nValid 12-byte MiOT Token is required. Please log into Xiaomi Account or import credentials."
                                                             } else if (!isCuktechAuth || !hasClient) {
@@ -1409,6 +1419,10 @@ fun BleBridgeDashboard(
                                 cuktechManager.disconnectCharger()
                                 BleBridgeService.getInstance()?.closeGattClean()
                             }
+                            val stopIntent = Intent(context, BleBridgeService::class.java).apply {
+                                action = BleBridgeService.ACTION_STOP_SERVER
+                            }
+                            context.startService(stopIntent)
                             showTelemetryScreen = false
                             val launchIntent = miHomeLaunchIntent ?: context.packageManager.getLaunchIntentForPackage(miHomePkg)
                             if (launchIntent != null) {

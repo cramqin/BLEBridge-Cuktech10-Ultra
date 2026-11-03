@@ -69,6 +69,7 @@ object CuktechProtocol {
     const val PIID_COUNTDOWN_C3 = 11
     const val PIID_COUNTDOWN_A = 12
     const val PIID_LANGUAGE = 13
+    const val PIID_GOTO_SCREEN = 14
     const val PIID_USB_A_LOW_CURRENT = 15
     const val PIID_PORT_SW_BITMAP = 16
     const val PIID_PORT_C1_PROTOCOL = 17
@@ -78,17 +79,18 @@ object CuktechProtocol {
     const val PIID_PROTOCOL_EXTEND = 21
 
     val SCENE_MODES = mapOf(
-        1 to "Dynamic Allocation",
-        2 to "Laptop Priority",
-        3 to "Single Port Mode",
-        4 to "Dual Port Fast Charge"
+        1 to "AI Mode",
+        2 to "Hybrid Mode",
+        3 to "Single Port 100W",
+        4 to "Dual Balance"
     )
 
     val SCREEN_TIMEOUTS = mapOf(
-        0 to "Always On",
-        1 to "60 Seconds",
-        2 to "5 Minutes",
-        3 to "60 Minutes"
+        5 to "1 min",
+        1 to "5 min",
+        2 to "10 min",
+        3 to "30 min",
+        4 to "Always On"
     )
 
     val COUNTDOWN_OPTIONS = mapOf(
@@ -101,8 +103,8 @@ object CuktechProtocol {
     )
 
     val LANGUAGE_OPTIONS = mapOf(
-        0 to "Chinese",
-        1 to "English"
+        0 to "English",
+        1 to "中文"
     )
 
     // =========================================================================

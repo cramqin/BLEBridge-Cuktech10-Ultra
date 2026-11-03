@@ -97,7 +97,7 @@ class BleDiagnostics(private val context: Context) {
             val p2 = mgr.ports.value[2]
             val p3 = mgr.ports.value[3]
             val p4 = mgr.ports.value[4]
-            sb.appendLine("Live Ports: C1=${p1?.powerW ?: 0.0}W, C2=${p2?.powerW ?: 0.0}W, C3=${p3?.powerW ?: 0.0}W, A=${p4?.powerW ?: 0.0}W")
+            sb.appendLine("Live Ports: C1=${"%.1f".format(p1?.powerW ?: 0.0)}W/120W, C2=${"%.1f".format(p2?.powerW ?: 0.0)}W/120W, C3=${"%.1f".format(p3?.powerW ?: 0.0)}W/44W, A=${"%.1f".format(p4?.powerW ?: 0.0)}W/33W (120W Max Total)")
         }
 
         val powerMgr = context.getSystemService(Context.POWER_SERVICE) as? PowerManager

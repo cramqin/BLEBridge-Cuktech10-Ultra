@@ -34,6 +34,15 @@ data class PortTelemetry(
 ) {
     val isCharging: Boolean
         get() = status == 2 || powerW >= 0.3 || currentA >= 0.05
+
+    val maxPowerW: Int
+        get() = when (portId) {
+            1 -> 120 // USB-C1: 120W Max (PD 100W / Xiaomi 120W)
+            2 -> 120 // USB-C2: 120W Max (PD 100W / Xiaomi 120W)
+            3 -> 44  // USB-C3: 44W Max
+            4 -> 33  // USB-A:  33W Max
+            else -> 120
+        }
 }
 
 data class ChargerSettingsState(
@@ -88,6 +97,13 @@ object PortTelemetryDecoder {
         2 to "USB-C2",
         3 to "USB-C3",
         4 to "USB-A"
+    )
+
+    val PORT_MAX_WATTS = mapOf(
+        1 to 120, // USB-C1: 120W Max (PD 100W / Xiaomi 120W)
+        2 to 120, // USB-C2: 120W Max (PD 100W / Xiaomi 120W)
+        3 to 44,  // USB-C3: 44W Max
+        4 to 33   // USB-A:  33W Max
     )
 
     // Exact Mijia protocol code map from `state_protocol_v2.py::MIJIA_PROTOCOL_MAP`

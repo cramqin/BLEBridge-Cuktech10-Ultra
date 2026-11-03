@@ -2342,15 +2342,16 @@ private fun PortTelemetryCard(
                                 .background(if (port.isCharging) accentColor else if (port.enabled) Color.Gray else Color.Red.copy(alpha = 0.5f))
                         )
                         Spacer(modifier = Modifier.width(8.dp))
+                        val maxW = port.maxPowerW
                         val headerText = if (port.isCharging) {
-                            "${port.portLabel}  |  ${"%.1f".format(port.powerW)}W ${"%.1f".format(port.voltageV)}V ${"%.2f".format(port.currentA)}A"
+                            "${port.portLabel} (${maxW}W Max)  |  ${"%.1f".format(port.powerW)}W ${"%.1f".format(port.voltageV)}V ${"%.2f".format(port.currentA)}A"
                         } else {
-                            "${port.portLabel}  |  No output"
+                            "${port.portLabel} (${maxW}W Max)  |  No output"
                         }
                         Text(
                             text = headerText,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            fontSize = 15.sp
                         )
                     }
                     if (port.protocolName.isNotBlank() && port.protocolName != "Normal") {

@@ -109,6 +109,7 @@ fun BleBridgeDashboard(
     val cloudIntegrations = remember { BleBridgeService.cloudIntegrations!! }
 
     var showTelemetryScreen by remember { mutableStateOf(false) }
+    var dashboardCurrentTab by remember { mutableStateOf(0) }
     var showPairingDialog by remember { mutableStateOf(false) }
     var showXiaomiLoginDialog by remember { mutableStateOf(false) }
     var showMiHomeDialogInSettings by remember { mutableStateOf(false) }
@@ -227,6 +228,7 @@ fun BleBridgeDashboard(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = (!showTelemetryScreen || dashboardCurrentTab == 0),
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = appColors.surface,
@@ -554,6 +556,9 @@ fun BleBridgeDashboard(
                         },
                         onNavigateBack = {
                             showTelemetryScreen = false
+                        },
+                        onTabChanged = { tab ->
+                            dashboardCurrentTab = tab
                         }
                     )
                 } else {

@@ -19,6 +19,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,8 +34,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -63,7 +67,8 @@ fun CuktechDashboardScreen(
     bleDiagnostics: BleDiagnostics,
     cloudIntegrations: CloudIntegrations,
     onRequestBlePermissions: (() -> Unit) -> Unit,
-    onNavigateBack: (() -> Unit)? = null
+    onNavigateBack: (() -> Unit)? = null,
+    onTabChanged: ((Int) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -104,7 +109,10 @@ fun CuktechDashboardScreen(
     var pendingScreenTimeoutCode by remember { mutableStateOf(4) }
     var isAdcRunning by remember { mutableStateOf(false) }
 
-    var selectedTab by rememberSaveable { mutableStateOf(0) }
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
+    LaunchedEffect(pagerState.currentPage) {
+        onTabChanged?.invoke(pagerState.currentPage)
+    }
     val tabItems = listOf(
         Triple("Live", Icons.Default.Bolt, 0),
         Triple("Ports", Icons.Default.Settings, 1),
@@ -242,7 +250,7 @@ fun CuktechDashboardScreen(
             }
 
             TabRow(
-                selectedTabIndex = selectedTab,
+                selectedTabIndex = pagerState.currentPage,
                 containerColor = MaterialTheme.colorScheme.surface,
                 contentColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
@@ -251,13 +259,17 @@ fun CuktechDashboardScreen(
             ) {
                 tabItems.forEach { (label, icon, idx) ->
                     Tab(
-                        selected = selectedTab == idx,
-                        onClick = { selectedTab = idx },
+                        selected = pagerState.currentPage == idx,
+                        onClick = {
+                            scope.launch {
+                                pagerState.animateScrollToPage(idx)
+                            }
+                        },
                         text = {
                             Text(
                                 text = label,
                                 fontSize = 12.sp,
-                                fontWeight = if (selectedTab == idx) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = if (pagerState.currentPage == idx) FontWeight.Bold else FontWeight.Medium
                             )
                         },
                         icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(16.dp)) }
@@ -358,14 +370,15 @@ fun CuktechDashboardScreen(
         }
 
         // =====================================================================
-        // INDEPENDENT SCROLLABLE TAB CONTENTS
+        // INDEPENDENT SCROLLABLE TAB CONTENTS (Horizontal Swiping Support)
         // =====================================================================
-        Box(
+        HorizontalPager(
+            state = pagerState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-        ) {
-            when (selectedTab) {
+        ) { page ->
+            when (page) {
                 0 -> {
                     // =============================================================
                     // TAB 0: LIVE TELEMETRY & HERO POWER
@@ -389,7 +402,7 @@ fun CuktechDashboardScreen(
                         CuktechChargerVisual(
                             portsMap = portsMap,
                             modeLabel = activeModeLabel,
-                            onPortClick = { selectedTab = 1 },
+                            onPortClick = { scope.launch { pagerState.animateScrollToPage(1) } },
                             modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
                         )
 
@@ -463,7 +476,7 @@ fun CuktechDashboardScreen(
                             }
                         }
 
-                        // Total Output Power Hero Card (Streamlined, no wasted space)
+                        // Total Output Power Hero Card (Mi Home Layout with Integrated Waveform & Port Grid)
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
@@ -473,58 +486,8 @@ fun CuktechDashboardScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.Bottom
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "CURRENT POWER",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Row(verticalAlignment = Alignment.Bottom) {
-                                            Text(
-                                                text = "%.1f".format(totalWatts),
-                                                fontSize = 36.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                fontFamily = FontFamily.Monospace,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                text = "W / 120W max",
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.padding(bottom = 6.dp)
-                                            )
-                                        }
-                                    }
-
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text(
-                                            text = "RSSI: ${devInfo.rssi} dBm",
-                                            fontSize = 11.sp,
-                                            fontFamily = FontFamily.Monospace,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        if (devInfo.firmwareVersion.isNotBlank() && devInfo.firmwareVersion != "--" && !devInfo.firmwareVersion.contains('\uFFFD')) {
-                                            Text(
-                                                text = "FW: ${devInfo.firmwareVersion}",
-                                                fontSize = 11.sp,
-                                                fontFamily = FontFamily.Monospace,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Multi-color Port Breakdown Legend (Mi Home Palette)
                                 val p1 = portsMap[1]?.powerW ?: 0.0
                                 val p2 = portsMap[2]?.powerW ?: 0.0
                                 val p3 = portsMap[3]?.powerW ?: 0.0
@@ -533,56 +496,65 @@ fun CuktechDashboardScreen(
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.Bottom
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFF7A00)))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("C1: ${if (p1 > 0.1) "%.1fW".format(p1) else "--"}", fontSize = 11.sp)
+                                    Column {
+                                        Row(verticalAlignment = Alignment.Bottom) {
+                                            Text(
+                                                text = "%.1f".format(totalWatts),
+                                                fontSize = 38.sp,
+                                                fontWeight = FontWeight.Black,
+                                                fontFamily = FontFamily.SansSerif,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "W",
+                                                fontSize = 18.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.padding(bottom = 6.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = "Current power",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF3B82F6)))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("C2: ${if (p2 > 0.1) "%.1fW".format(p2) else "--"}", fontSize = 11.sp)
-                                    }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF00E5FF)))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("C3: ${if (p3 > 0.1) "%.1fW".format(p3) else "--"}", fontSize = 11.sp)
-                                    }
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFBBF24)))
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("A: ${if (p4 > 0.1) "%.1fW".format(p4) else "--"}", fontSize = 11.sp)
+
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "Power Proportion",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        if (sumW > 0.1) {
+                                            Text(
+                                                text = "C1: ${(p1 / sumW * 100).toInt()}% · C2: ${(p2 / sumW * 100).toInt()}% · C3: ${(p3 / sumW * 100).toInt()}% · A: ${(p4 / sumW * 100).toInt()}%",
+                                                fontSize = 10.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                color = Color(0xFF00E5FF)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "Idle",
+                                                fontSize = 10.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
 
                                 // Stacked Power Proportion Bar
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = "Power Proportion",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    if (sumW > 0.1) {
-                                        Text(
-                                            text = "C1: ${(p1/sumW*100).toInt()}% · C2: ${(p2/sumW*100).toInt()}% · C3: ${(p3/sumW*100).toInt()}% · A: ${(p4/sumW*100).toInt()}%",
-                                            fontSize = 10.sp,
-                                            fontFamily = FontFamily.Monospace,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                }
-
-                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(RoundedCornerShape(4.dp))
+                                        .height(6.dp)
+                                        .clip(RoundedCornerShape(3.dp))
                                         .background(MaterialTheme.colorScheme.surfaceVariant)
                                 ) {
                                     if (sumW > 0.1) {
@@ -597,7 +569,84 @@ fun CuktechDashboardScreen(
                                     }
                                 }
 
-                                Spacer(Modifier.height(4.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f), modifier = Modifier.padding(vertical = 2.dp))
+
+                                // Port Power (2x2 Grid with Volts, Amps, Protocol)
+                                Text(
+                                    text = "Port Power",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                val c1Port = portsMap[1]
+                                val c2Port = portsMap[2]
+                                val c3Port = portsMap[3]
+                                val aPort = portsMap[4]
+
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    PortPowerMiniCell(
+                                        color = Color(0xFFFF7A00),
+                                        portName = "Type-C1",
+                                        powerW = c1Port?.powerW ?: 0.0,
+                                        subtitle = "${if ((c1Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c1Port?.voltageV) else "--V"}  ${if ((c1Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c1Port?.currentA) else "--A"}${if (!c1Port?.protocol.isNullOrBlank() && c1Port?.protocol != "--") " · ${c1Port?.protocol}" else ""}",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    PortPowerMiniCell(
+                                        color = Color(0xFF3B82F6),
+                                        portName = "Type-C2",
+                                        powerW = c2Port?.powerW ?: 0.0,
+                                        subtitle = "${if ((c2Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c2Port?.voltageV) else "--V"}  ${if ((c2Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c2Port?.currentA) else "--A"}${if (!c2Port?.protocol.isNullOrBlank() && c2Port?.protocol != "--") " · ${c2Port?.protocol}" else ""}",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    PortPowerMiniCell(
+                                        color = Color(0xFF00E5FF),
+                                        portName = "Type-C3",
+                                        powerW = c3Port?.powerW ?: 0.0,
+                                        subtitle = "${if ((c3Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c3Port?.voltageV) else "--V"}  ${if ((c3Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c3Port?.currentA) else "--A"}${if (!c3Port?.protocol.isNullOrBlank() && c3Port?.protocol != "--") " · ${c3Port?.protocol}" else ""}",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    PortPowerMiniCell(
+                                        color = Color(0xFFFBBF24),
+                                        portName = "USB-A",
+                                        powerW = aPort?.powerW ?: 0.0,
+                                        subtitle = "${if ((aPort?.voltageV ?: 0.0) > 0.1) "%.1fV".format(aPort?.voltageV) else "--V"}  ${if ((aPort?.currentA ?: 0.0) > 0.01) "%.2fA".format(aPort?.currentA) else "--A"}${if (!aPort?.protocol.isNullOrBlank() && aPort?.protocol != "--") " · ${aPort?.protocol}" else ""}",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f), modifier = Modifier.padding(vertical = 2.dp))
+
+                                // Live Power Waveform (Smooth Cubic Curve + Area Gradient)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Live Power Trend",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "${chartHistory.size} samples",
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                LivePowerChart(
+                                    points = chartHistory,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(130.dp)
+                                )
+
+                                Spacer(Modifier.height(2.dp))
+
+                                // AI Temperature Control Screen Shortcut
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -606,7 +655,7 @@ fun CuktechDashboardScreen(
                                             bleManager.gotoScreen(3)
                                             Toast.makeText(context, "Switching charger LCD to AI Temperature Control screen (Page 3)", Toast.LENGTH_SHORT).show()
                                         }
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
                                         .padding(horizontal = 10.dp, vertical = 6.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
@@ -649,42 +698,6 @@ fun CuktechDashboardScreen(
                                     }
                                 }
                             }
-                        }
-
-                    // Real-Time Power Waveform Chart
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Live Power Waveform (W)",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = "Samples: ${chartHistory.size}",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            LivePowerChart(
-                                points = chartHistory,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(140.dp)
-                                )
                         }
                     }
                 }
@@ -2492,41 +2505,189 @@ private fun SettingSwitchRow(
 }
 
 @Composable
+private fun PortPowerMiniCell(
+    color: Color,
+    portName: String,
+    powerW: Double,
+    subtitle: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Column {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = "$portName ",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (powerW > 0.1) "%.1f W".format(powerW) else "-- W",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (powerW > 0.1) color else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+            }
+            Text(
+                text = subtitle,
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
 private fun LivePowerChart(
     points: List<PowerChartPoint>,
     modifier: Modifier = Modifier
 ) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+    val lineColor = Color(0xFF00E5FF)
+    val gridColor = Color(0xFF64748B).copy(alpha = 0.25f)
+    val timeFormat = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()) }
 
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
+    val firstTimeStr = remember(points.firstOrNull()?.timestamp) {
+        points.firstOrNull()?.let { timeFormat.format(java.util.Date(it.timestamp)) } ?: ""
+    }
+    val lastTimeStr = remember(points.lastOrNull()?.timestamp) {
+        points.lastOrNull()?.let { timeFormat.format(java.util.Date(it.timestamp)) } ?: ""
+    }
 
-        // Draw horizontal reference lines
-        for (i in 0..3) {
-            val y = h * (i / 3f)
-            drawLine(
-                color = gridColor,
-                start = Offset(0f, y),
-                end = Offset(w, y),
-                strokeWidth = 1f
+    val maxWatts = remember(points) {
+        if (points.isEmpty()) 30.0 else max(30.0, points.maxOf { it.totalWatts } * 1.15)
+    }
+
+    Column(modifier = modifier) {
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+
+                // Dashed horizontal reference grid lines
+                val dash = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                val yMid = h * 0.5f
+                drawLine(
+                    color = gridColor,
+                    start = Offset(0f, yMid),
+                    end = Offset(w, yMid),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = dash
+                )
+                drawLine(
+                    color = gridColor,
+                    start = Offset(0f, h - 1f),
+                    end = Offset(w, h - 1f),
+                    strokeWidth = 1.dp.toPx(),
+                    pathEffect = dash
+                )
+
+                if (points.size < 2) return@Canvas
+
+                val strokePath = Path()
+                val fillPath = Path()
+
+                val coords = points.mapIndexed { idx, pt ->
+                    val x = (idx.toFloat() / (points.size - 1).toFloat()) * w
+                    val y = (h - (pt.totalWatts / maxWatts).toFloat() * h).coerceIn(4f, h - 4f)
+                    Offset(x, y)
+                }
+
+                strokePath.moveTo(coords[0].x, coords[0].y)
+                fillPath.moveTo(coords[0].x, h)
+                fillPath.lineTo(coords[0].x, coords[0].y)
+
+                for (i in 1 until coords.size) {
+                    val prev = coords[i - 1]
+                    val curr = coords[i]
+                    val cX = (prev.x + curr.x) / 2f
+                    strokePath.cubicTo(cX, prev.y, cX, curr.y, curr.x, curr.y)
+                    fillPath.cubicTo(cX, prev.y, cX, curr.y, curr.x, curr.y)
+                }
+
+                fillPath.lineTo(coords.last().x, h)
+                fillPath.close()
+
+                // Draw gradient fill below curve
+                drawPath(
+                    path = fillPath,
+                    brush = Brush.verticalGradient(
+                        listOf(
+                            lineColor.copy(alpha = 0.35f),
+                            lineColor.copy(alpha = 0.0f)
+                        ),
+                        startY = 0f,
+                        endY = h
+                    )
+                )
+
+                // Draw curve stroke
+                drawPath(
+                    path = strokePath,
+                    color = lineColor,
+                    style = Stroke(width = 2.5.dp.toPx())
+                )
+
+                // Glowing point on latest sample
+                val lastPt = coords.last()
+                drawCircle(
+                    color = lineColor.copy(alpha = 0.45f),
+                    radius = 6.dp.toPx(),
+                    center = lastPt
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = 3.dp.toPx(),
+                    center = lastPt
+                )
+            }
+
+            // Power labels on the right
+            Text(
+                text = "${(maxWatts * 0.5).toInt()}",
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 4.dp)
+            )
+            Text(
+                text = "0",
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 4.dp, bottom = 2.dp)
             )
         }
 
-        if (points.size < 2) return@Canvas
-        val maxWatts = max(20.0, points.maxOf { it.totalWatts } * 1.15)
-        val path = Path()
-        points.forEachIndexed { idx, pt ->
-            val x = (idx.toFloat() / (points.size - 1).toFloat()) * w
-            val y = (h - (pt.totalWatts / maxWatts).toFloat() * h).coerceIn(2f, h - 2f)
-            if (idx == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        // X-axis timestamps
+        if (firstTimeStr.isNotBlank() && lastTimeStr.isNotBlank()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(firstTimeStr, fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+                Text(lastTimeStr, fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+            }
         }
-        drawPath(
-            path = path,
-            color = primaryColor,
-            style = Stroke(width = 3.5f)
-        )
     }
 }
 

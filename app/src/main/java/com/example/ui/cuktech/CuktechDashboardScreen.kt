@@ -1166,52 +1166,7 @@ fun CuktechDashboardScreen(
                         }
                     }
 
-                    // 2. BLE Activity & Communication Logs Card
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "BLE Activity Logs",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = "Copy live GATT frames and MiOT commands to clipboard for diagnostics.",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Button(
-                                onClick = {
-                                    val logs = BleBridgeService.logs.value.joinToString("\n") { it.message }
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                                    val clip = ClipData.newPlainText("CUKTECH BLE Logs", logs)
-                                    clipboard?.setPrimaryClip(clip)
-                                    Toast.makeText(context, "BLE logs copied to clipboard", Toast.LENGTH_SHORT).show()
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF00E5FF),
-                                    contentColor = Color(0xFF0A0E1A)
-                                )
-                            ) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Copy Logs", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
+
 
                     // 3. Tasker & Automation Integration Card
                     Card(
@@ -2080,7 +2035,7 @@ fun CuktechDashboardScreen(
                 Button(
                     onClick = {
                         showClearHistoryDialog = false
-                        bleManager.persistence.clearHistory(selectedClearHistoryOption)
+                        bleManager.clearHistory(selectedClearHistoryOption)
                         Toast.makeText(context, "History cleared: ${selectedClearHistoryOption.label}", Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)

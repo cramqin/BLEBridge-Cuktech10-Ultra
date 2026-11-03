@@ -2,36 +2,35 @@ package com.example.ui.cuktech
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.cuktech.protocol.PortTelemetry
 
 /**
- * Authentic replica of the Xiaomi Mi Home CUKTECH 10 Ultra GaN Charger visual.
- * Features official 3D hardware assets, real glowing port beams, accurate
- * port alignments, and clean typography.
+ * Authentic visual illustration of the physical CUKTECH 10 Ultra GaN Charger front panel,
+ * patterned after the official Xiaomi Mi Home design.
+ * Features glowing active port slots, dynamic laser power beams, and bottom LED accent bar.
  */
 @Composable
 fun CuktechChargerVisual(
@@ -42,7 +41,7 @@ fun CuktechChargerVisual(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "charger_pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.75f,
+        initialValue = 0.5f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = FastOutSlowInEasing),
@@ -54,169 +53,232 @@ fun CuktechChargerVisual(
     val hasActiveCharging = portsMap.values.any { it.powerW > 0.2 }
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
+        modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ── 1. Top Scenario Pill Badge (Mi Home Style) ──
+        // 1. Floating Scenario Mode Pill on top (Mi Home Style)
         Surface(
             color = Color(0xFF13151A),
-            shape = RoundedCornerShape(20.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.7f)),
-            modifier = Modifier.padding(bottom = 16.dp)
+            shape = RoundedCornerShape(16.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.5f)),
+            modifier = Modifier.padding(bottom = 14.dp)
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "AI",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF00E5FF),
-                    modifier = Modifier.padding(end = 6.dp)
-                )
-                Text(
                     text = modeLabel,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     color = Color(0xFF00E5FF)
                 )
             }
         }
 
-        // ── 2. Charger Body & Power Readout Grid ──
-        Box(
+        // 2. Main Hardware Body & Power Callout Area
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(300.dp),
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Subtle Radial Glow behind active charger
-            if (hasActiveCharging) {
-                Box(
-                    modifier = Modifier
-                        .size(240.dp)
-                        .alpha(0.35f * pulseAlpha)
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFF00E5FF).copy(alpha = 0.25f), Color.Transparent)
-                            ),
-                            shape = CircleShape
-                        )
-                )
-            }
-
-            // Left Power Drop Indicator (Drop wire + Lightning Badge)
+            // Left Glow / AC Power Indicator
             Box(
                 modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = 12.dp)
-                    .width(50.dp)
-                    .height(280.dp)
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (hasActiveCharging) {
+                            Brush.radialGradient(listOf(Color(0xFF00E5FF).copy(alpha = 0.35f * pulseAlpha), Color.Transparent))
+                        } else {
+                            Brush.radialGradient(listOf(Color.White.copy(alpha = 0.05f), Color.Transparent))
+                        }
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                if (hasActiveCharging) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val stroke = 1.5.dp.toPx()
-                        val glowCyan = Color(0xFF00E5FF).copy(alpha = 0.7f * pulseAlpha)
-                        // Drop wire from top down to the power badge
-                        drawLine(
-                            color = glowCyan,
-                            start = Offset(size.width - 4.dp.toPx(), 45.dp.toPx()),
-                            end = Offset(size.width / 2, 45.dp.toPx()),
-                            strokeWidth = stroke
-                        )
-                        drawLine(
-                            color = glowCyan,
-                            start = Offset(size.width / 2, 45.dp.toPx()),
-                            end = Offset(size.width / 2, 130.dp.toPx()),
-                            strokeWidth = stroke
+                Surface(
+                    color = if (hasActiveCharging) Color(0xFF00E5FF).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant,
+                    shape = CircleShape,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = null,
+                            tint = if (hasActiveCharging) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
+                }
+            }
 
-                    // Neon Lightning Icon
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Physical Charger Front Faceplate (True to CUKTECH 10 Ultra hardware)
+            Box(
+                modifier = Modifier
+                    .width(135.dp)
+                    .height(235.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFF16181D))
+                    .border(2.dp, Brush.verticalGradient(listOf(Color(0xFF4A5260), Color(0xFF282C34))), RoundedCornerShape(18.dp))
+            ) {
+                // Background Grooved Lines Canvas
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val grooveColor = Color(0xFF1B1F26)
+                    val grooveStep = 7.dp.toPx()
+                    var y = 20.dp.toPx()
+                    while (y < size.height - 40.dp.toPx()) {
+                        drawLine(
+                            color = grooveColor,
+                            start = Offset(12.dp.toPx(), y),
+                            end = Offset(size.width - 12.dp.toPx(), y),
+                            strokeWidth = 2.dp.toPx()
+                        )
+                        y += grooveStep
+                    }
+                }
+
+                // Four Physical Ports (C1, C2, C3, A)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 22.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    for (portId in 1..4) {
+                        val port = portsMap[portId] ?: PortTelemetry(portId, "Port $portId")
+                        val isC = portId in 1..3
+                        val isCharging = port.powerW > 0.2
+                        val label = if (isC) "C$portId" else "A"
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(26.dp)
+                                .clickable { onPortClick?.invoke(portId) },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (isCharging) Color(0xFF00E5FF) else Color(0xFF8E99A8),
+                                modifier = Modifier.width(22.dp)
+                            )
+
+                            // Port Slot Geometry
+                            if (isC) {
+                                // Type-C Oval Pill Slot
+                                Box(
+                                    modifier = Modifier
+                                        .width(42.dp)
+                                        .height(11.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            if (isCharging) Color(0xFF00E5FF).copy(alpha = 0.25f * pulseAlpha) else Color(0xFF0D0F12)
+                                        )
+                                        .border(
+                                            width = if (isCharging) 1.5.dp else 1.dp,
+                                            color = if (isCharging) Color(0xFF00E5FF).copy(alpha = pulseAlpha) else Color(0xFF2C323D),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(24.dp)
+                                            .height(3.dp)
+                                            .clip(RoundedCornerShape(2.dp))
+                                            .background(if (isCharging) Color(0xFF00E5FF) else Color(0xFF1E222A))
+                                    )
+                                }
+                            } else {
+                                // USB-A Rectangular Slot
+                                Box(
+                                    modifier = Modifier
+                                        .width(48.dp)
+                                        .height(17.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(
+                                            if (isCharging) Color(0xFF00E5FF).copy(alpha = 0.25f * pulseAlpha) else Color(0xFF0D0F12)
+                                        )
+                                        .border(
+                                            width = if (isCharging) 1.5.dp else 1.dp,
+                                            color = if (isCharging) Color(0xFF00E5FF).copy(alpha = pulseAlpha) else Color(0xFF2C323D),
+                                            shape = RoundedCornerShape(3.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Internal Blue Tongue
+                                    Box(
+                                        modifier = Modifier
+                                            .width(28.dp)
+                                            .height(5.dp)
+                                            .clip(RoundedCornerShape(1.dp))
+                                            .background(if (isCharging) Color(0xFF00E5FF) else Color(0xFF1E5BB5))
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Bottom Section: Signature Glowing Cyan LED Bar & CUKTECH Brand Chin
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                ) {
+                    // Glowing LED Bar
                     Box(
                         modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(34.dp)
-                            .clip(CircleShape)
+                            .fillMaxWidth()
+                            .height(3.5.dp)
                             .background(
-                                Brush.radialGradient(
-                                    listOf(Color(0xFF00E5FF).copy(alpha = 0.4f), Color(0xFF0080FF).copy(alpha = 0.1f))
+                                Brush.horizontalGradient(
+                                    listOf(
+                                        Color(0xFF00E5FF).copy(alpha = 0.2f),
+                                        Color(0xFF00E5FF).copy(alpha = if (hasActiveCharging) 0.95f * pulseAlpha else 0.4f),
+                                        Color(0xFF00E5FF).copy(alpha = 0.2f)
+                                    )
+                                )
+                            )
+                    )
+
+                    // Silver Embossed Chin
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(30.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFF2E333D), Color(0xFF1E2229))
                                 )
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.main_charger_dark_power_on),
-                            contentDescription = "Active Charging",
-                            modifier = Modifier.size(24.dp)
+                        Text(
+                            text = "CUKTECH",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 2.sp,
+                            color = Color(0xFFA6B0C0)
                         )
                     }
                 }
             }
 
-            // Center 3D Charger Asset
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .width(160.dp)
-                    .height(290.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.main_charger_dark_ad1204_all),
-                    contentDescription = "CUKTECH 10 Ultra GaN Charger",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
+            Spacer(modifier = Modifier.width(14.dp))
 
-                // Glowing Port Halos overlaid precisely on the charger front face
-                // Vertical positions relative to the 290dp charger height
-                val portYFractions = listOf(
-                    1 to 0.28f, // C1
-                    2 to 0.38f, // C2
-                    3 to 0.48f, // C3
-                    4 to 0.60f  // A
-                )
-
-                portYFractions.forEach { (portId, fraction) ->
-                    val port = portsMap[portId]
-                    val isCharging = (port?.powerW ?: 0.0) > 0.2
-                    if (isCharging) {
-                        val glowDrawable = when (portId) {
-                            1 -> R.drawable.main_card_port_c1_on
-                            2 -> R.drawable.main_card_port_c2_on
-                            3 -> R.drawable.main_card_port_c3_on
-                            else -> R.drawable.main_card_port_a_on
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(fraction)
-                                .align(Alignment.TopCenter),
-                            contentAlignment = Alignment.BottomCenter
-                        ) {
-                            Image(
-                                painter = painterResource(id = glowDrawable),
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .padding(start = if (portId <= 3) 22.dp else 20.dp)
-                                    .size(width = if (portId <= 3) 34.dp else 38.dp, height = 16.dp)
-                                    .alpha(pulseAlpha)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Right Power Readout Column (Wattage & Soft Laser Beam)
+            // Right Power Callout Beams (Watts per Port)
             Column(
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .width(135.dp)
-                    .height(280.dp),
+                    .weight(1f)
+                    .height(235.dp),
                 verticalArrangement = Arrangement.SpaceAround
             ) {
                 for (portId in 1..4) {
@@ -227,27 +289,26 @@ fun CuktechChargerVisual(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onPortClick?.invoke(portId) }
-                            .padding(vertical = 4.dp),
+                            .clickable { onPortClick?.invoke(portId) },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Soft Horizontal Laser Light Ray
+                        // Glowing Beam Trace
                         Box(
                             modifier = Modifier
-                                .width(32.dp)
-                                .height(if (isCharging) 12.dp else 2.dp)
+                                .width(20.dp)
+                                .height(if (isCharging) 3.dp else 1.5.dp)
                                 .background(
                                     if (isCharging) {
                                         Brush.horizontalGradient(
                                             listOf(
-                                                Color(0xFF00E5FF).copy(alpha = 0.85f * pulseAlpha),
-                                                Color(0xFF00E5FF).copy(alpha = 0.15f)
+                                                Color(0xFF00E5FF).copy(alpha = pulseAlpha),
+                                                Color(0xFF00E5FF).copy(alpha = 0.2f)
                                             )
                                         )
                                     } else {
                                         Brush.horizontalGradient(
                                             listOf(
-                                                Color(0xFF2A303C).copy(alpha = 0.4f),
+                                                Color(0xFF38404E).copy(alpha = 0.4f),
                                                 Color.Transparent
                                             )
                                         )
@@ -257,42 +318,33 @@ fun CuktechChargerVisual(
 
                         Spacer(modifier = Modifier.width(8.dp))
 
-                        // Wattage Readout
-                        Column {
-                            if (isCharging) {
-                                Row(verticalAlignment = Alignment.Bottom) {
-                                    Text(
-                                        text = "%.1f".format(port.powerW),
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = "W",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Normal,
-                                        color = Color.White.copy(alpha = 0.85f),
-                                        modifier = Modifier.padding(bottom = 2.dp)
-                                    )
-                                }
+                        if (isCharging) {
+                            Column {
                                 Text(
-                                    text = "$portName · ${"%.1fV".format(port.voltageV)}",
-                                    fontSize = 11.sp,
-                                    color = Color.White.copy(alpha = 0.55f),
+                                    text = "%.1f W".format(port.powerW),
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF00E5FF)
+                                )
+                                Text(
+                                    text = "$portName · ${"%.1fV".format(port.voltageV)} · ${"%.2fA".format(port.currentA)}",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontFamily = FontFamily.Monospace
                                 )
-                            } else {
+                            }
+                        } else {
+                            Column {
                                 Text(
                                     text = "-- W",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color.White.copy(alpha = 0.25f)
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Normal,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                                 )
                                 Text(
                                     text = portName,
-                                    fontSize = 11.sp,
-                                    color = Color.White.copy(alpha = 0.22f),
+                                    fontSize = 9.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                                     fontFamily = FontFamily.Monospace
                                 )
                             }

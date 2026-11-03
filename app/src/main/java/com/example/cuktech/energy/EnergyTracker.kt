@@ -172,6 +172,15 @@ class ChargeSessionDetector(
         }
     }
 
+    fun reset() {
+        activeSession = null
+        lowPowerStartSec = null
+        sampleSumWatts = 0.0
+        sampleCount = 0
+        fastWindow.clear()
+        slowWindow.clear()
+    }
+
     private fun pushWindow(deque: ArrayDeque<Double>, maxSize: Int, value: Double) {
         if (deque.size >= maxSize) deque.removeFirst()
         deque.addLast(value)

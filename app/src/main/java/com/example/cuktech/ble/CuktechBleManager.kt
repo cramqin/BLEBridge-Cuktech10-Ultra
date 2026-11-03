@@ -2118,4 +2118,28 @@ class CuktechBleManager(
             _chargeLimits.value = map
         }
     }
+
+    fun clearHistory(option: com.example.cuktech.db.CuktechPersistence.ClearHistoryOption) {
+        persistence.clearHistory(option)
+        _completedSessions.value = persistence.getRecentSessions(50)
+        when (option) {
+            com.example.cuktech.db.CuktechPersistence.ClearHistoryOption.CLEAR_ALL -> {
+                sessionDetectors.values.forEach { it.reset() }
+                energyIntegrators.values.forEach { it.reset() }
+                _activeSessions.value = emptyMap()
+                _powerChartHistory.value = emptyList()
+                val updated = _ports.value.toMutableMap()
+                updated.keys.forEach { pId ->
+                    updated[pId]?.let { updated[pId] = it.copy(cumulativeWh = 0.0) }
+                }
+                _ports.value = updated
+            }
+            com.example.cuktech.db.CuktechPersistence.ClearHistoryOption.KEEP_ACTIVE -> {
+                // Completed sessions reloaded from DB
+            }
+            else -> {
+                // Older 24h / 7d reloaded from DB
+            }
+        }
+    }
 }

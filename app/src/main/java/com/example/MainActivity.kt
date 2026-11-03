@@ -1225,92 +1225,8 @@ fun BleBridgeDashboard(
                     }
                 }
 
-                // --- Bluetooth Low Energy & Adapter Diagnostics Section ---
-                val hasDiagOutput = diagStatus.lastDiagnosticOutput.isNotBlank()
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = appColors.surface),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            text = "BLUETOOTH & ADAPTER DIAGNOSTICS",
-                            fontWeight = FontWeight.Bold,
-                            color = appColors.textSecondary,
-                            fontSize = 10.sp,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Inspect hardware Bluetooth adapter status, scanning subsystem, and connection parameters.",
-                            color = appColors.textSecondary,
-                            fontSize = 11.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        bleDiagnostics.runBluetoothStackDiagnostics()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = appColors.primary,
-                                    contentColor = Color.White
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Run Diagnostics", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-
-                            if (hasDiagOutput) {
-                                OutlinedButton(
-                                    onClick = {
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                                        val clip = ClipData.newPlainText("BLE Diagnostics", diagStatus.lastDiagnosticOutput)
-                                        clipboard?.setPrimaryClip(clip)
-                                        Toast.makeText(context, "Diagnostics copied to clipboard", Toast.LENGTH_SHORT).show()
-                                    },
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Copy Logs", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-
-                        if (hasDiagOutput) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Surface(
-                                color = appColors.surfaceVariant,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = diagStatus.lastDiagnosticOutput,
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = appColors.textPrimary,
-                                    modifier = Modifier.padding(12.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // --- Console Log Section ---
+                // --- Unified System Console & BLE Diagnostics Card with Tabs ---
+                var terminalTab by remember { mutableStateOf(0) } // 0 = Live Console, 1 = BLE Diagnostics
                 Card(
                     colors = CardDefaults.cardColors(containerColor = if (appColors.isDark) Color(0xFF030712) else Color(0xFF0F172A)),
                     shape = RoundedCornerShape(24.dp),
@@ -1321,100 +1237,245 @@ fun BleBridgeDashboard(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "CONSOLE OUTPUT",
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF94A3B8),
-                                    fontSize = 10.sp,
-                                    letterSpacing = 1.sp
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "LIVE",
-                                    color = StatusSuccess,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                            // Left: Tabs (Live Console / BLE Diagnostics)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    modifier = Modifier.clickable { terminalTab = 0 },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (terminalTab == 0) appColors.primary.copy(alpha = 0.22f) else Color.Transparent,
+                                    border = if (terminalTab == 0) BorderStroke(1.dp, appColors.primary.copy(alpha = 0.5f)) else null
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "CONSOLE LOG",
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (terminalTab == 0) appColors.primary else Color(0xFF94A3B8),
+                                            fontSize = 11.sp,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .clip(CircleShape)
+                                                .background(StatusSuccess)
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    modifier = Modifier.clickable { terminalTab = 1 },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (terminalTab == 1) appColors.primary.copy(alpha = 0.22f) else Color.Transparent,
+                                    border = if (terminalTab == 1) BorderStroke(1.dp, appColors.primary.copy(alpha = 0.5f)) else null
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "BLE DIAGNOSTICS",
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (terminalTab == 1) appColors.primary else Color(0xFF94A3B8),
+                                            fontSize = 11.sp,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                    }
+                                }
                             }
 
+                            // Right: Action Icon Buttons
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(
-                                    onClick = {
-                                        val fullLogText = logs.joinToString("\n") { logMsg ->
-                                            "[${formatTimeHMS(logMsg.timestamp)}] ${logMsg.message}"
+                                if (terminalTab == 0) {
+                                    IconButton(
+                                        onClick = {
+                                            val fullLogText = logs.joinToString("\n") { logMsg ->
+                                                "[${formatTimeHMS(logMsg.timestamp)}] ${logMsg.message}"
+                                            }
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                            val clip = android.content.ClipData.newPlainText("Console Output", fullLogText)
+                                            clipboard?.setPrimaryClip(clip)
+                                            Toast.makeText(context, "Console output copied to clipboard", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ContentCopy,
+                                            contentDescription = "Copy logs",
+                                            tint = Color(0xFF94A3B8),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    IconButton(
+                                        onClick = { BleBridgeService.clearLogs() },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Clear logs",
+                                            tint = Color(0xFF94A3B8),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                } else {
+                                    // BLE Diagnostics: Recheck, Copy, Close
+                                    IconButton(
+                                        onClick = {
+                                            scope.launch {
+                                                bleDiagnostics.runBluetoothStackDiagnostics()
+                                            }
+                                            Toast.makeText(context, "Running BLE diagnostics...", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = "Recheck Diagnostics",
+                                            tint = appColors.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+
+                                    if (diagStatus.lastDiagnosticOutput.isNotBlank()) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        IconButton(
+                                            onClick = {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                                val clip = android.content.ClipData.newPlainText("BLE Diagnostics", diagStatus.lastDiagnosticOutput)
+                                                clipboard?.setPrimaryClip(clip)
+                                                Toast.makeText(context, "Diagnostics copied to clipboard", Toast.LENGTH_SHORT).show()
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ContentCopy,
+                                                contentDescription = "Copy diagnostics",
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(16.dp)
+                                            )
                                         }
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                                        val clip = android.content.ClipData.newPlainText("Console Output", fullLogText)
-                                        clipboard?.setPrimaryClip(clip)
-                                        Toast.makeText(context, "Console output copied to clipboard", Toast.LENGTH_SHORT).show()
-                                    },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ContentCopy,
-                                        contentDescription = "Copy logs",
-                                        tint = Color(0xFF94A3B8),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                IconButton(
-                                    onClick = { BleBridgeService.clearLogs() },
-                                    modifier = Modifier.size(24.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Clear logs",
-                                        tint = Color(0xFF94A3B8),
-                                        modifier = Modifier.size(16.dp)
-                                    )
+
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        IconButton(
+                                            onClick = {
+                                                bleDiagnostics.clearDiagnosticOutput()
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "Close diagnostics",
+                                                tint = Color(0xFF94A3B8),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
 
-                        val listState = rememberLazyListState()
-                        LaunchedEffect(logs.size) {
-                            if (logs.isNotEmpty()) {
-                                listState.animateScrollToItem(logs.size - 1)
-                            }
-                        }
-
+                        // Content Body
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(top = 4.dp)
                         ) {
-                            if (logs.isEmpty()) {
-                                Text(
-                                    text = "System logs are empty.",
-                                    color = Color(0xFF64748B),
-                                    fontSize = 10.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.align(Alignment.Center)
-                                )
-                            } else {
-                                LazyColumn(
-                                    state = listState,
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    items(logs) { msg ->
-                                        val logColor = when (msg.level) {
-                                            BleBridgeService.Companion.LogLevel.LEVEL1 -> Color(0xFFFCA5A5) // Soft red
-                                            BleBridgeService.Companion.LogLevel.LEVEL2 -> Color(0xFFBAE6FD) // Light sky cyan
-                                            BleBridgeService.Companion.LogLevel.LEVEL3 -> Color(0xFFFDE68A) // Soft amber
+                            if (terminalTab == 0) {
+                                // Tab 0: Console Logs
+                                val listState = rememberLazyListState()
+                                LaunchedEffect(logs.size) {
+                                    if (logs.isNotEmpty()) {
+                                        listState.animateScrollToItem(logs.size - 1)
+                                    }
+                                }
+
+                                if (logs.isEmpty()) {
+                                    Text(
+                                        text = "System logs are empty.",
+                                        color = Color(0xFF64748B),
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.align(Alignment.Center)
+                                    )
+                                } else {
+                                    LazyColumn(
+                                        state = listState,
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        items(logs) { msg ->
+                                            val logColor = when (msg.level) {
+                                                BleBridgeService.Companion.LogLevel.LEVEL1 -> Color(0xFFFCA5A5) // Soft red
+                                                BleBridgeService.Companion.LogLevel.LEVEL2 -> Color(0xFFBAE6FD) // Light sky cyan
+                                                BleBridgeService.Companion.LogLevel.LEVEL3 -> Color(0xFFFDE68A) // Soft amber
+                                            }
+                                            Text(
+                                                text = "[${formatTimeHMS(msg.timestamp)}] ${msg.message}",
+                                                color = logColor,
+                                                fontSize = 11.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                lineHeight = 15.sp,
+                                                modifier = Modifier.padding(vertical = 1.dp)
+                                            )
                                         }
+                                    }
+                                }
+                            } else {
+                                // Tab 1: BLE Diagnostics Output
+                                if (diagStatus.lastDiagnosticOutput.isBlank()) {
+                                    Column(
+                                        modifier = Modifier.align(Alignment.Center),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
                                         Text(
-                                            text = "[${formatTimeHMS(msg.timestamp)}] ${msg.message}",
-                                            color = logColor,
+                                            text = "Bluetooth adapter & MiOT diagnostics not run yet.",
+                                            color = Color(0xFF64748B),
+                                            fontSize = 11.sp,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                        Button(
+                                            onClick = {
+                                                scope.launch {
+                                                    bleDiagnostics.runBluetoothStackDiagnostics()
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = appColors.primary,
+                                                contentColor = Color.White
+                                            ),
+                                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                                        ) {
+                                            Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Run Stack Diagnostics", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                } else {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .verticalScroll(rememberScrollState())
+                                    ) {
+                                        Text(
+                                            text = diagStatus.lastDiagnosticOutput,
+                                            color = Color(0xFFE2E8F0),
                                             fontSize = 11.sp,
                                             fontFamily = FontFamily.Monospace,
-                                            lineHeight = 15.sp,
-                                            modifier = Modifier.padding(vertical = 1.dp)
+                                            lineHeight = 16.sp
                                         )
                                     }
                                 }

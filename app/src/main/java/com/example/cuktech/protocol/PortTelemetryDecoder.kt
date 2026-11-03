@@ -414,16 +414,25 @@ object PortTelemetryDecoder {
                 else "Samsung Galaxy (Super Fast Charging)"
             }
 
-            // Apple (iPhone / iPad / Mac)
+            // Apple hardware divider (D+/D- 2.4A resistor handshake)
             code == 12 || proto.contains("Apple", ignoreCase = true) -> "Apple Device (iPhone / iPad)"
-            proto.contains("PD", ignoreCase = true) && !proto.contains("PPS", ignoreCase = true) && (v in 8.5..9.5) && (w in 15.0..29.0) ->
-                "Apple iPhone (USB-PD)"
-            proto.contains("PD", ignoreCase = true) && !proto.contains("PPS", ignoreCase = true) && (v in 14.5..15.5) && (w in 25.0..36.0) ->
-                "Apple iPad (USB-PD)"
+
+            // 12V fixed voltage: Typical signature of semiconductor phone coolers (Bluewow, Black Shark, Flydigi)
+            (v in 11.5..12.5) && !proto.contains("PPS", ignoreCase = true) ->
+                "12V Fast Charge (Phone Cooler / Accessory)"
 
             // Laptop / MacBook / Steam Deck (Fixed PD 20V / 28V high power)
             proto.contains("PD", ignoreCase = true) && !proto.contains("PPS", ignoreCase = true) && (v >= 19.0 || w >= 45.0) ->
                 "Laptop / MacBook (USB-PD High Power)"
+
+            // Standard Fixed USB-PD (Used by iPhones, Android phones, phone coolers, power banks)
+            proto.contains("PD", ignoreCase = true) && !proto.contains("PPS", ignoreCase = true) -> {
+                when {
+                    v in 8.5..9.5 -> "USB-PD 9V (Phone / Cooler / Accessory)"
+                    v in 14.5..15.5 -> "USB-PD 15V (Tablet / Cooler / Accessory)"
+                    else -> "USB-PD Device"
+                }
+            }
 
             // UFCS (Universal Fast Charging Spec - Vivo / iQOO / OPPO / OnePlus / Huawei)
             code == 20 || proto.contains("UFCS", ignoreCase = true) ->
@@ -452,11 +461,10 @@ object PortTelemetryDecoder {
         return when {
             full.startsWith("Xiaomi") -> "Xiaomi"
             full.startsWith("Samsung") -> "Samsung"
-            full.startsWith("Apple iPhone") -> "iPhone"
-            full.startsWith("Apple iPad") -> "iPad"
             full.startsWith("Apple") -> "Apple"
             full.startsWith("Laptop") -> "Laptop"
             full.startsWith("UFCS") -> "UFCS"
+            full.contains("Cooler") -> "Cooler"
             full.startsWith("PPS") -> "PPS"
             else -> full.split(" ").firstOrNull() ?: full
         }

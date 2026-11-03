@@ -118,14 +118,23 @@ object PortTelemetryDecoder {
         val opcode = plaintext[4].toInt() and 0xFF
         val siid = if (plaintext.size > 6) plaintext[6].toInt() and 0xFF else -1
         val piid = if (plaintext.size > 8) (plaintext[7].toInt() and 0xFF) or ((plaintext[8].toInt() and 0xFF) shl 8) else -1
-        val valLen = if (plaintext.size > 11) plaintext[11].toInt() and 0xFF else 0
-        val value = if (plaintext.size >= 14) {
-            plaintext.copyOfRange(13, plaintext.size)
-        } else if (plaintext.size > 12) {
-            plaintext.copyOfRange(12, plaintext.size)
+        // In GET response (opcode 0x03), there are 2 error bytes at indices 9..10, so value starts at index 13
+        // In Push notification (opcode 0x04), there are NO error bytes, so value starts at index 11
+        // In SET ACK (opcode 0x01), there is no value
+        val valueOffset = when (opcode) {
+            0x03 -> 13
+            0x04 -> 11
+            else -> 12
+        }
+        val value = if (plaintext.size > valueOffset) {
+            plaintext.copyOfRange(valueOffset, plaintext.size)
+        } else if (plaintext.size >= 4) {
+            plaintext.copyOfRange(plaintext.size - 4, plaintext.size)
         } else {
             ByteArray(0)
         }
+        val valLen = value.size
+
         return DecodedMiotFrame(
             reqId = seq,
             b2 = frameType,

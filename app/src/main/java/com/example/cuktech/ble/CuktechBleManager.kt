@@ -98,6 +98,10 @@ class CuktechBleManager(
     private val authCtrlQueue = Channel<ByteArray>(Channel.UNLIMITED)
     private val authDataQueue = Channel<ByteArray>(Channel.UNLIMITED)
     private val cmdSendQueue = Channel<ByteArray>(Channel.UNLIMITED)
+    private val cmdRecvSubframeQueue = Channel<ByteArray>(Channel.UNLIMITED)
+    @Volatile
+    private var isAssemblingMultiFrame = false
+    private val multiFrameMutex = Mutex()
 
     // Pending MiOT command responses keyed by seq
     private val pendingMiotResponses = ConcurrentHashMap<Int, CompletableDeferred<DecodedMiotFrame>>()
@@ -1060,20 +1064,21 @@ class CuktechBleManager(
                 }
             }
             CuktechProtocol.CHAR_CMD_RECV -> {
-                handleEncryptedCmdRecv(value.copyOf())
+                if (isAssemblingMultiFrame) {
+                    cmdRecvSubframeQueue.trySend(value.copyOf())
+                } else {
+                    handleCmdRecvNotification(value.copyOf())
+                }
             }
         }
     }
 
-    private fun handleEncryptedCmdRecv(raw: ByteArray) {
-        val keys = sessionKeys ?: return
-        if (raw.size < 4) return
-
-        // Inline format on CHAR_CMD_RECV: 00 00 02 XX [encrypted_payload]
-        // Multi-frame header: 00 00 00 XX count_lo count_hi
+    private fun handleCmdRecvNotification(raw: ByteArray) {
+        if (raw.size < 3) return
         val frameType = raw[2].toInt() and 0xFF
-        val payloadToDecrypt = if (frameType == 0x02) {
-            // Write ACK immediately (matches controller.py line 1027)
+
+        if (frameType == 0x02) {
+            // Inline format: [00 00 02 XX it_lo it_hi ciphertext tag]
             scope.launch {
                 BleBridgeService.getInstance()?.enqueueBleWrite(
                     CuktechProtocol.MI_SERVICE_UUID,
@@ -1083,29 +1088,76 @@ class CuktechBleManager(
                 )
             }
             if (raw.size < 6) return
-            raw.copyOfRange(4, raw.size)
+            val payload = raw.copyOfRange(4, raw.size)
+            decryptAndDispatch(payload, raw)
         } else if (frameType == 0x00 && raw.size >= 6) {
-            // Multi-frame header: send RCV_RDY
+            // Multi-frame header: [00 00 00 XX count_lo count_hi]
             scope.launch {
-                BleBridgeService.getInstance()?.enqueueBleWrite(
-                    CuktechProtocol.MI_SERVICE_UUID,
-                    CuktechProtocol.CHAR_CMD_RECV,
-                    byteArrayOf(0x00, 0x00, 0x01, 0x01),
-                    withResponse = false
-                )
-            }
-            return
-        } else if (raw.size >= 6) {
-            raw
-        } else {
-            return
-        }
+                multiFrameMutex.withLock {
+                    drainChannel(cmdRecvSubframeQueue)
+                    isAssemblingMultiFrame = true
+                    try {
+                        val rawCount = (raw[4].toInt() and 0xFF) or ((raw[5].toInt() and 0xFF) shl 8)
+                        val frameCount = minOf(rawCount, 100)
 
+                        // Write RCV_RDY to start receiving subframes
+                        BleBridgeService.getInstance()?.enqueueBleWrite(
+                            CuktechProtocol.MI_SERVICE_UUID,
+                            CuktechProtocol.CHAR_CMD_RECV,
+                            byteArrayOf(0x00, 0x00, 0x01, 0x01),
+                            withResponse = false
+                        )
+
+                        var assembled = ByteArray(0)
+                        var receivedCount = 0
+                        val deadline = System.currentTimeMillis() + 10000L
+                        for (i in 0 until frameCount) {
+                            val remaining = deadline - System.currentTimeMillis()
+                            if (remaining <= 0) break
+                            val subframe = withTimeoutOrNull(minOf(remaining, 3000L)) {
+                                cmdRecvSubframeQueue.receive()
+                            }
+                            if (subframe == null) break
+                            receivedCount++
+                            // Strip 2-byte frame index (subframe[0..1])
+                            if (subframe.size > 2) {
+                                assembled += subframe.copyOfRange(2, subframe.size)
+                            }
+                        }
+
+                        // Write RCV_OK to finish multi-frame transfer
+                        BleBridgeService.getInstance()?.enqueueBleWrite(
+                            CuktechProtocol.MI_SERVICE_UUID,
+                            CuktechProtocol.CHAR_CMD_RECV,
+                            byteArrayOf(0x00, 0x00, 0x01, 0x00),
+                            withResponse = false
+                        )
+
+                        if (receivedCount == rawCount && assembled.size >= 6) {
+                            decryptAndDispatch(assembled, raw)
+                        } else {
+                            BleBridgeService.addLogMessage(
+                                BleBridgeService.Companion.LogLevel.LEVEL2,
+                                "[Cuktech] Multiframe incomplete: received $receivedCount/$rawCount frames (${assembled.size}B)"
+                            )
+                        }
+                    } finally {
+                        isAssemblingMultiFrame = false
+                        drainChannel(cmdRecvSubframeQueue)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun decryptAndDispatch(payloadToDecrypt: ByteArray, rawContext: ByteArray) {
+        val keys = sessionKeys ?: return
         if (payloadToDecrypt.size < 6) return
+
         val itLo = (payloadToDecrypt[0].toInt() and 0xFF) or ((payloadToDecrypt[1].toInt() and 0xFF) shl 8)
         val ciphertextWithTag = payloadToDecrypt.copyOfRange(2, payloadToDecrypt.size)
 
-        // Detect 16-bit counter rollover (`controller.py::_on_cmd_recv`)
+        // Detect 16-bit counter rollover
         if (itLo < lastDevItLo && (lastDevItLo - itLo) > 32768) {
             devItHi += 0x10000L
         }
@@ -1132,32 +1184,23 @@ class CuktechBleManager(
 
         if (plaintext == null) {
             BleBridgeService.addLogMessage(
-                BleBridgeService.Companion.LogLevel.LEVEL3,
-                "[Cuktech] Failed to decrypt cmd_recv payload (${payloadToDecrypt.size}B, itLo=$itLo)"
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Failed to decrypt payload (${payloadToDecrypt.size}B, itLo=$itLo)"
             )
             return
         }
 
-        val decrypted = plaintext
-        val b4 = if (decrypted.size > 4) decrypted[4].toInt() and 0xFF else -1
-        val siid = if (decrypted.size > 6) decrypted[6].toInt() and 0xFF else -1
+        processDecryptedFrame(plaintext)
+    }
+
+    private fun processDecryptedFrame(decrypted: ByteArray) {
+        if (decrypted.size < 8) return
+        val b4 = decrypted[4].toInt() and 0xFF
+        val siid = decrypted[6].toInt() and 0xFF
         val piid = if (decrypted.size > 8) {
             (decrypted[7].toInt() and 0xFF) or ((decrypted[8].toInt() and 0xFF) shl 8)
-        } else if (decrypted.size > 7) {
-            decrypted[7].toInt() and 0xFF
         } else {
-            -1
-        }
-        val seq = if (decrypted.size > 2) decrypted[2].toInt() and 0xFF else -1
-
-        // Live Port Push notification (b4 == 0x04) OR GET response (b4 == 0x03) for ports 1..4
-        if ((b4 == 0x04 || b4 == 0x03) && siid == CuktechProtocol.SIID_CHARGER && piid in 1..4) {
-            val curPorts = _ports.value
-            val existing = curPorts[piid]
-            val decoded = PortTelemetryDecoder.decodePortV2(piid, decrypted, existing)
-            if (decoded != null) {
-                updatePortTelemetry(piid, decoded)
-            }
+            decrypted[7].toInt() and 0xFF
         }
 
         // Hardware protocol push (b4 == 0x04, siid == 2, piid in 17..18)
@@ -1169,13 +1212,36 @@ class CuktechBleManager(
                     ((decrypted[15].toLong() and 0xFF) shl 24)
                 handleHwProtocolPush(piid, val32)
             }
+            return
+        }
+
+        // Live Port Push notification (b4 == 0x04) OR GET response (b4 == 0x03) for ports 1..4
+        if ((b4 == 0x04 || b4 == 0x03) && siid == CuktechProtocol.SIID_CHARGER && piid in 1..4) {
+            val curPorts = _ports.value
+            val existing = curPorts[piid]
+            val decoded = PortTelemetryDecoder.decodePortV2(piid, decrypted, existing)
+            if (decoded != null) {
+                updatePortTelemetry(piid, decoded)
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL2,
+                    "[Cuktech] Port $piid Telemetry: ${decoded.voltageV}V ${decoded.currentA}A ${decoded.powerW}W (${decoded.protocolName})"
+                )
+            }
         }
 
         val frame = PortTelemetryDecoder.parseMiotFrame(decrypted)
         if (frame != null) {
             // Complete any awaiting command deferred
-            pendingMiotResponses.remove(frame.reqId)?.complete(frame)
-            // Apply state update
+            val match = pendingMiotResponses.remove(frame.reqId)
+            if (match != null) {
+                match.complete(frame)
+            } else if (pendingMiotResponses.isNotEmpty() && frame.b4 in listOf(0x01, 0x03, 0x04)) {
+                // Complete any actively awaiting command if seq didn't match directly
+                val firstKey = pendingMiotResponses.keys.firstOrNull()
+                if (firstKey != null) {
+                    pendingMiotResponses.remove(firstKey)?.complete(frame)
+                }
+            }
             applyDecodedMiotFrame(frame)
         }
     }

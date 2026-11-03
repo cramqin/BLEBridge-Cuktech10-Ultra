@@ -878,6 +878,15 @@ class XiaomiCloudClient {
             val rawMac = d.optString("mac", "")
             val mac = formatMacAddress(rawMac)
             val token = d.optString("token", "").lowercase().trim()
+            val extraObj = d.optJSONObject("extra") ?: runCatching {
+                val str = d.optString("extra", "")
+                if (str.startsWith("{")) JSONObject(str) else null
+            }.getOrNull()
+            val extraToken = extraObj?.optString("token", "")?.lowercase()?.trim() ?: ""
+            val extraBeaconKey = extraObj?.optString("beaconkey", extraObj.optString("key", ""))?.lowercase()?.trim() ?: ""
+            val propKey = d.optString("key", "").lowercase().trim()
+            val bindKey = d.optString("bindkey", "").lowercase().trim()
+            val beaconKeyFromD = d.optString("beaconkey", "").lowercase().trim()
 
             val isCuktech = did.startsWith("blt.") ||
                 model.contains("ad1204", ignoreCase = true) ||
@@ -885,7 +894,7 @@ class XiaomiCloudClient {
                 name.contains("CUKTECH", ignoreCase = true) ||
                 name.contains("酷态科", ignoreCase = true) ||
                 name.contains("10", ignoreCase = true) ||
-                token.length == 24
+                listOf(token, extraToken, extraBeaconKey, propKey, bindKey, beaconKeyFromD).any { it.length in 24..32 }
 
             var bleKey = ""
             if (isCuktech) {
@@ -896,12 +905,18 @@ class XiaomiCloudClient {
                 }
             }
 
-            val resolvedToken = when {
-                token.length == 24 -> token
-                bleKey.length == 24 -> bleKey
-                token.length == 32 -> token.substring(0, 24)
-                else -> token
-            }
+            val candidates = listOf(
+                token,
+                extraToken,
+                bleKey,
+                extraBeaconKey,
+                beaconKeyFromD,
+                bindKey,
+                propKey
+            )
+            val resolvedToken = candidates.firstOrNull { it.length == 24 }
+                ?: candidates.firstOrNull { it.length == 32 }?.substring(0, 24)
+                ?: token
 
             if (mac.isNotBlank() || resolvedToken.isNotBlank()) {
                 val cleanName = name.replace("酷态科10号超级电能充", "CUKTECH 10 Ultra")

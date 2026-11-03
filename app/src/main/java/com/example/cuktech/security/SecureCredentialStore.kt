@@ -120,8 +120,27 @@ class SecureCredentialStore(context: Context) {
     }
 
     fun saveDevices(deviceList: List<CuktechDeviceCredentials>) {
-        val arr = JSONArray()
+        if (deviceList.isEmpty() && _devices.value.isNotEmpty()) {
+            return
+        }
+        val mergedMap = _devices.value.associateBy { it.mac.uppercase().trim() }.toMutableMap()
         for (dev in deviceList) {
+            val key = dev.mac.uppercase().trim()
+            if (key.isBlank()) continue
+            val existing = mergedMap[key]
+            if (existing != null) {
+                mergedMap[key] = dev.copy(
+                    name = if (dev.name.isNotBlank() && !dev.name.contains("Mi Device")) dev.name else existing.name,
+                    tokenHex = if (dev.hasValidToken) dev.tokenHex else existing.tokenHex,
+                    bleKeyHex = if (dev.hasValidBleKey) dev.bleKeyHex else existing.bleKeyHex
+                )
+            } else {
+                mergedMap[key] = dev
+            }
+        }
+        val mergedList = if (mergedMap.isNotEmpty()) mergedMap.values.toList() else deviceList
+        val arr = JSONArray()
+        for (dev in mergedList) {
             arr.put(JSONObject().apply {
                 put("did", dev.did)
                 put("name", dev.name)
@@ -133,14 +152,15 @@ class SecureCredentialStore(context: Context) {
             })
         }
         prefs.edit().putString(KEY_DEVICES_ENC, encrypt(arr.toString())).apply()
-        _devices.value = deviceList
+        _devices.value = mergedList
         val currentActive = _activeDevice.value
         val nextActive = if (currentActive != null) {
-            deviceList.firstOrNull { it.mac.equals(currentActive.mac, ignoreCase = true) }
+            mergedList.firstOrNull { it.mac.equals(currentActive.mac, ignoreCase = true) }
         } else null
         val chosen = nextActive
-            ?: deviceList.firstOrNull { it.isCuktech10Ultra && it.hasValidToken }
-            ?: deviceList.firstOrNull()
+            ?: mergedList.firstOrNull { it.isCuktech10Ultra && it.hasValidToken }
+            ?: mergedList.firstOrNull { it.hasValidToken }
+            ?: mergedList.firstOrNull()
         if (chosen != null) {
             selectActiveDevice(chosen.mac)
         } else {

@@ -98,6 +98,7 @@ fun CuktechDashboardScreen(
     var selectedClearHistoryOption by remember { mutableStateOf(CuktechPersistence.ClearHistoryOption.KEEP_ACTIVE) }
     var showScreenOnTimeoutDialog by remember { mutableStateOf(false) }
     var pendingScreenTimeoutCode by remember { mutableStateOf(4) }
+    var isAdcRunning by remember { mutableStateOf(false) }
 
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     val tabItems = listOf(
@@ -160,17 +161,36 @@ fun CuktechDashboardScreen(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = "$displayMac · ${authState.label}",
+                            text = if (statusMsg.isNotBlank() && authState != CuktechAuthState.AUTHENTICATED) {
+                                statusMsg
+                            } else {
+                                "$displayMac · ${authState.label}"
+                            },
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
-                        onClick = { bleManager.refreshAllTelemetryNow() },
+                        onClick = {
+                            if (authState == CuktechAuthState.AUTHENTICATED) {
+                                bleManager.refreshAllTelemetryNow()
+                            } else {
+                                val targetMac = bleManager.lastConnectedMac
+                                    ?: activeCred?.mac
+                                    ?: savedDevices.firstOrNull()?.mac
+                                if (!targetMac.isNullOrBlank()) {
+                                    bleManager.connectToCharger(targetMac)
+                                } else {
+                                    showPairingDialog = true
+                                }
+                            }
+                        },
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
@@ -193,6 +213,25 @@ fun CuktechDashboardScreen(
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                         ) {
                             Text("Disconnect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Button(
+                            onClick = {
+                                val targetMac = bleManager.lastConnectedMac
+                                    ?: activeCred?.mac
+                                    ?: savedDevices.firstOrNull()?.mac
+                                if (!targetMac.isNullOrBlank()) {
+                                    bleManager.connectToCharger(targetMac)
+                                } else {
+                                    showPairingDialog = true
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("Connect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -223,12 +262,26 @@ fun CuktechDashboardScreen(
             }
 
             if (authState != CuktechAuthState.AUTHENTICATED) {
+                val hasReadyCredentials = savedDevices.any { it.hasValidToken } || activeCred?.hasValidToken == true
+                val targetMac = bleManager.lastConnectedMac
+                    ?: activeCred?.mac
+                    ?: savedDevices.firstOrNull { it.hasValidToken }?.mac
+                    ?: savedDevices.firstOrNull()?.mac
+
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f),
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        containerColor = if (hasReadyCredentials) {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f)
+                        },
+                        contentColor = if (hasReadyCredentials) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onErrorContainer
+                        }
                     )
                 ) {
                     Row(
@@ -243,35 +296,57 @@ fun CuktechDashboardScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "Locked",
-                                modifier = Modifier.size(16.dp)
+                                imageVector = if (hasReadyCredentials) Icons.Default.BluetoothSearching else Icons.Default.Lock,
+                                contentDescription = if (hasReadyCredentials) "Disconnected" else "Locked",
+                                modifier = Modifier.size(16.dp),
+                                tint = if (hasReadyCredentials) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Column {
+                            Column(modifier = Modifier.padding(end = 6.dp)) {
                                 Text(
-                                    text = "Charger Unauthenticated",
+                                    text = if (hasReadyCredentials) {
+                                        if (authState == CuktechAuthState.AUTH_FAILED) "Authentication Failed" else "Charger Disconnected"
+                                    } else {
+                                        "Charger Unauthenticated"
+                                    },
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "Screen controls & live telemetry require Xiaomi token.",
+                                    text = if (hasReadyCredentials) {
+                                        if (statusMsg.isNotBlank()) statusMsg else "Tap Connect to start live telemetry & controls."
+                                    } else {
+                                        "Screen controls & live telemetry require Xiaomi token."
+                                    },
                                     fontSize = 9.sp,
-                                    lineHeight = 11.sp
+                                    lineHeight = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
-                        Button(
-                            onClick = { showXiaomiLoginDialog = true },
-                            shape = RoundedCornerShape(6.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            modifier = Modifier.height(26.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error,
-                                contentColor = MaterialTheme.colorScheme.onError
-                            )
-                        ) {
-                            Text("Sign In", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        if (hasReadyCredentials && !targetMac.isNullOrBlank()) {
+                            Button(
+                                onClick = { bleManager.connectToCharger(targetMac) },
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                modifier = Modifier.height(26.dp)
+                            ) {
+                                Text("Connect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        } else {
+                            Button(
+                                onClick = { showXiaomiLoginDialog = true },
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                modifier = Modifier.height(26.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    contentColor = MaterialTheme.colorScheme.onError
+                                )
+                            ) {
+                                Text("Sign In", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -1162,6 +1237,18 @@ fun CuktechDashboardScreen(
                                     }
                                 }
                             }
+
+                            if (authState != CuktechAuthState.AUTHENTICATED && activeCred != null) {
+                                Button(
+                                    onClick = { bleManager.connectToCharger(activeCred!!.mac) },
+                                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.BluetoothConnected, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Connect to ${activeCred!!.name}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
                         }
                     }
 
@@ -1671,25 +1758,48 @@ fun CuktechDashboardScreen(
                                 )
                             }
 
+                            if (isAdcRunning) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    LinearProgressIndicator(
+                                        modifier = Modifier.fillMaxWidth().height(4.dp),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "Configuring ADC Assistant & re-negotiating USB-PD contracts...",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Button(
                                     onClick = {
+                                        isAdcRunning = true
                                         bleManager.invokeAdcAssistant {
+                                            isAdcRunning = false
                                             scope.launch {
                                                 Toast.makeText(context, "ADC Assistant activated on charger LCD & ports re-negotiated.", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     },
+                                    enabled = !isAdcRunning,
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(8.dp),
                                     colors = ButtonDefaults.filledTonalButtonColors()
                                 ) {
                                     Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Run ADC Setup", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(if (isAdcRunning) "Running..." else "Run ADC Setup", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
 
                                 Button(
@@ -1827,7 +1937,15 @@ fun CuktechDashboardScreen(
             credentialStore = bleManager.credentialStore,
             onDismiss = { showXiaomiLoginDialog = false },
             onDevicesSynced = { list ->
+                showXiaomiLoginDialog = false
                 Toast.makeText(context, "Successfully synced ${list.size} device credentials", Toast.LENGTH_SHORT).show()
+                val target = list.firstOrNull { it.isCuktech10Ultra && it.hasValidToken }
+                    ?: list.firstOrNull { it.hasValidToken }
+                    ?: list.firstOrNull()
+                if (target != null) {
+                    bleManager.credentialStore.selectActiveDevice(target.mac)
+                    bleManager.connectToCharger(target.mac)
+                }
             }
         )
     }

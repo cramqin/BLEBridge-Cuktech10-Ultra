@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,9 +60,9 @@ fun CuktechChargerVisual(
     ) {
         // 1. Floating Scenario Mode Pill on top (Mi Home Style)
         Surface(
-            color = Color(0xFF13151A),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
             shape = RoundedCornerShape(16.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.5f)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.6f)),
             modifier = Modifier.padding(bottom = 12.dp)
         ) {
             Row(
@@ -72,13 +73,13 @@ fun CuktechChargerVisual(
                     text = if (modeLabel.startsWith("AI", ignoreCase = true)) modeLabel else "AI $modeLabel",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF00E5FF)
+                    color = Color(0xFF00B0FF)
                 )
             }
         }
 
         // 2. Hardware Faceplate & Aligned Laser Callouts Area
-        // Fixed dimensions ensure 100% mathematical horizontal alignment
+        // Symmetrical 100.dp - 135.dp - 100.dp layout guarantees exact mathematical center alignment
         val rowHeight = 34.dp
         val rowSpacing = 12.dp
         val topPadding = 18.dp
@@ -86,14 +87,14 @@ fun CuktechChargerVisual(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp),
+                .padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.Top
         ) {
             // --- LEFT: Power Drop-Line & Lightning AC Badge (Mi Home replica) ---
             Box(
                 modifier = Modifier
-                    .width(44.dp)
+                    .width(100.dp)
                     .height(235.dp)
             ) {
                 if (hasActiveCharging) {
@@ -101,7 +102,7 @@ fun CuktechChargerVisual(
                         val stroke = 1.8.dp.toPx()
                         val glowCyan = Color(0xFF00E5FF).copy(alpha = 0.85f * pulseAlpha)
                         val startY = (topPadding + rowHeight / 2).toPx() // Exactly aligned with C1 port
-                        val cornerX = 18.dp.toPx()
+                        val cornerX = size.width - 28.dp.toPx()
                         val endY = 125.dp.toPx()
 
                         // Horizontal line from charger faceplate left edge towards corner
@@ -123,7 +124,7 @@ fun CuktechChargerVisual(
                     // Glowing Vertical Line Capsule
                     Box(
                         modifier = Modifier
-                            .offset(x = 16.dp, y = 105.dp)
+                            .offset(x = 70.dp, y = 98.dp)
                             .width(4.dp)
                             .height(26.dp)
                             .clip(RoundedCornerShape(2.dp))
@@ -137,7 +138,7 @@ fun CuktechChargerVisual(
                     // Soft Glowing Neon Lightning Badge (Mi Home replica)
                     Box(
                         modifier = Modifier
-                            .offset(x = (-4).dp, y = 122.dp)
+                            .offset(x = 50.dp, y = 103.dp)
                             .size(44.dp)
                             .clip(CircleShape)
                             .background(
@@ -168,8 +169,6 @@ fun CuktechChargerVisual(
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.width(6.dp))
 
             // --- CENTER: Physical CUKTECH 10 Ultra Hardware Front Body ---
             Box(
@@ -309,40 +308,38 @@ fun CuktechChargerVisual(
 
                             if (isCharging) {
                                 // Soft, translucent glowing laser beam shooting out of port slot to charger edge
-                                Box(
+                                Canvas(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(18.dp),
-                                    contentAlignment = Alignment.Center
+                                        .height(rowHeight)
                                 ) {
-                                    // Translucent diffuse halo showing grooved lines underneath
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    listOf(
-                                                        Color.Transparent,
-                                                        Color(0xFF00E5FF).copy(alpha = 0.32f * pulseAlpha),
-                                                        Color(0xFF00E5FF).copy(alpha = 0.32f * pulseAlpha),
-                                                        Color.Transparent
-                                                    )
-                                                )
+                                    val cy = size.height / 2f
+                                    val w = size.width
+                                    // Outer halo glow
+                                    drawLine(
+                                        brush = Brush.horizontalGradient(
+                                            listOf(
+                                                Color(0xFF00E5FF).copy(alpha = 0.12f * pulseAlpha),
+                                                Color(0xFF00E5FF).copy(alpha = 0.35f * pulseAlpha)
                                             )
+                                        ),
+                                        start = Offset(0f, cy),
+                                        end = Offset(w, cy),
+                                        strokeWidth = 6.dp.toPx(),
+                                        cap = StrokeCap.Round
                                     )
-                                    // Thin bright laser core line
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(2.dp)
-                                            .background(
-                                                Brush.horizontalGradient(
-                                                    listOf(
-                                                        Color(0xFF00E5FF).copy(alpha = 0.85f * pulseAlpha),
-                                                        Color(0xFF00E5FF).copy(alpha = 0.55f * pulseAlpha)
-                                                    )
-                                                )
+                                    // Bright core laser line
+                                    drawLine(
+                                        brush = Brush.horizontalGradient(
+                                            listOf(
+                                                Color(0xFF00E5FF).copy(alpha = 0.70f * pulseAlpha),
+                                                Color(0xFF00E5FF).copy(alpha = 0.95f * pulseAlpha)
                                             )
+                                        ),
+                                        start = Offset(0f, cy),
+                                        end = Offset(w, cy),
+                                        strokeWidth = 2.dp.toPx(),
+                                        cap = StrokeCap.Round
                                     )
                                 }
                             } else {
@@ -400,7 +397,7 @@ fun CuktechChargerVisual(
             // --- RIGHT: Laser Power Beams & Wattage Callouts (Strictly Row-Aligned) ---
             Column(
                 modifier = Modifier
-                    .width(115.dp)
+                    .width(100.dp)
                     .height(235.dp)
                     .padding(top = topPadding),
                 verticalArrangement = Arrangement.spacedBy(rowSpacing)
@@ -417,56 +414,57 @@ fun CuktechChargerVisual(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (isCharging) {
-                            // Soft, translucent glowing laser ray continuing seamlessly from edge to wattage callout
-                            Box(
+                            // Soft, borderless glowing laser ray continuing seamlessly from edge to wattage callout
+                            Canvas(
                                 modifier = Modifier
                                     .width(28.dp)
-                                    .height(18.dp),
-                                contentAlignment = Alignment.Center
+                                    .height(rowHeight)
                             ) {
-                                // Soft diffuse halo fading out to right
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                listOf(
-                                                    Color(0xFF00E5FF).copy(alpha = 0.30f * pulseAlpha),
-                                                    Color(0xFF00E5FF).copy(alpha = 0.04f)
-                                                )
-                                            )
+                                val cy = size.height / 2f
+                                val w = size.width
+                                // Outer halo glow fading out to right
+                                drawLine(
+                                    brush = Brush.horizontalGradient(
+                                        listOf(
+                                            Color(0xFF00E5FF).copy(alpha = 0.35f * pulseAlpha),
+                                            Color(0xFF00E5FF).copy(alpha = 0.0f)
                                         )
+                                    ),
+                                    start = Offset(0f, cy),
+                                    end = Offset(w, cy),
+                                    strokeWidth = 6.dp.toPx(),
+                                    cap = StrokeCap.Round
                                 )
-                                // Thin bright laser core line
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(2.dp)
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                listOf(
-                                                    Color(0xFF00E5FF).copy(alpha = 0.55f * pulseAlpha),
-                                                    Color(0xFF00E5FF).copy(alpha = 0.05f)
-                                                )
-                                            )
+                                // Bright core laser line
+                                drawLine(
+                                    brush = Brush.horizontalGradient(
+                                        listOf(
+                                            Color(0xFF00E5FF).copy(alpha = 0.95f * pulseAlpha),
+                                            Color(0xFF00E5FF).copy(alpha = 0.10f * pulseAlpha)
                                         )
+                                    ),
+                                    start = Offset(0f, cy),
+                                    end = Offset(w, cy),
+                                    strokeWidth = 2.dp.toPx(),
+                                    cap = StrokeCap.Round
                                 )
                             }
 
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
 
                             Row(verticalAlignment = Alignment.Bottom) {
                                 Text(
                                     text = "%.1f".format(port.powerW),
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(modifier = Modifier.width(2.dp))
                                 Text(
                                     text = "W",
                                     fontSize = 12.sp,
-                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(bottom = 1.dp)
                                 )
                             }

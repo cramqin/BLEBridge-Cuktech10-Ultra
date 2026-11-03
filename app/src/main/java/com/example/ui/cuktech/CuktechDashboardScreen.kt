@@ -17,6 +17,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -25,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -83,6 +85,7 @@ fun CuktechDashboardScreen(
     val activeSessions by bleManager.activeSessions.collectAsState()
     val completedSessions by bleManager.completedSessions.collectAsState()
     val chargeLimits by bleManager.chargeLimits.collectAsState()
+    val countdownRemainingSeconds by bleManager.countdownRemainingSeconds.collectAsState()
 
     val accountSession by bleManager.credentialStore.session.collectAsState()
     val savedDevices by bleManager.credentialStore.devices.collectAsState()
@@ -741,6 +744,7 @@ fun CuktechDashboardScreen(
                                 port = port,
                                 settings = settings,
                                 chargeLimit = limit,
+                                countdownRemainingSec = countdownRemainingSeconds[portId],
                                 onToggleEnabled = { enabled -> bleManager.setPortEnabled(portId, enabled) },
                                 onSelectCountdown = { code -> bleManager.setPortCountdown(portId, code) },
                                 onSetProtocol = { proto, en -> bleManager.setPortProtocol(portId, proto, en) },
@@ -1407,10 +1411,10 @@ fun CuktechDashboardScreen(
                                         val isSelected = (localActivePage == page)
                                         Surface(
                                             shape = RoundedCornerShape(8.dp),
-                                            color = if (isSelected) Color(0xFF00E5FF) else Color(0xFF141923),
+                                            color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.surfaceVariant,
                                             border = BorderStroke(
                                                 width = if (isSelected) 1.5.dp else 1.dp,
-                                                color = if (isSelected) Color(0xFF00E5FF) else Color.White.copy(alpha = 0.15f)
+                                                color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
                                             ),
                                             modifier = Modifier.clickable {
                                                 localActivePage = page
@@ -1420,7 +1424,7 @@ fun CuktechDashboardScreen(
                                         ) {
                                             Text(
                                                 text = label,
-                                                color = if (isSelected) Color(0xFF0A0E1A) else Color.White,
+                                                color = if (isSelected) Color(0xFF0A0E1A) else MaterialTheme.colorScheme.onSurfaceVariant,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                                 fontSize = 11.sp,
                                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
@@ -1450,10 +1454,10 @@ fun CuktechDashboardScreen(
                                         val isSelected = (localLanguage == code)
                                         Surface(
                                             shape = RoundedCornerShape(10.dp),
-                                            color = if (isSelected) Color(0xFF00E5FF) else Color(0xFF141923),
+                                            color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.surfaceVariant,
                                             border = BorderStroke(
                                                 width = if (isSelected) 1.5.dp else 1.dp,
-                                                color = if (isSelected) Color(0xFF00E5FF) else Color.White.copy(alpha = 0.15f)
+                                                color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
                                             ),
                                             modifier = Modifier
                                                 .weight(1f)
@@ -1479,7 +1483,7 @@ fun CuktechDashboardScreen(
                                                 }
                                                 Text(
                                                     text = name,
-                                                    color = if (isSelected) Color(0xFF0A0E1A) else Color.White,
+                                                    color = if (isSelected) Color(0xFF0A0E1A) else MaterialTheme.colorScheme.onSurfaceVariant,
                                                     fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
                                                     fontSize = 13.sp
                                                 )
@@ -1776,66 +1780,13 @@ fun CuktechDashboardScreen(
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // --- HOURS COLUMN ---
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                FilledTonalButton(
-                                    onClick = { if (selectedHours > 0) selectedHours-- else selectedHours = 23 },
-                                    shape = CircleShape,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Text("−", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                }
-
-                                Text(
-                                    text = "%02d".format(if (selectedHours > 0) selectedHours - 1 else 23),
-                                    fontSize = 15.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.clickable {
-                                        if (selectedHours > 0) selectedHours-- else selectedHours = 23
-                                    }
-                                )
-
-                                Row(verticalAlignment = Alignment.Bottom) {
-                                    Text(
-                                        text = "%02d".format(selectedHours),
-                                        fontSize = 32.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = Color(0xFF00E5FF)
-                                    )
-                                    Text(
-                                        text = " ʰ",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF00E5FF),
-                                        modifier = Modifier.padding(bottom = 6.dp)
-                                    )
-                                }
-
-                                Text(
-                                    text = "%02d".format((selectedHours + 1) % 24),
-                                    fontSize = 15.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.clickable {
-                                        selectedHours = (selectedHours + 1) % 24
-                                    }
-                                )
-
-                                FilledTonalButton(
-                                    onClick = { selectedHours = (selectedHours + 1) % 24 },
-                                    shape = CircleShape,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
+                            WheelTimeColumn(
+                                value = selectedHours,
+                                maxValue = 23,
+                                unit = "h",
+                                onValueChange = { selectedHours = it },
+                                modifier = Modifier.weight(1f)
+                            )
 
                             // Divider
                             Box(
@@ -1845,66 +1796,13 @@ fun CuktechDashboardScreen(
                                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                             )
 
-                            // --- MINUTES COLUMN ---
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                FilledTonalButton(
-                                    onClick = { if (selectedMins >= 5) selectedMins -= 5 else selectedMins = 55 },
-                                    shape = CircleShape,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Text("−", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                }
-
-                                Text(
-                                    text = "%02d".format((selectedMins + 55) % 60),
-                                    fontSize = 15.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.clickable {
-                                        selectedMins = (selectedMins + 55) % 60
-                                    }
-                                )
-
-                                Row(verticalAlignment = Alignment.Bottom) {
-                                    Text(
-                                        text = "%02d".format(selectedMins),
-                                        fontSize = 32.sp,
-                                        fontWeight = FontWeight.Black,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = Color(0xFF00E5FF)
-                                    )
-                                    Text(
-                                        text = " ᵐᶦⁿ",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF00E5FF),
-                                        modifier = Modifier.padding(bottom = 6.dp)
-                                    )
-                                }
-
-                                Text(
-                                    text = "%02d".format((selectedMins + 5) % 60),
-                                    fontSize = 15.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier.clickable {
-                                        selectedMins = (selectedMins + 5) % 60
-                                    }
-                                )
-
-                                FilledTonalButton(
-                                    onClick = { selectedMins = (selectedMins + 5) % 60 },
-                                    shape = CircleShape,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
+                            WheelTimeColumn(
+                                value = selectedMins,
+                                maxValue = 59,
+                                unit = "min",
+                                onValueChange = { selectedMins = it },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
 
@@ -2277,10 +2175,105 @@ fun CuktechDashboardScreen(
 }
 
 @Composable
+private fun WheelTimeColumn(
+    value: Int,
+    maxValue: Int,
+    unit: String,
+    onValueChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var dragAccumulator by remember { mutableFloatStateOf(0f) }
+    val stepThreshold = 30f // px per increment
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = modifier
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragStart = { dragAccumulator = 0f },
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        dragAccumulator -= dragAmount // Dragging UP (negative dragAmount) increases time
+                        val steps = (dragAccumulator / stepThreshold).toInt()
+                        if (steps != 0) {
+                            var newVal = (value + steps) % (maxValue + 1)
+                            if (newVal < 0) newVal += (maxValue + 1)
+                            onValueChange(newVal)
+                            dragAccumulator -= steps * stepThreshold
+                        }
+                    }
+                )
+            }
+            .padding(vertical = 4.dp)
+    ) {
+        FilledTonalButton(
+            onClick = {
+                val next = (value + 1) % (maxValue + 1)
+                onValueChange(next)
+            },
+            shape = CircleShape,
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier.size(32.dp)
+        ) {
+            Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+
+        val prev = if (value > 0) value - 1 else maxValue
+        Text(
+            text = "%02d".format(prev),
+            fontSize = 15.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.clickable { onValueChange(prev) }
+        )
+
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = "%02d".format(value),
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+                color = Color(0xFF00E5FF)
+            )
+            Text(
+                text = " $unit",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF00E5FF),
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+        }
+
+        val next = (value + 1) % (maxValue + 1)
+        Text(
+            text = "%02d".format(next),
+            fontSize = 15.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.clickable { onValueChange(next) }
+        )
+
+        FilledTonalButton(
+            onClick = {
+                val p = if (value > 0) value - 1 else maxValue
+                onValueChange(p)
+            },
+            shape = CircleShape,
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier.size(32.dp)
+        ) {
+            Text("−", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
 private fun PortTelemetryCard(
     port: PortTelemetry,
     settings: ChargerSettingsState,
     chargeLimit: PortChargeLimit?,
+    countdownRemainingSec: Long? = null,
     onToggleEnabled: (Boolean) -> Unit,
     onSelectCountdown: (Int) -> Unit,
     onSetProtocol: (String, Boolean) -> Unit,
@@ -2370,6 +2363,12 @@ private fun PortTelemetryCard(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
             // 2. Delay Poweroff & Closure Time Rows
+            val liveRemainingText = if (countdownRemainingSec != null && countdownRemainingSec > 0) {
+                val m = countdownRemainingSec / 60
+                val s = countdownRemainingSec % 60
+                String.format(java.util.Locale.US, "%d:%02d", m, s)
+            } else null
+
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 // Delay Poweroff Switch Row
                 Row(
@@ -2384,13 +2383,20 @@ private fun PortTelemetryCard(
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            text = if (port.countdownCode > 0) "Power cuts off in ${formatCountdown(port.countdownCode)}" else "Cut off port power after set duration",
+                            text = if (liveRemainingText != null) {
+                                "Power cuts off in $liveRemainingText"
+                            } else if (port.countdownCode > 0) {
+                                "Power cuts off in ${formatCountdown(port.countdownCode)}"
+                            } else {
+                                "Cut off port power after set duration"
+                            },
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontWeight = if (liveRemainingText != null) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (liveRemainingText != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Switch(
-                        checked = port.countdownCode > 0,
+                        checked = (countdownRemainingSec != null && countdownRemainingSec > 0) || port.countdownCode > 0,
                         onCheckedChange = { checked ->
                             if (checked) {
                                 onOpenClosureTimeDialog()
@@ -2417,12 +2423,12 @@ private fun PortTelemetryCard(
                         fontWeight = FontWeight.Medium
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val durationText = formatCountdown(port.countdownCode)
+                        val durationText = liveRemainingText ?: formatCountdown(port.countdownCode)
                         Text(
                             text = durationText,
                             fontSize = 13.sp,
-                            fontWeight = if (port.countdownCode > 0) FontWeight.Bold else FontWeight.Normal,
-                            color = if (port.countdownCode > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            fontWeight = if (liveRemainingText != null || port.countdownCode > 0) FontWeight.Bold else FontWeight.Normal,
+                            color = if (liveRemainingText != null || port.countdownCode > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(

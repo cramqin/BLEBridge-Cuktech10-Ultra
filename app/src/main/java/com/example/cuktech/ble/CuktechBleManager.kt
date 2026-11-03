@@ -184,6 +184,11 @@ class CuktechBleManager(
     private val _chargeLimits = MutableStateFlow<Map<Int, PortChargeLimit>>(emptyMap())
     val chargeLimits: StateFlow<Map<Int, PortChargeLimit>> = _chargeLimits.asStateFlow()
 
+    // Map of portId -> remaining countdown seconds for active realtime display (e.g. 4:59, 4:58)
+    private val _countdownRemainingSeconds = MutableStateFlow<Map<Int, Long>>(emptyMap())
+    val countdownRemainingSeconds: StateFlow<Map<Int, Long>> = _countdownRemainingSeconds.asStateFlow()
+    private val targetCountdownEpochSec = ConcurrentHashMap<Int, Long>()
+
     // Callback invoked on telemetry update so Tasker / MQTT / Bemfa can broadcast
     var onTelemetryUpdated: ((Map<Int, PortTelemetry>, Double, ChargerDeviceInfo) -> Unit)? = null
 
@@ -197,6 +202,14 @@ class CuktechBleManager(
                 model = cred.model.ifBlank { "njcuk.fitting.ad1204" },
                 macAddress = cred.mac
             )
+        }
+
+        // Realtime 1-second ticker for second-by-second countdown and rich notification telemetry
+        scope.launch {
+            while (isActive) {
+                delay(1000L)
+                updateCountdownTickAndNotification()
+            }
         }
     }
 
@@ -1446,6 +1459,15 @@ class CuktechBleManager(
                     val existing = curPorts[portId] ?: return
                     curPorts[portId] = existing.copy(countdownCode = minutes)
                     _ports.value = curPorts
+
+                    if (minutes > 0) {
+                        if (!targetCountdownEpochSec.containsKey(portId)) {
+                            targetCountdownEpochSec[portId] = (System.currentTimeMillis() / 1000L) + (minutes * 60L)
+                        }
+                    } else {
+                        targetCountdownEpochSec.remove(portId)
+                        _countdownRemainingSeconds.value = _countdownRemainingSeconds.value - portId
+                    }
                 }
             }
 
@@ -1853,6 +1875,19 @@ class CuktechBleManager(
             val curPorts = _ports.value.toMutableMap()
             curPorts[portId]?.let { curPorts[portId] = it.copy(countdownCode = countdownMinutes) }
             _ports.value = curPorts
+
+            if (countdownMinutes > 0) {
+                targetCountdownEpochSec[portId] = (System.currentTimeMillis() / 1000L) + (countdownMinutes * 60L)
+                val remMap = _countdownRemainingSeconds.value.toMutableMap()
+                remMap[portId] = countdownMinutes * 60L
+                _countdownRemainingSeconds.value = remMap
+            } else {
+                targetCountdownEpochSec.remove(portId)
+                val remMap = _countdownRemainingSeconds.value.toMutableMap()
+                remMap.remove(portId)
+                _countdownRemainingSeconds.value = remMap
+            }
+
             val valBytes = if (countdownMinutes <= 0xFF) {
                 byteArrayOf((countdownMinutes and 0xFF).toByte())
             } else {
@@ -1864,6 +1899,58 @@ class CuktechBleManager(
                 isSet = true,
                 valueBytes = valBytes
             )
+        }
+    }
+
+    private fun updateCountdownTickAndNotification() {
+        val nowSec = System.currentTimeMillis() / 1000L
+        val remMap = mutableMapOf<Int, Long>()
+        for ((pId, targetEpoch) in targetCountdownEpochSec) {
+            val rem = targetEpoch - nowSec
+            if (rem > 0) {
+                remMap[pId] = rem
+            } else {
+                targetCountdownEpochSec.remove(pId)
+                val curPorts = _ports.value.toMutableMap()
+                curPorts[pId]?.let { curPorts[pId] = it.copy(countdownCode = 0) }
+                _ports.value = curPorts
+            }
+        }
+        _countdownRemainingSeconds.value = remMap
+
+        if (_connectionState.value == CuktechConnectionState.READY) {
+            val totalW = _totalPowerW.value
+            val ports = _ports.value
+            val activePorts = ports.values.filter { it.powerW >= 0.1 }
+
+            val title = if (totalW >= 0.1) {
+                String.format(java.util.Locale.US, "⚡ %.1fW Total · CUKTECH 10 Ultra", totalW)
+            } else {
+                "⚡ CUKTECH 10 Ultra (Idle)"
+            }
+
+            val timers = remMap.entries.sortedBy { it.key }.joinToString(", ") { (pId, secs) ->
+                val m = secs / 60
+                val s = secs % 60
+                val pLabel = ports[pId]?.portLabel ?: "P$pId"
+                String.format(java.util.Locale.US, "%s: %d:%02d", pLabel, m, s)
+            }
+
+            val portWatts = if (activePorts.isNotEmpty()) {
+                activePorts.joinToString(" · ") {
+                    String.format(java.util.Locale.US, "%s: %.1fW", it.portLabel, it.powerW)
+                }
+            } else {
+                "All ports idle"
+            }
+
+            val content = if (timers.isNotEmpty()) {
+                "⏱️ $timers | $portWatts"
+            } else {
+                portWatts
+            }
+
+            BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content)
         }
     }
 

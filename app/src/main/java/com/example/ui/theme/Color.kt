@@ -2,27 +2,27 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Light Theme Palette (Clean Slate / Cool Gray)
-val LightBackground = Color(0xFFF8FAFC)
+// Light Theme Palette (Sleek Brushed Titanium & Precision Hardware - Gentle on eyes)
+val LightBackground = Color(0xFFF4F6F9)
 val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFF1F5F9)
-val LightBorder = Color(0xFFE2E8F0)
+val LightSurfaceVariant = Color(0xFFE8EDF5)
+val LightBorder = Color(0xFFCBD5E1)
 val LightTextPrimary = Color(0xFF0F172A)
-val LightTextSecondary = Color(0xFF64748B)
-val LightPrimary = Color(0xFF0284C7) // Cyan / Blue accent (Cuktech blue)
+val LightTextSecondary = Color(0xFF475569)
+val LightPrimary = Color(0xFF0284C7) // High-contrast precision laser cyan
 val LightPrimaryContainer = Color(0xFFE0F2FE)
 val LightOnPrimaryContainer = Color(0xFF0369A1)
 
-// Dark Theme Palette (Deep Zinc / OLED Dark, Gentle on the eyes)
-val DarkBackground = Color(0xFF090D16)
-val DarkSurface = Color(0xFF111827)
-val DarkSurfaceVariant = Color(0xFF1E293B)
-val DarkBorder = Color(0xFF334155)
-val DarkTextPrimary = Color(0xFFF8FAFC)
+// Dark Theme Palette (CUKTECH 10 Ultra Obsidian Gunmetal & Cyber Cyan)
+val DarkBackground = Color(0xFF0B0D13)
+val DarkSurface = Color(0xFF141720)
+val DarkSurfaceVariant = Color(0xFF1E2330)
+val DarkBorder = Color(0xFF2C3242)
+val DarkTextPrimary = Color(0xFFF1F5F9)
 val DarkTextSecondary = Color(0xFF94A3B8)
-val DarkPrimary = Color(0xFF38BDF8) // Bright Cyan (matching Cuktech LCD)
-val DarkPrimaryContainer = Color(0xFF0C4A6E)
-val DarkOnPrimaryContainer = Color(0xFFBAE6FD)
+val DarkPrimary = Color(0xFF00E5FF) // CUKTECH Signature Cyber Cyan
+val DarkPrimaryContainer = Color(0xFF083344)
+val DarkOnPrimaryContainer = Color(0xFFA5F3FC)
 
 // Status Colors
 val StatusSuccess = Color(0xFF22C55E)

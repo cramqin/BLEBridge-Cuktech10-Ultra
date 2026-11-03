@@ -43,22 +43,32 @@ val LocalAppColors = staticCompositionLocalOf {
 
 private val DarkColorScheme = darkColorScheme(
     primary = DarkPrimary,
+    onPrimary = Color(0xFF0A0E1A),
+    primaryContainer = DarkPrimaryContainer,
+    onPrimaryContainer = DarkOnPrimaryContainer,
     background = DarkBackground,
     surface = DarkSurface,
     surfaceVariant = DarkSurfaceVariant,
-    onPrimary = Color.Black,
     onBackground = DarkTextPrimary,
-    onSurface = DarkTextPrimary
+    onSurface = DarkTextPrimary,
+    onSurfaceVariant = DarkTextSecondary,
+    outline = DarkBorder,
+    outlineVariant = DarkBorder.copy(alpha = 0.5f)
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = LightPrimary,
+    onPrimary = Color.White,
+    primaryContainer = LightPrimaryContainer,
+    onPrimaryContainer = LightOnPrimaryContainer,
     background = LightBackground,
     surface = LightSurface,
     surfaceVariant = LightSurfaceVariant,
-    onPrimary = Color.White,
     onBackground = LightTextPrimary,
-    onSurface = LightTextPrimary
+    onSurface = LightTextPrimary,
+    onSurfaceVariant = LightTextSecondary,
+    outline = LightBorder,
+    outlineVariant = LightBorder.copy(alpha = 0.5f)
 )
 
 @Composable

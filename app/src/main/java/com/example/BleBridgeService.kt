@@ -203,6 +203,30 @@ class BleBridgeService : Service() {
         }
     }
 
+    /**
+     * Updates the ongoing foreground service notification with live CUKTECH charger telemetry,
+     * per-port wattage, and active delay poweroff countdown timers.
+     */
+    fun updateNotificationTelemetry(title: String, content: String) {
+        runCatching {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            val stopIntent = Intent(this, BleBridgeService::class.java).apply { action = ACTION_STOP_SERVER }
+            val stopPendingIntent = PendingIntent.getService(
+                this, 0, stopIntent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            val notif = NotificationCompat.Builder(this, "ble_bridge_service_channel")
+                .setContentTitle(title)
+                .setContentText(content)
+                .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Gateway", stopPendingIntent)
+                .build()
+            nm.notify(NOTIFICATION_ID, notif)
+        }
+    }
+
     // --- TCP Socket Server Support ---
 
     private fun startTcpServer(port: Int) {

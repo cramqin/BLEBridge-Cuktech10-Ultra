@@ -196,8 +196,8 @@ class ChargeSessionDetector(
         private const val START_THRESHOLD_W = 0.50
         private const val TRICKLE_END_W = 0.30
         private const val UNPLUG_THRESHOLD_W = 0.15
-        private const val UNPLUG_CONFIRM_SEC = 6.0
-        private const val TRICKLE_CONFIRM_SEC = 45.0
-        private const val MIN_SESSION_DURATION_SEC = 10L
+        private const val UNPLUG_CONFIRM_SEC = 1.5
+        private const val TRICKLE_CONFIRM_SEC = 30.0
+        private const val MIN_SESSION_DURATION_SEC = 3L
     }
 }

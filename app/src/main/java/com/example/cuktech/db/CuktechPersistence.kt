@@ -158,37 +158,32 @@ class CuktechPersistence(private val context: Context) :
 
     fun clearHistory(option: ClearHistoryOption) {
         runCatching {
-            val now = System.currentTimeMillis()
+            val nowMs = System.currentTimeMillis()
+            val nowSec = nowMs / 1000.0
             when (option) {
                 ClearHistoryOption.KEEP_ACTIVE -> {
-                    writableDatabase.delete("charge_sessions", "is_active = 0", null)
-                    val activeMinStart = getActiveSessionMinStartTime() ?: now
-                    writableDatabase.delete("port_history", "timestamp_ms < ?", arrayOf(activeMinStart.toString()))
+                    // charge_sessions table only contains completed/historical records.
+                    // Active sessions reside in memory so deleting charge_sessions clears history while keeping active.
+                    writableDatabase.delete("charge_sessions", null, null)
+                    writableDatabase.delete("port_history", "ts_ms < ?", arrayOf((nowMs - 300_000L).toString()))
                 }
                 ClearHistoryOption.OLDER_24H -> {
-                    val cutoff = now - 24 * 3600 * 1000L
-                    writableDatabase.delete("charge_sessions", "end_time_ms < ? AND is_active = 0", arrayOf(cutoff.toString()))
-                    writableDatabase.delete("port_history", "timestamp_ms < ?", arrayOf(cutoff.toString()))
+                    val cutoffSec = nowSec - 24 * 3600.0
+                    val cutoffMs = nowMs - 24 * 3600 * 1000L
+                    writableDatabase.delete("charge_sessions", "end_ts < ?", arrayOf(cutoffSec.toString()))
+                    writableDatabase.delete("port_history", "ts_ms < ?", arrayOf(cutoffMs.toString()))
                 }
                 ClearHistoryOption.OLDER_7D -> {
-                    val cutoff = now - 7 * 24 * 3600 * 1000L
-                    writableDatabase.delete("charge_sessions", "end_time_ms < ? AND is_active = 0", arrayOf(cutoff.toString()))
-                    writableDatabase.delete("port_history", "timestamp_ms < ?", arrayOf(cutoff.toString()))
+                    val cutoffSec = nowSec - 7 * 24 * 3600.0
+                    val cutoffMs = nowMs - 7 * 24 * 3600 * 1000L
+                    writableDatabase.delete("charge_sessions", "end_ts < ?", arrayOf(cutoffSec.toString()))
+                    writableDatabase.delete("port_history", "ts_ms < ?", arrayOf(cutoffMs.toString()))
                 }
                 ClearHistoryOption.CLEAR_ALL -> {
                     writableDatabase.delete("charge_sessions", null, null)
                     writableDatabase.delete("port_history", null, null)
                 }
             }
-        }
-    }
-
-    private fun getActiveSessionMinStartTime(): Long? {
-        return readableDatabase.rawQuery(
-            "SELECT MIN(start_time_ms) FROM charge_sessions WHERE is_active = 1",
-            null
-        ).use { cursor ->
-            if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
         }
     }
 

@@ -161,6 +161,7 @@ fun XiaomiAccountLoginDialog(
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         val scrollState = rememberScrollState()
         Card(
             modifier = Modifier

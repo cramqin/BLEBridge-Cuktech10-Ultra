@@ -607,6 +607,8 @@ class XiaomiCloudClient {
             cloudLog("Exception in 2FA redirect completion: ${e.message}", isError = true)
             XiaomiLoginResult.Error(e.message ?: "Failed to complete 2FA verification session")
         }
+    }
+
     /**
      * Complete authentication from Google OAuth or Web login in an Android WebView.
      * Extracts passToken, userId, and serviceToken to establish a fully authenticated session.

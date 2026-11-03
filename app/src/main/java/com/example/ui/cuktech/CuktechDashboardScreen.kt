@@ -108,6 +108,8 @@ fun CuktechDashboardScreen(
     var showScreenOnTimeoutDialog by remember { mutableStateOf(false) }
     var pendingScreenTimeoutCode by remember { mutableStateOf(4) }
     var isAdcRunning by remember { mutableStateOf(false) }
+    var selectedSessionDetail by remember { mutableStateOf<com.example.cuktech.energy.ChargeSessionRecord?>(null) }
+    var showConsolidatedTable by remember { mutableStateOf(false) }
 
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
     LaunchedEffect(pagerState.currentPage) {
@@ -873,9 +875,15 @@ fun CuktechDashboardScreen(
                                     )
                                 }
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    TextButton(
+                                        onClick = { showConsolidatedTable = true },
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("View All", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    }
                                     OutlinedButton(
                                         onClick = { showExportDialog = true },
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
@@ -903,19 +911,30 @@ fun CuktechDashboardScreen(
                                     Surface(
                                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
                                         shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { selectedSessionDetail = s }
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(10.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Column {
-                                                Text("${s.portLabel} · Charging (${s.protocolUsed})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                                Text(
+                                                    text = "${s.portLabel} · Charging (${s.protocolUsed})",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
                                                 Text(
                                                     text = "Duration: ${s.durationSeconds / 60}m ${s.durationSeconds % 60}s · Peak: ${"%.1f".format(s.peakWatts)}W · Avg: ${"%.1f".format(s.avgWatts)}W",
                                                     fontSize = 11.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                             Text(
@@ -932,16 +951,26 @@ fun CuktechDashboardScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 4.dp),
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .clickable { selectedSessionDetail = s }
+                                            .padding(vertical = 4.dp, horizontal = 2.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Column {
-                                            Text("${s.portLabel} (${s.protocolUsed})", fontWeight = FontWeight.Medium, fontSize = 12.sp)
+                                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                            Text(
+                                                text = "${s.portLabel} (${s.protocolUsed})",
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 12.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                             Text(
                                                 text = "Duration: ${s.durationSeconds / 60}m · Peak: ${"%.1f".format(s.peakWatts)}W · Avg: ${"%.1f".format(s.avgWatts)}W",
                                                 fontSize = 11.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                         Text(
@@ -950,6 +979,15 @@ fun CuktechDashboardScreen(
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 12.sp
                                         )
+                                    }
+                                }
+
+                                if (completedSessions.size > 6) {
+                                    TextButton(
+                                        onClick = { showConsolidatedTable = true },
+                                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                                    ) {
+                                        Text("View All Consolidated Sessions (${completedSessions.size}) ➔", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                 }
                             }
@@ -1713,37 +1751,181 @@ fun CuktechDashboardScreen(
 
         AlertDialog(
             onDismissRequest = { closureTimeDialogPort = null },
-            icon = { Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            title = { Text("Closure Time (${port?.portLabel ?: "Port $portId"})") },
+            title = {
+                Text(
+                    text = "Closure Time (${port?.portLabel ?: "Port $portId"})",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text(
-                        text = "Automatically shut off port power after set duration:",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    // 2-Column Wheel-style Hours & Minutes Picker (Mi Home replica)
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp, horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // --- HOURS COLUMN ---
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                FilledTonalButton(
+                                    onClick = { if (selectedHours > 0) selectedHours-- else selectedHours = 23 },
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(0.dp),
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Text("−", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Text(
+                                    text = "%02d".format(if (selectedHours > 0) selectedHours - 1 else 23),
+                                    fontSize = 15.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.clickable {
+                                        if (selectedHours > 0) selectedHours-- else selectedHours = 23
+                                    }
+                                )
+
+                                Row(verticalAlignment = Alignment.Bottom) {
+                                    Text(
+                                        text = "%02d".format(selectedHours),
+                                        fontSize = 32.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = Color(0xFF00E5FF)
+                                    )
+                                    Text(
+                                        text = " ʰ",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF00E5FF),
+                                        modifier = Modifier.padding(bottom = 6.dp)
+                                    )
+                                }
+
+                                Text(
+                                    text = "%02d".format((selectedHours + 1) % 24),
+                                    fontSize = 15.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.clickable {
+                                        selectedHours = (selectedHours + 1) % 24
+                                    }
+                                )
+
+                                FilledTonalButton(
+                                    onClick = { selectedHours = (selectedHours + 1) % 24 },
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(0.dp),
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            // Divider
+                            Box(
+                                modifier = Modifier
+                                    .width(1.dp)
+                                    .height(100.dp)
+                                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                            )
+
+                            // --- MINUTES COLUMN ---
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                FilledTonalButton(
+                                    onClick = { if (selectedMins >= 5) selectedMins -= 5 else selectedMins = 55 },
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(0.dp),
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Text("−", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                }
+
+                                Text(
+                                    text = "%02d".format((selectedMins + 55) % 60),
+                                    fontSize = 15.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.clickable {
+                                        selectedMins = (selectedMins + 55) % 60
+                                    }
+                                )
+
+                                Row(verticalAlignment = Alignment.Bottom) {
+                                    Text(
+                                        text = "%02d".format(selectedMins),
+                                        fontSize = 32.sp,
+                                        fontWeight = FontWeight.Black,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = Color(0xFF00E5FF)
+                                    )
+                                    Text(
+                                        text = " ᵐᶦⁿ",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF00E5FF),
+                                        modifier = Modifier.padding(bottom = 6.dp)
+                                    )
+                                }
+
+                                Text(
+                                    text = "%02d".format((selectedMins + 5) % 60),
+                                    fontSize = 15.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier.clickable {
+                                        selectedMins = (selectedMins + 5) % 60
+                                    }
+                                )
+
+                                FilledTonalButton(
+                                    onClick = { selectedMins = (selectedMins + 5) % 60 },
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(0.dp),
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
 
                     // Quick Template Presets
                     Text(
-                        text = "Presets",
+                        text = "Quick Presets",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     val presets = listOf(
                         0 to "Always On",
+                        15 to "15m",
                         30 to "30m",
                         60 to "1h",
                         120 to "2h",
-                        240 to "4h",
-                        480 to "8h"
+                        240 to "4h"
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         presets.take(3).forEach { (m, label) ->
                             val isSel = (selectedHours * 60 + selectedMins) == m
@@ -1753,14 +1935,14 @@ fun CuktechDashboardScreen(
                                     selectedHours = m / 60
                                     selectedMins = m % 60
                                 },
-                                label = { Text(label, fontSize = 11.sp) },
+                                label = { Text(label, fontSize = 10.sp) },
                                 modifier = Modifier.weight(1f)
                             )
                         }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         presets.drop(3).forEach { (m, label) ->
                             val isSel = (selectedHours * 60 + selectedMins) == m
@@ -1770,100 +1952,12 @@ fun CuktechDashboardScreen(
                                     selectedHours = m / 60
                                     selectedMins = m % 60
                                 },
-                                label = { Text(label, fontSize = 11.sp) },
+                                label = { Text(label, fontSize = 10.sp) },
                                 modifier = Modifier.weight(1f)
                             )
                         }
                     }
 
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                    // 2-Column Hours & Minutes Picker
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Hours Column
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text("Hours", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                FilledTonalButton(
-                                    onClick = { if (selectedHours > 0) selectedHours-- },
-                                    shape = CircleShape,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Text("−", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                }
-                                Surface(
-                                    modifier = Modifier.padding(horizontal = 6.dp),
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant
-                                ) {
-                                    Text(
-                                        text = "$selectedHours hr",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                    )
-                                }
-                                FilledTonalButton(
-                                    onClick = { if (selectedHours < 24) selectedHours++ },
-                                    shape = CircleShape,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Text("+", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-
-                        // Minutes Column
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text("Minutes", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                FilledTonalButton(
-                                    onClick = { if (selectedMins >= 5) selectedMins -= 5 else selectedMins = 0 },
-                                    shape = CircleShape,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Text("−", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                }
-                                Surface(
-                                    modifier = Modifier.padding(horizontal = 6.dp),
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant
-                                ) {
-                                    Text(
-                                        text = "$selectedMins min",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                    )
-                                }
-                                FilledTonalButton(
-                                    onClick = { if (selectedMins <= 50) selectedMins += 5 else selectedMins = 55 },
-                                    shape = CircleShape,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Text("+", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-
-                    // Summary text
                     val totalM = selectedHours * 60 + selectedMins
                     Text(
                         text = if (totalM == 0) "Current Selection: Always On (Never shut off)" else "Current Selection: Shut off in ${formatCountdown(totalM)}",
@@ -1880,16 +1974,44 @@ fun CuktechDashboardScreen(
                         val totalM = selectedHours * 60 + selectedMins
                         bleManager.setPortCountdown(portId, totalM)
                         closureTimeDialogPort = null
-                    }
+                    },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF00E5FF),
+                        contentColor = Color.Black
+                    ),
+                    modifier = Modifier.height(38.dp)
                 ) {
-                    Text("Apply")
+                    Text("OK", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { closureTimeDialogPort = null }) {
-                    Text("Cancel")
+                Surface(
+                    onClick = { closureTimeDialogPort = null },
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.height(38.dp)
+                ) {
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+                        Text("Cancel", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
+        )
+    }
+
+    selectedSessionDetail?.let { session ->
+        SessionDetailDialog(
+            session = session,
+            onDismiss = { selectedSessionDetail = null }
+        )
+    }
+
+    if (showConsolidatedTable) {
+        ConsolidatedSessionsTableDialog(
+            allSessions = activeSessions.values.toList() + completedSessions,
+            onDismiss = { showConsolidatedTable = false },
+            onExportCsv = { showExportDialog = true }
         )
     }
 
@@ -3037,4 +3159,198 @@ private fun CloudIntegrationConfigPanel(
             Text("Save Cloud Settings")
         }
     }
+}
+
+@Composable
+private fun SessionDetailDialog(
+    session: com.example.cuktech.energy.ChargeSessionRecord,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val timeFormat = remember { java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()) }
+    val startTimeStr = remember(session.startTimeSec) {
+        timeFormat.format(java.util.Date((session.startTimeSec * 1000).toLong()))
+    }
+    val endTimeStr = remember(session.endTimeSec) {
+        session.endTimeSec?.let { timeFormat.format(java.util.Date((it * 1000).toLong())) } ?: "In Progress"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+        title = { Text("${session.portLabel} Session Details") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Port:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(session.portLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Protocol:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(session.protocolUsed, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00E5FF))
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Energy Delivered:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${"%.3f".format(session.whAccumulated)} Wh", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Duration:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${session.durationSeconds / 60}m ${session.durationSeconds % 60}s", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Peak Power:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${"%.1f".format(session.peakWatts)} W", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Average Power:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${"%.1f".format(session.avgWatts)} W", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Start Time:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(startTimeStr, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("End Time:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(endTimeStr, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val csvLine = "${session.portLabel},${session.protocolUsed},${"%.3f".format(session.whAccumulated)},${session.durationSeconds},${"%.1f".format(session.peakWatts)},${"%.1f".format(session.avgWatts)},$startTimeStr,$endTimeStr"
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Cuktech Session", csvLine))
+                    Toast.makeText(context, "Session CSV copied to clipboard", Toast.LENGTH_SHORT).show()
+                }
+            ) {
+                Text("Copy CSV Row")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
+private fun ConsolidatedSessionsTableDialog(
+    allSessions: List<com.example.cuktech.energy.ChargeSessionRecord>,
+    onDismiss: () -> Unit,
+    onExportCsv: () -> Unit
+) {
+    val context = LocalContext.current
+    val timeFormat = remember { java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Consolidated Charging History (${allSessions.size})", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (allSessions.isEmpty()) {
+                    Text("No charging sessions recorded yet.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 380.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            // Table Header Row
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f))
+                                    .padding(vertical = 4.dp, horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Port / Proto", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.3f))
+                                Text("Energy", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.9f))
+                                Text("Dur", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f))
+                                Text("Peak", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f))
+                                Text("Time", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.0f))
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                            allSessions.forEachIndexed { idx, s ->
+                                val bg = if (idx % 2 == 0) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(bg)
+                                        .padding(vertical = 4.dp, horizontal = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1.3f)) {
+                                        Text(s.portLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text(s.protocolUsed.take(12), fontSize = 9.sp, color = Color(0xFF00E5FF), maxLines = 1)
+                                    }
+                                    Text("${"%.2f".format(s.whAccumulated)}Wh", fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(0.9f))
+                                    Text("${s.durationSeconds / 60}m", fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(0.8f))
+                                    Text("${"%.1f".format(s.peakWatts)}W", fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(0.8f))
+                                    val startStr = timeFormat.format(java.util.Date((s.startTimeSec * 1000).toLong()))
+                                    Text(startStr, fontSize = 9.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1.0f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val sb = StringBuilder("Port,Protocol,EnergyWh,DurationSec,PeakWatts,AvgWatts,StartTime\n")
+                    allSessions.forEach { s ->
+                        val startStr = timeFormat.format(java.util.Date((s.startTimeSec * 1000).toLong()))
+                        sb.append("${s.portLabel},\"${s.protocolUsed}\",${"%.3f".format(s.whAccumulated)},${s.durationSeconds},${"%.1f".format(s.peakWatts)},${"%.1f".format(s.avgWatts)},$startStr\n")
+                    }
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Cuktech All Sessions CSV", sb.toString()))
+                    Toast.makeText(context, "All ${allSessions.size} sessions copied as CSV", Toast.LENGTH_SHORT).show()
+                }
+            ) {
+                Text("Copy All CSV")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
 }

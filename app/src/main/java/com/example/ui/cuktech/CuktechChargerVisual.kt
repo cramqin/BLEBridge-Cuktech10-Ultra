@@ -134,30 +134,34 @@ fun CuktechChargerVisual(
                             )
                     )
 
-                    // Neon Lightning Badge
+                    // Soft Glowing Neon Lightning Badge (Mi Home replica)
                     Box(
                         modifier = Modifier
-                            .offset(x = 2.dp, y = 128.dp)
-                            .size(32.dp)
+                            .offset(x = (-4).dp, y = 122.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
                             .background(
                                 Brush.radialGradient(
-                                    listOf(Color(0xFF00E5FF).copy(alpha = 0.45f * pulseAlpha), Color.Transparent)
+                                    listOf(
+                                        Color(0xFF00E5FF).copy(alpha = 0.55f * pulseAlpha),
+                                        Color(0xFF00E5FF).copy(alpha = 0.20f * pulseAlpha),
+                                        Color.Transparent
+                                    )
                                 )
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Surface(
-                            color = Color(0xFF00E5FF).copy(alpha = 0.2f),
+                            color = Color(0xFF00E5FF).copy(alpha = 0.25f),
                             shape = CircleShape,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(26.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Bolt,
                                     contentDescription = "AC Power Connected",
                                     tint = Color(0xFF00E5FF),
-                                    modifier = Modifier.size(15.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
@@ -195,6 +199,30 @@ fun CuktechChargerVisual(
                         y += grooveStep
                     }
                 }
+
+                // Chrome Metallic Edge Pillars (Mi Home hardware realism)
+                Box(
+                    modifier = Modifier
+                        .width(3.5.dp)
+                        .fillMaxHeight()
+                        .align(Alignment.CenterStart)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF71717A), Color(0xFFD4D4D8), Color(0xFF3F3F46))
+                            )
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .width(3.5.dp)
+                        .fillMaxHeight()
+                        .align(Alignment.CenterEnd)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF3F3F46), Color(0xFFD4D4D8), Color(0xFF71717A))
+                            )
+                        )
+                )
 
                 // Four Physical Ports (C1, C2, C3, A)
                 Column(
@@ -280,20 +308,43 @@ fun CuktechChargerVisual(
                             }
 
                             if (isCharging) {
-                                // Continuous glowing cyan laser beam shooting out of port slot to charger edge
+                                // Soft, translucent glowing laser beam shooting out of port slot to charger edge
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(if (isC) 12.dp else 16.dp)
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                listOf(
-                                                    Color(0xFF00E5FF).copy(alpha = 0.90f * pulseAlpha),
-                                                    Color(0xFF00E5FF).copy(alpha = 0.75f * pulseAlpha)
+                                        .height(18.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Translucent diffuse halo showing grooved lines underneath
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    listOf(
+                                                        Color.Transparent,
+                                                        Color(0xFF00E5FF).copy(alpha = 0.32f * pulseAlpha),
+                                                        Color(0xFF00E5FF).copy(alpha = 0.32f * pulseAlpha),
+                                                        Color.Transparent
+                                                    )
                                                 )
                                             )
-                                        )
-                                )
+                                    )
+                                    // Thin bright laser core line
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(2.dp)
+                                            .background(
+                                                Brush.horizontalGradient(
+                                                    listOf(
+                                                        Color(0xFF00E5FF).copy(alpha = 0.85f * pulseAlpha),
+                                                        Color(0xFF00E5FF).copy(alpha = 0.55f * pulseAlpha)
+                                                    )
+                                                )
+                                            )
+                                    )
+                                }
                             } else {
                                 Spacer(modifier = Modifier.weight(1f))
                             }
@@ -366,20 +417,41 @@ fun CuktechChargerVisual(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (isCharging) {
-                            // Soft, wide Glowing Laser Light Ray continuing from edge
+                            // Soft, translucent glowing laser ray continuing seamlessly from edge to wattage callout
                             Box(
                                 modifier = Modifier
                                     .width(28.dp)
-                                    .height(if (portId in 1..3) 12.dp else 16.dp)
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            listOf(
-                                                Color(0xFF00E5FF).copy(alpha = 0.75f * pulseAlpha),
-                                                Color(0xFF00E5FF).copy(alpha = 0.08f)
+                                    .height(18.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // Soft diffuse halo fading out to right
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                listOf(
+                                                    Color(0xFF00E5FF).copy(alpha = 0.30f * pulseAlpha),
+                                                    Color(0xFF00E5FF).copy(alpha = 0.04f)
+                                                )
                                             )
                                         )
-                                    )
-                            )
+                                )
+                                // Thin bright laser core line
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(2.dp)
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                listOf(
+                                                    Color(0xFF00E5FF).copy(alpha = 0.55f * pulseAlpha),
+                                                    Color(0xFF00E5FF).copy(alpha = 0.05f)
+                                                )
+                                            )
+                                        )
+                                )
+                            }
 
                             Spacer(modifier = Modifier.width(6.dp))
 

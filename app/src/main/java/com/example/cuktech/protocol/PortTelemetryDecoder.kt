@@ -132,20 +132,14 @@ object PortTelemetryDecoder {
         val opcode = plaintext[4].toInt() and 0xFF
         val siid = if (plaintext.size > 6) plaintext[6].toInt() and 0xFF else -1
         val piid = if (plaintext.size > 8) (plaintext[7].toInt() and 0xFF) or ((plaintext[8].toInt() and 0xFF) shl 8) else -1
-        // In GET response (opcode 0x03), there are 2 error bytes at indices 9..10, so value starts at index 13
-        // In Push notification (opcode 0x04), there are NO error bytes, so value starts at index 11
-        // In SET ACK (opcode 0x01), there is no value
-        val valueOffset = when (opcode) {
-            0x03 -> 13
-            0x04 -> 11
-            else -> 12
-        }
-        val value = if (plaintext.size > valueOffset) {
-            plaintext.copyOfRange(valueOffset, plaintext.size)
-        } else if (plaintext.size >= 4) {
-            plaintext.copyOfRange(plaintext.size - 4, plaintext.size)
-        } else {
-            ByteArray(0)
+        // In SET ACK (opcode 0x01), there is no value returned by device
+        // In GET response (opcode 0x03), error bytes are at 9..10, value starts at index 13
+        // In Push notification (opcode 0x04), no error bytes, value starts at index 11
+        val value = when (opcode) {
+            0x01 -> ByteArray(0) // SET ACK has no property payload
+            0x03 -> if (plaintext.size > 13) plaintext.copyOfRange(13, plaintext.size) else ByteArray(0)
+            0x04 -> if (plaintext.size > 11) plaintext.copyOfRange(11, plaintext.size) else ByteArray(0)
+            else -> if (plaintext.size > 12) plaintext.copyOfRange(12, plaintext.size) else ByteArray(0)
         }
         val valLen = value.size
 

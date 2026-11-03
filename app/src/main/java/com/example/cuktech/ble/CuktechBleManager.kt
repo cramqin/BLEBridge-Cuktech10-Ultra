@@ -1353,6 +1353,9 @@ class CuktechBleManager(
     }
 
     private fun applyDecodedMiotFrame(frame: DecodedMiotFrame) {
+        // Opcode 0x01 is SET ACK — it confirms a write operation and carries no property payload
+        if (frame.b4 == 0x01) return
+
         if (frame.siid == CuktechProtocol.SIID_DEVICE_INFO) {
             val text = PortTelemetryDecoder.decodeAsciiInfo(frame.payload)
             if (text.isNotBlank()) {

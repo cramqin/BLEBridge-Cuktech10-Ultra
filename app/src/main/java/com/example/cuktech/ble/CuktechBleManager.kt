@@ -1760,7 +1760,7 @@ class CuktechBleManager(
 
     fun invokeAdcAssistant(onComplete: (() -> Unit)? = null) {
         scope.launch {
-            setScenarioMode(1)
+            setSceneMode(1)
             gotoScreen(2)
             forceSoftRestart {
                 onComplete?.invoke()
@@ -1793,13 +1793,29 @@ class CuktechBleManager(
     }
 
     fun setOrientationLock(locked: Boolean) {
+        setOrientation(if (locked) 0 else -1)
+    }
+
+    fun setOrientation(degrees: Int) {
         scope.launch {
-            _settings.value = _settings.value.copy(orientationLock = locked)
+            // degrees: -1 = Auto (G-Sensor), 0 = 0° (Landscape), 90 = 90°, 180 = 180°, 270 = 270°
+            // In Xiaomi protocol, byte value 0 = Auto-rotate (sensor active), 1 = 0°/lock, 2 = 90°, 3 = 180°, 4 = 270°
+            val valByte = when (degrees) {
+                0 -> 1.toByte()
+                90 -> 2.toByte()
+                180 -> 3.toByte()
+                270 -> 4.toByte()
+                else -> 0.toByte() // Auto
+            }
+            _settings.value = _settings.value.copy(
+                orientationLock = (degrees != -1),
+                orientationDegrees = degrees
+            )
             sendMiotCommand(
                 siid = CuktechProtocol.SIID_CHARGER,
                 piid = CuktechProtocol.PIID_ORIENTATION_LOCK,
                 isSet = true,
-                valueBytes = byteArrayOf(if (locked) 1 else 0)
+                valueBytes = byteArrayOf(valByte)
             )
         }
     }

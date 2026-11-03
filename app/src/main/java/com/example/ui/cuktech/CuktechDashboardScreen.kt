@@ -757,12 +757,58 @@ fun CuktechDashboardScreen(
                                 checked = settings.idleScreenOff,
                                 onCheckedChange = { bleManager.setIdleScreenOff(it) }
                             )
-                            SettingSwitchRow(
-                                title = "Screen Orientation Lock",
-                                subtitle = "Locks orientation in place; disable to let charger's built-in G-sensor auto-rotate 180°",
-                                checked = settings.orientationLock,
-                                onCheckedChange = { bleManager.setOrientationLock(it) }
-                            )
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = "Screen Orientation (Degrees & G-Sensor)",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Auto-rotates with G-sensor or lock to specific angle (0°, 90°, 180°, 270°)",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val currentDeg = settings.orientationDegrees
+                                    val isAuto = !settings.orientationLock && currentDeg == -1
+                                    FilterChip(
+                                        selected = isAuto,
+                                        onClick = { bleManager.setOrientation(-1) },
+                                        label = {
+                                            Text(
+                                                text = "🔄 Auto",
+                                                fontWeight = if (isAuto) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    )
+                                    listOf(
+                                        0 to "0° (Normal)",
+                                        90 to "90° (Vertical)",
+                                        180 to "180° (Invert)",
+                                        270 to "270° (Vertical)"
+                                    ).forEach { (deg, label) ->
+                                        val isSelected = (settings.orientationLock && currentDeg == deg)
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = { bleManager.setOrientation(deg) },
+                                            label = {
+                                                Text(
+                                                    text = label,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1390,33 +1436,43 @@ fun CuktechDashboardScreen(
                             }
 
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
+                                val currentDeg = settings.orientationDegrees
+                                val isAuto = !settings.orientationLock && currentDeg == -1
                                 FilterChip(
-                                    selected = !settings.orientationLock,
-                                    onClick = { bleManager.setOrientationLock(false) },
+                                    selected = isAuto,
+                                    onClick = { bleManager.setOrientation(-1) },
                                     label = {
                                         Text(
-                                            text = "🔄 Auto-Rotate",
-                                            fontWeight = if (!settings.orientationLock) FontWeight.Bold else FontWeight.Normal,
-                                            fontSize = 12.sp
+                                            text = "🔄 Auto (G-Sensor)",
+                                            fontWeight = if (isAuto) FontWeight.Bold else FontWeight.Normal,
+                                            fontSize = 11.sp
                                         )
-                                    },
-                                    modifier = Modifier.weight(1f)
+                                    }
                                 )
-                                FilterChip(
-                                    selected = settings.orientationLock,
-                                    onClick = { bleManager.setOrientationLock(true) },
-                                    label = {
-                                        Text(
-                                            text = "🔒 Fixed / Locked",
-                                            fontWeight = if (settings.orientationLock) FontWeight.Bold else FontWeight.Normal,
-                                            fontSize = 12.sp
-                                        )
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
+                                listOf(
+                                    0 to "0° (Normal)",
+                                    90 to "90° (Vertical)",
+                                    180 to "180° (Invert)",
+                                    270 to "270° (Vertical)"
+                                ).forEach { (deg, label) ->
+                                    val isSelected = (settings.orientationLock && currentDeg == deg)
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { bleManager.setOrientation(deg) },
+                                        label = {
+                                            Text(
+                                                text = label,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
                     }

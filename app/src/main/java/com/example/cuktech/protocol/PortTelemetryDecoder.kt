@@ -43,6 +43,7 @@ data class ChargerSettingsState(
     val usbALowCurrent: Boolean = false,
     val idleScreenOff: Boolean = false,
     val orientationLock: Boolean = false,
+    val orientationDegrees: Int = -1, // -1 = Auto, 0 = 0°, 90 = 90°, 180 = 180°, 270 = 270°
     val portSwitchBitmap: Int = 0x0F, // Bit 0=C1, 1=C2, 2=C3, 3=A
     val pdEnabled: Boolean = true,
     val ppsEnabled: Boolean = true,

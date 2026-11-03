@@ -65,18 +65,13 @@ fun XiaomiAccountLoginDialog(
 ) {
     val scope = rememberCoroutineScope()
     val localView = LocalView.current
-    val autofillManager = remember {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.getSystemService(AutofillManager::class.java)
-        } else null
-    }
     var selectedTab by remember { mutableStateOf(0) } // 0 = QR Login, 1 = Password Login, 2 = Manual/JSON
     var selectedRegion by remember { mutableStateOf("cn") }
 
     LaunchedEffect(selectedTab) {
         if (selectedTab == 1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             kotlinx.coroutines.delay(200)
-            autofillManager?.requestAutofill(localView)
+            localView.requestAutofill()
         }
     }
 
@@ -391,7 +386,7 @@ fun XiaomiAccountLoginDialog(
                                         .fillMaxWidth()
                                         .onFocusChanged {
                                             if (it.isFocused && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                                autofillManager?.requestAutofill(localView)
+                                                localView.requestAutofill()
                                             }
                                         }
                                 )
@@ -418,7 +413,7 @@ fun XiaomiAccountLoginDialog(
                                         .fillMaxWidth()
                                         .onFocusChanged {
                                             if (it.isFocused && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                                autofillManager?.requestAutofill(localView)
+                                                localView.requestAutofill()
                                             }
                                         }
                                 )

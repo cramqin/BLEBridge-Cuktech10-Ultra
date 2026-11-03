@@ -701,7 +701,6 @@ fun CuktechDashboardScreen(
                         }
                     }
                 }
-            }
 
             1 -> {
                 // =============================================================
@@ -2560,11 +2559,11 @@ private fun LivePowerChart(
     val gridColor = Color(0xFF64748B).copy(alpha = 0.25f)
     val timeFormat = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()) }
 
-    val firstTimeStr = remember(points.firstOrNull()?.timestamp) {
-        points.firstOrNull()?.let { timeFormat.format(java.util.Date(it.timestamp)) } ?: ""
+    val firstTimeStr = remember(points.firstOrNull()?.timestampMs) {
+        points.firstOrNull()?.let { timeFormat.format(java.util.Date(it.timestampMs)) } ?: ""
     }
-    val lastTimeStr = remember(points.lastOrNull()?.timestamp) {
-        points.lastOrNull()?.let { timeFormat.format(java.util.Date(it.timestamp)) } ?: ""
+    val lastTimeStr = remember(points.lastOrNull()?.timestampMs) {
+        points.lastOrNull()?.let { timeFormat.format(java.util.Date(it.timestampMs)) } ?: ""
     }
 
     val maxWatts = remember(points) {

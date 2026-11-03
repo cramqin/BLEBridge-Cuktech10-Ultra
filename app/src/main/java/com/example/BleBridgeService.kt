@@ -179,18 +179,25 @@ class BleBridgeService : Service() {
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notificationBuilder.build(),
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-                )
+                val hasBlePerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                } else true
+
+                if (hasBlePerm) {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notificationBuilder.build(),
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, notificationBuilder.build())
+                }
             } else {
                 startForeground(NOTIFICATION_ID, notificationBuilder.build())
             }
         } catch (e: Exception) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && e is android.app.ForegroundServiceStartNotAllowedException) {
-                log(LogLevel.LEVEL1, "Foreground service start not allowed: ${e.message}")
-            } else {
+            android.util.Log.w("BleBridgeService", "Foreground service start deferred: ${e.message}")
+            if (e !is SecurityException && (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || e !is android.app.ForegroundServiceStartNotAllowedException)) {
                 log(LogLevel.LEVEL1, "Error starting foreground service: ${e.message}")
             }
         }

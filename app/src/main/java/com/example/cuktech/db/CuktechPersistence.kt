@@ -200,13 +200,48 @@ class CuktechPersistence(private val context: Context) :
         return map
     }
 
+    enum class ExportTimeframe(val label: String) {
+        CURRENT_SESSION("Current Active Session"),
+        LAST_1_HOUR("Last 1 Hour"),
+        LAST_24_HOURS("Last 24 Hours"),
+        LAST_7_DAYS("Last 7 Days"),
+        ALL_TIME("All Time History")
+    }
+
+    enum class ExportScope(val label: String) {
+        ALL("Full (Sessions + Telemetry)"),
+        SESSIONS_ONLY("Sessions Only"),
+        TELEMETRY_ONLY("Raw Telemetry Only")
+    }
+
     /**
-     * Exports charging sessions and recent port history to a CSV file in the public
-     * Downloads/cuktech10/history folder and returns the exported `File`.
+     * Exports charging sessions and port history to a CSV file in the public
+     * Downloads/cuktech10/history folder with customizable timeframe and scope filters.
      */
-    fun exportSessionsAndHistoryCsv(): File {
+    fun exportSessionsAndHistoryCsv(
+        timeframe: ExportTimeframe = ExportTimeframe.ALL_TIME,
+        scope: ExportScope = ExportScope.ALL,
+        currentSessionStartMs: Long = 0L
+    ): File {
+        val now = System.currentTimeMillis()
+        val minTsMs = when (timeframe) {
+            ExportTimeframe.CURRENT_SESSION -> if (currentSessionStartMs > 0) currentSessionStartMs else (now - 3600_000L)
+            ExportTimeframe.LAST_1_HOUR -> now - 3600_000L
+            ExportTimeframe.LAST_24_HOURS -> now - 86400_000L
+            ExportTimeframe.LAST_7_DAYS -> now - (7 * 86400_000L)
+            ExportTimeframe.ALL_TIME -> 0L
+        }
+        val minStartSec = minTsMs / 1000.0
+
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val fileName = "cuktech10_telemetry_$stamp.csv"
+        val suffix = when (timeframe) {
+            ExportTimeframe.CURRENT_SESSION -> "session"
+            ExportTimeframe.LAST_1_HOUR -> "1h"
+            ExportTimeframe.LAST_24_HOURS -> "24h"
+            ExportTimeframe.LAST_7_DAYS -> "7d"
+            ExportTimeframe.ALL_TIME -> "all"
+        }
+        val fileName = "cuktech10_${suffix}_$stamp.csv"
 
         val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
         val targetDir = File(downloadsDir, "cuktech10/history")
@@ -222,30 +257,45 @@ class CuktechPersistence(private val context: Context) :
 
         val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         val sb = StringBuilder()
-        sb.appendLine("# CUKTECH 10 Ultra Charging Sessions")
-        sb.appendLine("session_id,port,start_time,end_time,duration_sec,energy_wh,peak_watts,avg_watts,protocol")
-        val sessions = getRecentSessions(200)
-        for (s in sessions) {
-            val startStr = fmt.format(Date((s.startTimeSec * 1000).toLong()))
-            val endStr = s.endTimeSec?.let { fmt.format(Date((it * 1000).toLong())) } ?: "active"
-            sb.appendLine(
-                "${s.id},${s.portLabel},$startStr,$endStr,${s.durationSeconds},${"%.3f".format(s.whAccumulated)},${"%.2f".format(s.peakWatts)},${"%.2f".format(s.avgWatts)},${s.protocolUsed}"
-            )
+        sb.appendLine("# CUKTECH 10 Ultra Telemetry Export")
+        sb.appendLine("# Filter: ${timeframe.label} | Scope: ${scope.label} | Exported: ${fmt.format(Date(now))}")
+
+        if (scope == ExportScope.ALL || scope == ExportScope.SESSIONS_ONLY) {
+            sb.appendLine("\n# Charging Sessions")
+            sb.appendLine("session_id,port,start_time,end_time,duration_sec,energy_wh,peak_watts,avg_watts,protocol")
+            runCatching {
+                readableDatabase.rawQuery(
+                    "SELECT id, port_id, port_label, start_ts, end_ts, wh_accumulated, peak_watts, avg_watts, protocol_used FROM charge_sessions WHERE start_ts >= ? ORDER BY start_ts DESC LIMIT 1000",
+                    arrayOf(minStartSec.toString())
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val sStart = cursor.getDouble(3)
+                        val sEnd = if (cursor.isNull(4)) null else cursor.getDouble(4)
+                        val startStr = fmt.format(Date((sStart * 1000).toLong()))
+                        val endStr = sEnd?.let { fmt.format(Date((it * 1000).toLong())) } ?: "active"
+                        val durSec = if (sEnd != null) maxOf(0L, (sEnd - sStart).toLong()) else maxOf(0L, ((now / 1000.0) - sStart).toLong())
+                        sb.appendLine(
+                            "${cursor.getLong(0)},${cursor.getString(2)},$startStr,$endStr,$durSec,${"%.3f".format(cursor.getDouble(5))},${"%.2f".format(cursor.getDouble(6))},${"%.2f".format(cursor.getDouble(7))},${cursor.getString(8)}"
+                        )
+                    }
+                }
+            }
         }
 
-        sb.appendLine()
-        sb.appendLine("# Recent Port Telemetry History (Last 500 Samples)")
-        sb.appendLine("timestamp,port_id,voltage_v,current_a,power_w,protocol")
-        runCatching {
-            readableDatabase.rawQuery(
-                "SELECT ts_ms, port_id, voltage_v, current_a, power_w, protocol_name FROM port_history ORDER BY ts_ms DESC LIMIT 500",
-                null
-            ).use { c ->
-                while (c.moveToNext()) {
-                    val tStr = fmt.format(Date(c.getLong(0)))
-                    sb.appendLine(
-                        "$tStr,${c.getInt(1)},${"%.2f".format(c.getDouble(2))},${"%.2f".format(c.getDouble(3))},${"%.2f".format(c.getDouble(4))},${c.getString(5)}"
-                    )
+        if (scope == ExportScope.ALL || scope == ExportScope.TELEMETRY_ONLY) {
+            sb.appendLine("\n# Raw Port Telemetry History")
+            sb.appendLine("timestamp,port_id,voltage_v,current_a,power_w,protocol")
+            runCatching {
+                readableDatabase.rawQuery(
+                    "SELECT ts_ms, port_id, voltage_v, current_a, power_w, protocol_name FROM port_history WHERE ts_ms >= ? ORDER BY ts_ms DESC LIMIT 10000",
+                    arrayOf(minTsMs.toString())
+                ).use { c ->
+                    while (c.moveToNext()) {
+                        val tStr = fmt.format(Date(c.getLong(0)))
+                        sb.appendLine(
+                            "$tStr,${c.getInt(1)},${"%.2f".format(c.getDouble(2))},${"%.2f".format(c.getDouble(3))},${"%.2f".format(c.getDouble(4))},${c.getString(5)}"
+                        )
+                    }
                 }
             }
         }

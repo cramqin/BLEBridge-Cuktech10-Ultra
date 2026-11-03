@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -106,6 +107,7 @@ fun BleBridgeDashboard(
     var showTelemetryScreen by remember { mutableStateOf(false) }
     var showPairingDialog by remember { mutableStateOf(false) }
     var showXiaomiLoginDialog by remember { mutableStateOf(false) }
+    var showMiHomeDialogInSettings by remember { mutableStateOf(false) }
     var prerequisiteWarning by remember { mutableStateOf<String?>(null) }
 
     val accountSession by cuktechManager.credentialStore.session.collectAsState()
@@ -162,6 +164,14 @@ fun BleBridgeDashboard(
         val ok = results.all { it.value }
         permissionsGranted = ok
         if (ok) {
+            val svcIntent = Intent(context, BleBridgeService::class.java)
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(svcIntent)
+                } else {
+                    context.startService(svcIntent)
+                }
+            }
             pendingPermissionCallback?.invoke()
             pendingPermissionCallback = null
         } else {
@@ -170,19 +180,19 @@ fun BleBridgeDashboard(
     }
 
     fun ensureBleServiceStartedAndPermissions(onReady: () -> Unit) {
-        val svcIntent = Intent(context, BleBridgeService::class.java)
-        runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(svcIntent)
-            } else {
-                context.startService(svcIntent)
-            }
-        }
         val allOk = permissionsToRequest.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
         if (allOk) {
             permissionsGranted = true
+            val svcIntent = Intent(context, BleBridgeService::class.java)
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(svcIntent)
+                } else {
+                    context.startService(svcIntent)
+                }
+            }
             onReady()
         } else {
             pendingPermissionCallback = onReady
@@ -191,14 +201,6 @@ fun BleBridgeDashboard(
     }
 
     LaunchedEffect(Unit) {
-        val svcIntent = Intent(context, BleBridgeService::class.java)
-        runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(svcIntent)
-            } else {
-                context.startService(svcIntent)
-            }
-        }
         val allOk = permissionsToRequest.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
@@ -206,6 +208,14 @@ fun BleBridgeDashboard(
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
         } else {
             permissionsGranted = true
+            val svcIntent = Intent(context, BleBridgeService::class.java)
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(svcIntent)
+                } else {
+                    context.startService(svcIntent)
+                }
+            }
         }
         BleBridgeService.checkForUpdates()
     }
@@ -292,6 +302,50 @@ fun BleBridgeDashboard(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                     )
                 }
+
+                HorizontalDivider(color = appColors.border, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+
+                Text(
+                    text = "XIAOMI MI HOME",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    color = appColors.textSecondary,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Launch,
+                            contentDescription = "Open Xiaomi Mi Home",
+                            tint = appColors.primary
+                        )
+                    },
+                    label = {
+                        Column {
+                            Text(
+                                text = "Open Xiaomi Mi Home",
+                                fontWeight = FontWeight.Medium,
+                                color = appColors.textPrimary
+                            )
+                            Text(
+                                text = "Firmware updates & official settings",
+                                fontSize = 11.sp,
+                                color = appColors.textSecondary
+                            )
+                        }
+                    },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        showMiHomeDialogInSettings = true
+                    },
+                    colors = NavigationDrawerItemDefaults.colors(
+                        unselectedContainerColor = Color.Transparent
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
 
                 Spacer(modifier = Modifier.weight(1f))
 
@@ -1325,6 +1379,66 @@ fun BleBridgeDashboard(
                 confirmButton = {
                     TextButton(onClick = { prerequisiteWarning = null }) {
                         Text("UNDERSTOOD", color = appColors.primary, fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
+        }
+
+        if (showMiHomeDialogInSettings) {
+            val miHomePkg = "com.xiaomi.smarthome"
+            val miHomeLaunchIntent = remember { context.packageManager.getLaunchIntentForPackage(miHomePkg) }
+            val isConnected = (cuktechAuthState == CuktechAuthState.AUTHENTICATED)
+            AlertDialog(
+                onDismissRequest = { showMiHomeDialogInSettings = false },
+                icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFF59E0B)) },
+                title = { Text("Switch to Xiaomi Mi Home?") },
+                text = {
+                    Text(
+                        if (isConnected) {
+                            "Xiaomi Mi Home requires exclusive Bluetooth access to check for and install official charger firmware updates.\n\nOpening Mi Home will safely disconnect the BLE Bridge gateway and release the charger handle.\n\nWhen you return to this app, you will be on the Gateway screen ready to reconnect."
+                        } else {
+                            "Launch Xiaomi Mi Home to check for charger firmware updates or configure official MiOT settings.\n\nMake sure the charger is within Bluetooth range."
+                        }
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showMiHomeDialogInSettings = false
+                            if (isConnected) {
+                                cuktechManager.disconnectCharger()
+                                BleBridgeService.getInstance()?.closeGattClean()
+                            }
+                            showTelemetryScreen = false
+                            val launchIntent = miHomeLaunchIntent ?: context.packageManager.getLaunchIntentForPackage(miHomePkg)
+                            if (launchIntent != null) {
+                                context.startActivity(launchIntent)
+                            } else {
+                                try {
+                                    val storeIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$miHomePkg")).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    context.startActivity(storeIntent)
+                                } catch (e: Exception) {
+                                    val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$miHomePkg")).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    context.startActivity(webIntent)
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B))
+                    ) {
+                        Text(
+                            if (isConnected) "Disconnect & Open Mi Home" else "Open Mi Home",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showMiHomeDialogInSettings = false }) {
+                        Text("Cancel")
                     }
                 }
             )

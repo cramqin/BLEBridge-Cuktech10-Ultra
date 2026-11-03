@@ -23,8 +23,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -363,7 +369,13 @@ fun XiaomiAccountLoginDialog(
                                     onValueChange = { username = it },
                                     label = { Text("Xiaomi ID / Phone / Email") },
                                     singleLine = true,
-                                    modifier = Modifier.fillMaxWidth()
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Email,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .semantics { contentType = ContentType.Username }
                                 )
                                 var passwordVisible by remember { mutableStateOf(false) }
                                 OutlinedTextField(
@@ -371,6 +383,10 @@ fun XiaomiAccountLoginDialog(
                                     onValueChange = { password = it },
                                     label = { Text("Password") },
                                     singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Password,
+                                        imeAction = ImeAction.Done
+                                    ),
                                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                     trailingIcon = {
                                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -380,7 +396,9 @@ fun XiaomiAccountLoginDialog(
                                             )
                                         }
                                     },
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .semantics { contentType = ContentType.Password }
                                 )
 
                                 if (loginStatusText.isNotBlank()) {

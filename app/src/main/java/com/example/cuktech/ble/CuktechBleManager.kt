@@ -1627,6 +1627,38 @@ class CuktechBleManager(
         }
     }
 
+    /**
+     * Executes a non-destructive soft port reset by toggling all port switches
+     * (0x00 -> 0x0F). This discharges the DC-DC stages and triggers fresh USB-PD / PPS / UFCS
+     * negotiation for all connected devices without unplugging from AC mains.
+     */
+    fun forceSoftRestart(onComplete: (() -> Unit)? = null) {
+        scope.launch {
+            _statusMessage.value = "Executing soft port reset..."
+            sendMiotCommand(
+                siid = CuktechProtocol.SIID_CHARGER,
+                piid = CuktechProtocol.PIID_PORT_SW_BITMAP,
+                isSet = true,
+                valueBytes = byteArrayOf(0x00.toByte())
+            )
+            delay(1500L)
+            sendMiotCommand(
+                siid = CuktechProtocol.SIID_CHARGER,
+                piid = CuktechProtocol.PIID_PORT_SW_BITMAP,
+                isSet = true,
+                valueBytes = byteArrayOf(0x0F.toByte())
+            )
+            _settings.value = _settings.value.copy(portSwitchBitmap = 0x0F)
+            val curPorts = _ports.value.toMutableMap()
+            (1..4).forEach { pId ->
+                curPorts[pId]?.let { curPorts[pId] = it.copy(enabled = true) }
+            }
+            _ports.value = curPorts
+            _statusMessage.value = "Soft port reset complete. USB-PD re-negotiated."
+            onComplete?.invoke()
+        }
+    }
+
     fun setSceneMode(mode: Int) {
         if (mode !in CuktechProtocol.SCENE_MODES.keys) return
         scope.launch {

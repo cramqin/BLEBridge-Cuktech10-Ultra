@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.example.cuktech.ble.CuktechAuthState
 import com.example.cuktech.ble.CuktechBleManager
 import com.example.cuktech.cloud.XiaomiCloudClient
+import com.example.cuktech.db.CuktechPersistence
 import com.example.cuktech.db.PowerChartPoint
 import com.example.cuktech.diagnostics.BleDiagnostics
 import com.example.cuktech.energy.PortChargeLimit
@@ -85,6 +86,10 @@ fun CuktechDashboardScreen(
     var showTaskerDocs by remember { mutableStateOf(false) }
     var showCloudConfig by remember { mutableStateOf(false) }
     var showMiHomeWarningDialog by remember { mutableStateOf(false) }
+    var showSoftRestartDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
+    var selectedExportTimeframe by remember { mutableStateOf(CuktechPersistence.ExportTimeframe.ALL_TIME) }
+    var selectedExportScope by remember { mutableStateOf(CuktechPersistence.ExportScope.ALL) }
 
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     val tabItems = listOf(
@@ -453,28 +458,6 @@ fun CuktechDashboardScreen(
                             }
                         }
 
-                    // Four Individual Port Telemetry Tiles
-                    Text(
-                        text = "Individual Port Live Telemetry (USB-C1 / C2 / C3 / USB-A)",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        for (portId in 1..4) {
-                            val port = portsMap[portId] ?: PortTelemetry(portId, "Port $portId")
-                            val limit = chargeLimits[portId]
-                            PortTelemetryCard(
-                                port = port,
-                                chargeLimit = limit,
-                                onToggleEnabled = { enabled -> bleManager.setPortEnabled(portId, enabled) },
-                                onSelectCountdown = { code -> bleManager.setPortCountdown(portId, code) },
-                                onOpenChargeLimit = { chargeLimitDialogPort = portId }
-                            )
-                        }
-                    }
-
                     // Real-Time Power Waveform Chart
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -525,6 +508,57 @@ fun CuktechDashboardScreen(
                         .padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    // Force Soft Port Reset Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.RestartAlt,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "Force Soft Port Reset",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                        Text(
+                                            text = "Re-negotiates USB-PD / PPS / UFCS without unplugging",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Button(
+                                    onClick = { showSoftRestartDialog = true },
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Reset Ports", fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+
                     Text(
                         text = "Individual Port Controls & Protocols",
                         fontWeight = FontWeight.Bold,
@@ -771,10 +805,7 @@ fun CuktechDashboardScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     OutlinedButton(
-                                        onClick = {
-                                            val file = bleManager.persistence.exportSessionsAndHistoryCsv()
-                                            Toast.makeText(context, "Saved to Downloads: ${file.name}", Toast.LENGTH_LONG).show()
-                                        },
+                                        onClick = { showExportDialog = true },
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                                         shape = RoundedCornerShape(8.dp)
                                     ) {
@@ -981,10 +1012,27 @@ fun CuktechDashboardScreen(
                     }
 
                     val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
-                    val isBatteryIgnored = remember(diagStatus) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
-                        } else true
+                    var isBatteryIgnored by remember {
+                        mutableStateOf(
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+                            } else true
+                        )
+                    }
+
+                    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                    DisposableEffect(lifecycleOwner) {
+                        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                                isBatteryIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                    powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+                                } else true
+                            }
+                        }
+                        lifecycleOwner.lifecycle.addObserver(observer)
+                        onDispose {
+                            lifecycleOwner.lifecycle.removeObserver(observer)
+                        }
                     }
 
                     // 1. Background Keepalive & Battery Optimization Card
@@ -1335,7 +1383,22 @@ fun CuktechDashboardScreen(
                         bleManager.disconnectCharger()
                         BleBridgeService.getInstance()?.closeGattClean()
                         onNavigateBack?.invoke()
-                        miHomeLaunchIntent?.let { context.startActivity(it) }
+                        val intent = miHomeLaunchIntent ?: context.packageManager.getLaunchIntentForPackage(miHomePkg)
+                        if (intent != null) {
+                            context.startActivity(intent)
+                        } else {
+                            try {
+                                val storeIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$miHomePkg")).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(storeIntent)
+                            } catch (e: Exception) {
+                                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$miHomePkg")).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                context.startActivity(webIntent)
+                            }
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6900))
                 ) {
@@ -1381,6 +1444,115 @@ fun CuktechDashboardScreen(
             onConfirm = { wh, mode, en ->
                 bleManager.setPortChargeLimit(portId, wh, mode, en)
                 chargeLimitDialogPort = null
+            }
+        )
+    }
+
+    if (showSoftRestartDialog) {
+        AlertDialog(
+            onDismissRequest = { showSoftRestartDialog = false },
+            icon = { Icon(Icons.Default.RestartAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Force Soft Port Reset?") },
+            text = {
+                Text("This will momentarily cycle all 4 port power switches off and on (0x00 -> 0x0F) to trigger fresh USB-PD, PPS, and UFCS protocol negotiation.\n\n• Discharges DC-DC converters cleanly\n• Safe for laptops, phones, and power banks\n• No physical wear and no need to unplug from AC outlet")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSoftRestartDialog = false
+                        bleManager.forceSoftRestart {
+                            scope.launch {
+                                Toast.makeText(context, "All ports reset and re-negotiated successfully.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                ) {
+                    Text("Execute Soft Reset")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSoftRestartDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            icon = { Icon(Icons.Default.FileDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Export Telemetry History") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "TIMEFRAME FILTER",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CuktechPersistence.ExportTimeframe.values().forEach { tf ->
+                            FilterChip(
+                                selected = (selectedExportTimeframe == tf),
+                                onClick = { selectedExportTimeframe = tf },
+                                label = { Text(tf.label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "DATA SCOPE",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CuktechPersistence.ExportScope.values().forEach { sc ->
+                            FilterChip(
+                                selected = (selectedExportScope == sc),
+                                onClick = { selectedExportScope = sc },
+                                label = { Text(sc.label, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "CSV file will be saved to:\nDownloads/cuktech10/history/",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExportDialog = false
+                        val activeMin = activeSessions.values.minOfOrNull { (it.startTimeSec * 1000).toLong() } ?: 0L
+                        val file = bleManager.persistence.exportSessionsAndHistoryCsv(
+                            timeframe = selectedExportTimeframe,
+                            scope = selectedExportScope,
+                            currentSessionStartMs = activeMin
+                        )
+                        Toast.makeText(context, "Saved: ${file.name}\nIn: Downloads/cuktech10/history", Toast.LENGTH_LONG).show()
+                    }
+                ) {
+                    Text("Export to CSV")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text("Cancel")
+                }
             }
         )
     }

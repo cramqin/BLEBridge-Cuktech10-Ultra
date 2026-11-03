@@ -996,6 +996,7 @@ fun CuktechDiscoveryPairingDialog(
 ) {
     val discovered by bleManager.discoveredDevices.collectAsState()
     val authState by bleManager.authState.collectAsState()
+    val isScanning by bleManager.isScanning.collectAsState()
     val statusMsg by bleManager.statusMessage.collectAsState()
     val savedCreds by bleManager.credentialStore.devices.collectAsState()
 
@@ -1049,7 +1050,7 @@ fun CuktechDiscoveryPairingDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                if (authState == CuktechAuthState.SCANNING) {
+                if (isScanning || authState == CuktechAuthState.SCANNING) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
 

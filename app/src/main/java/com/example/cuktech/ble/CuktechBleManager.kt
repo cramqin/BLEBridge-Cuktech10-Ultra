@@ -144,6 +144,9 @@ class CuktechBleManager(
     private val _authState = MutableStateFlow(CuktechAuthState.DISCONNECTED)
     val authState: StateFlow<CuktechAuthState> = _authState.asStateFlow()
 
+    private val _isScanning = MutableStateFlow(false)
+    val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
     private val _statusMessage = MutableStateFlow("Ready")
     val statusMessage: StateFlow<String> = _statusMessage.asStateFlow()
 
@@ -212,15 +215,21 @@ class CuktechBleManager(
             return
         }
         clearDiscoveredDevices()
-        _authState.value = CuktechAuthState.SCANNING
+        _isScanning.value = true
+        if (_authState.value != CuktechAuthState.AUTHENTICATED && _authState.value != CuktechAuthState.CONNECTING_GATT) {
+            _authState.value = CuktechAuthState.SCANNING
+        }
         _statusMessage.value = "Scanning for nearby CUKTECH 10 Ultra chargers..."
         svc.startNativeCuktechScan(durationMs)
     }
 
     fun onScanStopped() {
+        _isScanning.value = false
         if (_authState.value == CuktechAuthState.SCANNING) {
             _authState.value = CuktechAuthState.DISCONNECTED
-            val count = _discoveredDevices.value.size
+        }
+        val count = _discoveredDevices.value.size
+        if (_authState.value != CuktechAuthState.AUTHENTICATED) {
             _statusMessage.value = if (count > 0) {
                 "Scan complete, found $count device(s)"
             } else {
@@ -1425,10 +1434,14 @@ class CuktechBleManager(
             CuktechProtocol.PIID_COUNTDOWN_A -> {
                 if (frame.payload.isNotEmpty()) {
                     val portId = frame.piid - CuktechProtocol.PIID_COUNTDOWN_C1 + 1
-                    val code = frame.payload[0].toInt() and 0xFF
+                    val minutes = if (frame.payload.size >= 2) {
+                        (frame.payload[0].toInt() and 0xFF) or ((frame.payload[1].toInt() and 0xFF) shl 8)
+                    } else {
+                        frame.payload[0].toInt() and 0xFF
+                    }
                     val curPorts = _ports.value.toMutableMap()
                     val existing = curPorts[portId] ?: return
-                    curPorts[portId] = existing.copy(countdownCode = code)
+                    curPorts[portId] = existing.copy(countdownCode = minutes)
                     _ports.value = curPorts
                 }
             }
@@ -1552,6 +1565,9 @@ class CuktechBleManager(
                 CuktechProtocol.buildMiotTlv(seq = seq, siid = siid, piid = piid, rawBytes = valueBytes)
             } else if (valueBytes.size == 1) {
                 CuktechProtocol.buildMiotTlv(seq = seq, siid = siid, piid = piid, value = valueBytes[0].toLong() and 0xFFL)
+            } else if (valueBytes.size == 2) {
+                val v = (valueBytes[0].toLong() and 0xFFL) or ((valueBytes[1].toLong() and 0xFFL) shl 8)
+                CuktechProtocol.buildMiotTlv(seq = seq, siid = siid, piid = piid, value = v)
             } else if (valueBytes.size == 4) {
                 val v = (valueBytes[0].toLong() and 0xFFL) or
                     ((valueBytes[1].toLong() and 0xFFL) shl 8) or
@@ -1827,18 +1843,23 @@ class CuktechBleManager(
         }
     }
 
-    fun setPortCountdown(portId: Int, countdownCode: Int) {
-        if (portId !in 1..4 || countdownCode !in CuktechProtocol.COUNTDOWN_OPTIONS.keys) return
+    fun setPortCountdown(portId: Int, countdownMinutes: Int) {
+        if (portId !in 1..4 || countdownMinutes !in 0..1440) return
         val piid = CuktechProtocol.PIID_COUNTDOWN_C1 + (portId - 1)
         scope.launch {
             val curPorts = _ports.value.toMutableMap()
-            curPorts[portId]?.let { curPorts[portId] = it.copy(countdownCode = countdownCode) }
+            curPorts[portId]?.let { curPorts[portId] = it.copy(countdownCode = countdownMinutes) }
             _ports.value = curPorts
+            val valBytes = if (countdownMinutes <= 0xFF) {
+                byteArrayOf((countdownMinutes and 0xFF).toByte())
+            } else {
+                byteArrayOf((countdownMinutes and 0xFF).toByte(), ((countdownMinutes shr 8) and 0xFF).toByte())
+            }
             sendMiotCommand(
                 siid = CuktechProtocol.SIID_CHARGER,
                 piid = piid,
                 isSet = true,
-                valueBytes = byteArrayOf(countdownCode.toByte())
+                valueBytes = valBytes
             )
         }
     }

@@ -200,7 +200,7 @@ fun CuktechChargerVisual(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = topPadding, start = 12.dp, end = 12.dp),
+                        .padding(top = topPadding, start = 12.dp, end = 0.dp),
                     verticalArrangement = Arrangement.spacedBy(rowSpacing)
                 ) {
                     for (portId in 1..4) {
@@ -278,6 +278,25 @@ fun CuktechChargerVisual(
                                     )
                                 }
                             }
+
+                            if (isCharging) {
+                                // Continuous glowing cyan laser beam shooting out of port slot to charger edge
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(if (isC) 12.dp else 16.dp)
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                listOf(
+                                                    Color(0xFF00E5FF).copy(alpha = 0.90f * pulseAlpha),
+                                                    Color(0xFF00E5FF).copy(alpha = 0.75f * pulseAlpha)
+                                                )
+                                            )
+                                        )
+                                )
+                            } else {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
                         }
                     }
                 }
@@ -347,15 +366,15 @@ fun CuktechChargerVisual(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (isCharging) {
-                            // Soft, wide Glowing Laser Light Ray
+                            // Soft, wide Glowing Laser Light Ray continuing from edge
                             Box(
                                 modifier = Modifier
-                                    .width(32.dp)
-                                    .height(12.dp)
+                                    .width(28.dp)
+                                    .height(if (portId in 1..3) 12.dp else 16.dp)
                                     .background(
                                         Brush.horizontalGradient(
                                             listOf(
-                                                Color(0xFF00E5FF).copy(alpha = 0.85f * pulseAlpha),
+                                                Color(0xFF00E5FF).copy(alpha = 0.75f * pulseAlpha),
                                                 Color(0xFF00E5FF).copy(alpha = 0.08f)
                                             )
                                         )

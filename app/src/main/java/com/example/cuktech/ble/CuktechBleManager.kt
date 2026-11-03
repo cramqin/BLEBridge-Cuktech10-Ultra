@@ -344,10 +344,11 @@ class CuktechBleManager(
     }
 
     fun onConnectionStateChange(address: String, status: Int, newState: Int) {
+        lastConnectedMac = address
         if (newState == BluetoothGatt.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
             _authState.value = CuktechAuthState.DISCOVERING_SERVICES
             _statusMessage.value = "GATT connected, discovering services..."
-        } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
+        } else {
             authJob?.cancel()
             stopBackgroundLoops()
             sessionKeys = null
@@ -356,9 +357,7 @@ class CuktechBleManager(
             }
             pendingMiotResponses.clear()
 
-            if (_authState.value != CuktechAuthState.AUTH_FAILED) {
-                _authState.value = CuktechAuthState.DISCONNECTED
-            }
+            _authState.value = CuktechAuthState.DISCONNECTED
             _statusMessage.value = "Disconnected (status=$status)"
 
             if (autoReconnectEnabled && !lastConnectedMac.isNullOrBlank()) {
@@ -370,8 +369,8 @@ class CuktechBleManager(
     private fun scheduleAutoReconnect(mac: String) {
         reconnectJob?.cancel()
         reconnectJob = scope.launch {
-            delay(4500L)
-            if (autoReconnectEnabled && _authState.value == CuktechAuthState.DISCONNECTED) {
+            delay(3500L)
+            if (autoReconnectEnabled && _authState.value != CuktechAuthState.AUTHENTICATED) {
                 _statusMessage.value = "Attempting auto-reconnect to $mac..."
                 BleBridgeService.getInstance()?.connectBleNative(mac)
             }
@@ -396,9 +395,8 @@ class CuktechBleManager(
             var activeCred = credentialStore.devices.value.firstOrNull {
                 it.mac.replace(":", "").equals(gattMac.replace(":", ""), ignoreCase = true)
             } ?: credentialStore.activeDevice.value
-              ?: if (credentialStore.devices.value.size == 1 && credentialStore.devices.value[0].hasValidToken) {
-                  credentialStore.devices.value[0]
-              } else null
+              ?: credentialStore.devices.value.firstOrNull { it.isCuktech10Ultra && it.hasValidToken }
+              ?: credentialStore.devices.value.firstOrNull { it.hasValidToken }
 
             // If token is missing, attempt automatic sync with saved Xiaomi Cloud session
             if (activeCred == null || !activeCred.hasValidToken) {

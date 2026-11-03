@@ -59,6 +59,25 @@ class ShizukuCompanion(private val context: Context) {
         )
     }
 
+    fun clearDiagnosticOutput() {
+        _status.value = _status.value.copy(lastDiagnosticOutput = "")
+    }
+
+    fun requestIgnoreBatteryOptimizations() {
+        try {
+            val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = android.net.Uri.parse("package:${context.packageName}")
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            val fallback = android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(fallback)
+        }
+    }
+
     /**
      * Applies background keepalive & Doze whitelist rules via Shizuku/rish if available.
      */
@@ -67,10 +86,11 @@ class ShizukuCompanion(private val context: Context) {
         val cmd = "dumpsys deviceidle whitelist +$pkg; cmd appops set $pkg RUN_ANY_IN_BACKGROUND allow; cmd appops set $pkg WAKE_LOCK allow"
         val res = runElevatedOrLocalCommand(cmd)
         refreshStatus()
-        val msg = if (res.isSuccess) {
-            "Background keepalive & Doze whitelist commands applied:\n${res.getOrDefault("OK").ifBlank { "Success" }}"
+        val raw = res.getOrNull() ?: ""
+        val msg = if (res.isSuccess && !raw.contains("Permission Denial") && !raw.contains("SecurityException")) {
+            "Keepalive & Doze whitelist applied successfully."
         } else {
-            "Ensure Shizuku is running and authorized (or set Unrestricted Battery in system settings): ${res.exceptionOrNull()?.message}"
+            "Shizuku ADB service is not active. Please use 'System Battery Settings' to whitelist the app from battery optimizations."
         }
         _status.value = _status.value.copy(lastDiagnosticOutput = msg)
         msg
@@ -82,8 +102,12 @@ class ShizukuCompanion(private val context: Context) {
     suspend fun runBluetoothStackDiagnostics(): String = withContext(Dispatchers.IO) {
         val cmd = "dumpsys bluetooth_manager | grep -E 'enabled|ConnectionState|AdapterProperties|BondState|GattService' | head -n 25"
         val res = runElevatedOrLocalCommand(cmd)
-        val out = res.getOrElse { "Reading Bluetooth diagnostics requires Shizuku permission: ${it.message}" }
-            .ifBlank { "Bluetooth stack status normal (Native Android BLE API is ready)" }
+        val raw = res.getOrNull() ?: ""
+        val out = if (res.isSuccess && !raw.contains("Permission Denial") && !raw.contains("SecurityException")) {
+            raw.ifBlank { "Bluetooth stack status normal (Native Android BLE API is ready)" }
+        } else {
+            "Shizuku ADB permission required to read full bluetooth dumpsys."
+        }
         _status.value = _status.value.copy(lastDiagnosticOutput = out)
         out
     }
@@ -99,7 +123,10 @@ class ShizukuCompanion(private val context: Context) {
             pb.redirectErrorStream(true)
             val proc = pb.start()
             val output = BufferedReader(InputStreamReader(proc.inputStream)).use { it.readText() }.trim()
-            proc.waitFor()
+            val exitCode = proc.waitFor()
+            if (exitCode != 0 || output.contains("Permission Denial") || output.contains("SecurityException")) {
+                throw SecurityException(output.ifBlank { "Exit code $exitCode" })
+            }
             output
         }
     }

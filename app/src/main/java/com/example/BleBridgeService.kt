@@ -12,6 +12,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -66,6 +67,7 @@ class BleBridgeService : Service() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        acquireWakeLock()
         ensureCuktechManagersInitialized(applicationContext)
         bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         bluetoothAdapter = bluetoothManager?.adapter
@@ -107,8 +109,36 @@ class BleBridgeService : Service() {
         return START_STICKY
     }
 
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    private fun acquireWakeLock() {
+        try {
+            if (wakeLock == null) {
+                val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                wakeLock = powerManager?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BLEBridge::BackgroundKeepalive")
+                wakeLock?.setReferenceCounted(false)
+            }
+            if (wakeLock?.isHeld != true) {
+                wakeLock?.acquire(24 * 60 * 60 * 1000L) // 24 hours safeguard
+                log(LogLevel.LEVEL2, "Acquired partial CPU wake lock for background keepalive.")
+            }
+        } catch (e: Exception) {
+            log(LogLevel.LEVEL1, "Error acquiring WakeLock: ${e.message}")
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+                log(LogLevel.LEVEL2, "Released CPU wake lock.")
+            }
+        } catch (_: Exception) {}
+    }
+
     override fun onDestroy() {
         log(LogLevel.LEVEL2, "BLE Bridge Service destroying...")
+        releaseWakeLock()
         cleanupServer()
         closeGattClean()
         stopBleScan()
@@ -120,6 +150,7 @@ class BleBridgeService : Service() {
     // --- Foreground Service Notification ---
 
     private fun createNotificationChannelAndStartForeground() {
+        acquireWakeLock()
         val channelId = "BleBridgeServiceChannel"
         val channelName = "BLE Bridge Background Service"
 
@@ -561,6 +592,11 @@ class BleBridgeService : Service() {
                     // Broadcast connected event to socket clients
                     val telemetry = createTelemetryJson("connected", addr, null, null, null)
                     broadcastJson(telemetry)
+
+                    // Request balanced connection priority for steady background telemetry
+                    try {
+                        gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_BALANCED)
+                    } catch (_: Exception) {}
 
                     // Auto-MTU Negotiation immediately
                     try {

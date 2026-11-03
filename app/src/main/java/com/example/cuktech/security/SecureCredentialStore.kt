@@ -43,10 +43,21 @@ data class CuktechDeviceCredentials(
                 name.contains("10", ignoreCase = true)
 
     val hasValidToken: Boolean
-        get() = tokenHex.trim().length == 24 && tokenHex.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
+        get() {
+            val clean = tokenHex.trim().replace(":", "").replace("-", "").replace(" ", "")
+            return (clean.length == 24 || clean.length == 32) && clean.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
+        }
 
-    fun tokenBytes(): ByteArray = hexToBytes(tokenHex.trim())
-    fun bleKeyBytes(): ByteArray = if (bleKeyHex.trim().length == 32) hexToBytes(bleKeyHex.trim()) else ByteArray(16)
+    fun tokenBytes(): ByteArray {
+        val clean = tokenHex.trim().replace(":", "").replace("-", "").replace(" ", "")
+        val hex24 = if (clean.length >= 24) clean.substring(0, 24) else clean
+        return hexToBytes(hex24)
+    }
+
+    fun bleKeyBytes(): ByteArray {
+        val clean = bleKeyHex.trim().replace(":", "").replace("-", "").replace(" ", "")
+        return if (clean.length == 32) hexToBytes(clean) else ByteArray(16)
+    }
 
     companion object {
         fun hexToBytes(hex: String): ByteArray {

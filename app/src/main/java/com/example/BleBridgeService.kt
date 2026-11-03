@@ -413,6 +413,11 @@ class BleBridgeService : Service() {
     }
 
     fun startNativeCuktechScan(durationMs: Long = 10000L) {
+        if (bluetoothAdapter?.isEnabled != true) {
+            log(LogLevel.LEVEL1, "Scan aborted: Bluetooth is turned OFF on your phone. Please enable Bluetooth.")
+            cuktechManager?.onScanStopped()
+            return
+        }
         val scanner = bluetoothAdapter?.bluetoothLeScanner
         if (scanner == null) {
             log(LogLevel.LEVEL1, "Scan failed: Bluetooth LE Scanner not available")
@@ -471,6 +476,12 @@ class BleBridgeService : Service() {
     // --- BLE Connection & GATT Core ---
 
     fun connectBleNative(address: String): Boolean {
+        if (bluetoothAdapter?.isEnabled != true) {
+            log(LogLevel.LEVEL1, "Connection aborted: Bluetooth is turned OFF on your phone. Please enable Bluetooth.")
+            setBleConnectionState(BleConnectionState.DISCONNECTED, null)
+            cuktechManager?.onConnectionFailed("Bluetooth is turned off")
+            return false
+        }
         if (isScanning) {
             stopBleScan()
         }

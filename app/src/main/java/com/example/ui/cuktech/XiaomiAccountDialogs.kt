@@ -8,6 +8,8 @@ import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.content.Context
+import android.bluetooth.BluetoothManager
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Job
 import androidx.compose.foundation.BorderStroke
@@ -1000,8 +1002,14 @@ fun CuktechDiscoveryPairingDialog(
     val statusMsg by bleManager.statusMessage.collectAsState()
     val savedCreds by bleManager.credentialStore.devices.collectAsState()
 
-    LaunchedEffect(Unit) {
-        bleManager.startSearchForCuktechChargers(10000L)
+    val context = LocalContext.current
+    val btManager = remember { context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager }
+    val isBtEnabled = btManager?.adapter?.isEnabled == true
+
+    LaunchedEffect(isBtEnabled) {
+        if (isBtEnabled) {
+            bleManager.startSearchForCuktechChargers(10000L)
+        }
     }
 
     Dialog(
@@ -1044,8 +1052,38 @@ fun CuktechDiscoveryPairingDialog(
                     }
                 }
 
+                if (!isBtEnabled) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.BluetoothDisabled, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Bluetooth is turned OFF",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Text(
+                                    text = "Please turn on Bluetooth to scan or connect.\n(Note: Location is NOT required on Android 12+).",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Text(
-                    text = statusMsg,
+                    text = if (!isBtEnabled) "Bluetooth is disabled. Please turn on Bluetooth." else statusMsg,
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1181,7 +1219,13 @@ fun CuktechDiscoveryPairingDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     OutlinedButton(
-                        onClick = { bleManager.startSearchForCuktechChargers(10000L) }
+                        onClick = {
+                            if (btManager?.adapter?.isEnabled == true) {
+                                bleManager.startSearchForCuktechChargers(10000L)
+                            } else {
+                                android.widget.Toast.makeText(context, "Bluetooth is turned OFF. Please turn on Bluetooth.", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))

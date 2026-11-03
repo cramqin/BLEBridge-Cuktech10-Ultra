@@ -8,7 +8,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.Bundle
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -164,6 +166,27 @@ fun BleBridgeDashboard(
 
     var permissionsGranted by remember { mutableStateOf(false) }
     var pendingPermissionCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var showBluetoothOffDialog by remember { mutableStateOf(false) }
+
+    val enableBluetoothLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        val btManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        if (btManager?.adapter?.isEnabled == true) {
+            val svcIntent = Intent(context, BleBridgeService::class.java)
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(svcIntent)
+                } else {
+                    context.startService(svcIntent)
+                }
+            }
+            pendingPermissionCallback?.invoke()
+            pendingPermissionCallback = null
+        } else {
+            Toast.makeText(context, "Bluetooth is required to search and connect to CUKTECH 10 Ultra.", Toast.LENGTH_LONG).show()
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -171,6 +194,11 @@ fun BleBridgeDashboard(
         val ok = results.all { it.value }
         permissionsGranted = ok
         if (ok) {
+            val btManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            if (btManager?.adapter?.isEnabled != true) {
+                showBluetoothOffDialog = true
+                return@rememberLauncherForActivityResult
+            }
             val svcIntent = Intent(context, BleBridgeService::class.java)
             runCatching {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -190,21 +218,29 @@ fun BleBridgeDashboard(
         val allOk = permissionsToRequest.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
-        if (allOk) {
-            permissionsGranted = true
-            val svcIntent = Intent(context, BleBridgeService::class.java)
-            runCatching {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(svcIntent)
-                } else {
-                    context.startService(svcIntent)
-                }
-            }
-            onReady()
-        } else {
+        if (!allOk) {
             pendingPermissionCallback = onReady
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
+            return
         }
+
+        val btManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        if (btManager?.adapter?.isEnabled != true) {
+            pendingPermissionCallback = onReady
+            showBluetoothOffDialog = true
+            return
+        }
+
+        permissionsGranted = true
+        val svcIntent = Intent(context, BleBridgeService::class.java)
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(svcIntent)
+            } else {
+                context.startService(svcIntent)
+            }
+        }
+        onReady()
     }
 
     LaunchedEffect(Unit) {
@@ -1334,6 +1370,46 @@ fun BleBridgeDashboard(
                 confirmButton = {
                     TextButton(onClick = { prerequisiteWarning = null }) {
                         Text("UNDERSTOOD", color = appColors.primary, fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
+        }
+
+        if (showBluetoothOffDialog) {
+            AlertDialog(
+                onDismissRequest = { showBluetoothOffDialog = false },
+                containerColor = appColors.surface,
+                titleContentColor = appColors.textPrimary,
+                textContentColor = appColors.textSecondary,
+                icon = { Icon(Icons.Default.BluetoothDisabled, contentDescription = null, tint = Color(0xFF00E5FF)) },
+                title = { Text("Turn On Bluetooth", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+                text = {
+                    Text(
+                        "Bluetooth is currently turned OFF on your phone.\n\n" +
+                        "To search for and connect to your CUKTECH 10 Ultra, Bluetooth needs to be enabled.\n\n" +
+                        "ℹ️ Location is NOT required on Android 12+ (Android ${Build.VERSION.RELEASE})—only Bluetooth is needed.",
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showBluetoothOffDialog = false
+                            try {
+                                enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                            } catch (e: Exception) {
+                                context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF), contentColor = Color(0xFF0A0E1A))
+                    ) {
+                        Text("Turn On Bluetooth", fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showBluetoothOffDialog = false }) {
+                        Text("Cancel")
                     }
                 }
             )

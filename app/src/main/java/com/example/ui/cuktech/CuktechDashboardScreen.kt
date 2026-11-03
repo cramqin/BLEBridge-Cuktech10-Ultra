@@ -583,19 +583,24 @@ fun CuktechDashboardScreen(
                                 val c3Port = portsMap[3]
                                 val aPort = portsMap[4]
 
+                                val c1Proto = c1Port?.protocolName?.takeIf { it.isNotBlank() && it != "Idle" && it != "--" }?.let { " · $it" } ?: ""
+                                val c2Proto = c2Port?.protocolName?.takeIf { it.isNotBlank() && it != "Idle" && it != "--" }?.let { " · $it" } ?: ""
+                                val c3Proto = c3Port?.protocolName?.takeIf { it.isNotBlank() && it != "Idle" && it != "--" }?.let { " · $it" } ?: ""
+                                val aProto = aPort?.protocolName?.takeIf { it.isNotBlank() && it != "Idle" && it != "--" }?.let { " · $it" } ?: ""
+
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     PortPowerMiniCell(
                                         color = Color(0xFFFF7A00),
                                         portName = "Type-C1",
                                         powerW = c1Port?.powerW ?: 0.0,
-                                        subtitle = "${if ((c1Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c1Port?.voltageV) else "--V"}  ${if ((c1Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c1Port?.currentA) else "--A"}${if (!c1Port?.protocol.isNullOrBlank() && c1Port?.protocol != "--") " · ${c1Port?.protocol}" else ""}",
+                                        subtitle = "${if ((c1Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c1Port?.voltageV) else "--V"}  ${if ((c1Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c1Port?.currentA) else "--A"}$c1Proto",
                                         modifier = Modifier.weight(1f)
                                     )
                                     PortPowerMiniCell(
                                         color = Color(0xFF3B82F6),
                                         portName = "Type-C2",
                                         powerW = c2Port?.powerW ?: 0.0,
-                                        subtitle = "${if ((c2Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c2Port?.voltageV) else "--V"}  ${if ((c2Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c2Port?.currentA) else "--A"}${if (!c2Port?.protocol.isNullOrBlank() && c2Port?.protocol != "--") " · ${c2Port?.protocol}" else ""}",
+                                        subtitle = "${if ((c2Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c2Port?.voltageV) else "--V"}  ${if ((c2Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c2Port?.currentA) else "--A"}$c2Proto",
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
@@ -604,14 +609,14 @@ fun CuktechDashboardScreen(
                                         color = Color(0xFF00E5FF),
                                         portName = "Type-C3",
                                         powerW = c3Port?.powerW ?: 0.0,
-                                        subtitle = "${if ((c3Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c3Port?.voltageV) else "--V"}  ${if ((c3Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c3Port?.currentA) else "--A"}${if (!c3Port?.protocol.isNullOrBlank() && c3Port?.protocol != "--") " · ${c3Port?.protocol}" else ""}",
+                                        subtitle = "${if ((c3Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c3Port?.voltageV) else "--V"}  ${if ((c3Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c3Port?.currentA) else "--A"}$c3Proto",
                                         modifier = Modifier.weight(1f)
                                     )
                                     PortPowerMiniCell(
                                         color = Color(0xFFFBBF24),
                                         portName = "USB-A",
                                         powerW = aPort?.powerW ?: 0.0,
-                                        subtitle = "${if ((aPort?.voltageV ?: 0.0) > 0.1) "%.1fV".format(aPort?.voltageV) else "--V"}  ${if ((aPort?.currentA ?: 0.0) > 0.01) "%.2fA".format(aPort?.currentA) else "--A"}${if (!aPort?.protocol.isNullOrBlank() && aPort?.protocol != "--") " · ${aPort?.protocol}" else ""}",
+                                        subtitle = "${if ((aPort?.voltageV ?: 0.0) > 0.1) "%.1fV".format(aPort?.voltageV) else "--V"}  ${if ((aPort?.currentA ?: 0.0) > 0.01) "%.2fA".format(aPort?.currentA) else "--A"}$aProto",
                                         modifier = Modifier.weight(1f)
                                     )
                                 }

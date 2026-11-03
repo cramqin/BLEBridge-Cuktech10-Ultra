@@ -80,9 +80,9 @@ object CuktechProtocol {
 
     val SCENE_MODES = mapOf(
         1 to "AI Mode",
-        2 to "Hybrid Mode",
-        3 to "Single Port 100W",
-        4 to "Dual Balance"
+        2 to "Hybrid",
+        3 to "Single",
+        4 to "Dual"
     )
 
     val SCREEN_TIMEOUTS = mapOf(

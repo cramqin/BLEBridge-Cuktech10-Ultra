@@ -431,9 +431,9 @@ fun CuktechDashboardScreen(
                     ) {
                         val activeModeLabel = when (settings.sceneMode) {
                             1 -> "AI Mode"
-                            2 -> "Hybrid Mode"
-                            3 -> "Single Port Max"
-                            4 -> "Dual Port Mode"
+                            2 -> "Hybrid"
+                            3 -> "Single"
+                            4 -> "Dual"
                             else -> "AI Mode"
                         }
 

@@ -2224,7 +2224,11 @@ private fun PortTelemetryCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 12.dp)
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
@@ -2242,7 +2246,7 @@ private fun PortTelemetryCard(
                         Text(
                             text = headerText,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
+                            fontSize = 14.sp
                         )
                     }
                     if (port.protocolName.isNotBlank() && port.protocolName != "Normal") {

@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,7 +18,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,7 +34,8 @@ class TaskerEditActivity : ComponentActivity() {
         val initialPort = existingBundle?.getInt("PORT", 1) ?: 1
         val initialState = existingBundle?.getBoolean("STATE", true) ?: true
         val initialMode = existingBundle?.getInt("MODE", 1) ?: 1
-        val initialTimeout = existingBundle?.getInt("TIMEOUT", 1) ?: 1
+        val initialTimeout = existingBundle?.getInt("TIMEOUT", 4) ?: 4
+        val initialTimerMins = existingBundle?.getInt("TIMER_MINS", 60) ?: 60
 
         setContent {
             MyApplicationTheme {
@@ -50,17 +49,19 @@ class TaskerEditActivity : ComponentActivity() {
                         initialState = initialState,
                         initialMode = initialMode,
                         initialTimeout = initialTimeout,
+                        initialTimerMins = initialTimerMins,
                         onCancel = {
                             setResult(Activity.RESULT_CANCELED)
                             finish()
                         },
-                        onSave = { action, port, state, mode, timeout, blurb ->
+                        onSave = { action, port, state, mode, timeout, timerMins, blurb ->
                             val resultBundle = Bundle().apply {
                                 putString("ACTION", action)
                                 putInt("PORT", port)
                                 putBoolean("STATE", state)
                                 putInt("MODE", mode)
                                 putInt("TIMEOUT", timeout)
+                                putInt("TIMER_MINS", timerMins)
                             }
                             val resultIntent = Intent().apply {
                                 putExtra("com.twofortyfouram.locale.intent.extra.BUNDLE", resultBundle)
@@ -84,14 +85,31 @@ fun TaskerEditScreen(
     initialState: Boolean,
     initialMode: Int,
     initialTimeout: Int,
+    initialTimerMins: Int,
     onCancel: () -> Unit,
-    onSave: (action: String, port: Int, state: Boolean, mode: Int, timeout: Int, blurb: String) -> Unit
+    onSave: (action: String, port: Int, state: Boolean, mode: Int, timeout: Int, timerMins: Int, blurb: String) -> Unit
 ) {
     var selectedAction by remember { mutableStateOf(initialAction) }
     var selectedPort by remember { mutableIntStateOf(initialPort) }
     var selectedPortState by remember { mutableStateOf(initialState) }
     var selectedMode by remember { mutableIntStateOf(initialMode) }
     var selectedTimeout by remember { mutableIntStateOf(initialTimeout) }
+    var selectedTimerMins by remember { mutableIntStateOf(initialTimerMins) }
+
+    val portNames = listOf(1 to "USB-C1", 2 to "USB-C2", 3 to "USB-C3", 4 to "USB-A")
+    val modeNames = mapOf(
+        1 to "AI Mode",
+        2 to "Hybrid",
+        3 to "Single",
+        4 to "Dual"
+    )
+    val timeoutNames = mapOf(
+        4 to "Always On",
+        5 to "1 min",
+        1 to "5 min",
+        2 to "10 min",
+        3 to "30 min"
+    )
 
     Scaffold(
         topBar = {
@@ -104,15 +122,23 @@ fun TaskerEditScreen(
                 },
                 actions = {
                     IconButton(onClick = {
+                        val portLabel = portNames.firstOrNull { it.first == selectedPort }?.second ?: "Port $selectedPort"
                         val blurb = when (selectedAction) {
-                            "CONNECT" -> "CUKTECH 10: Connect"
-                            "DISCONNECT" -> "CUKTECH 10: Disconnect"
-                            "SET_PORT" -> "CUKTECH 10: Port $selectedPort ${if (selectedPortState) "ON" else "OFF"}"
-                            "SET_MODE" -> "CUKTECH 10: Mode $selectedMode"
-                            "SET_TIMEOUT" -> "CUKTECH 10: Timeout ${if (selectedTimeout == 0) "Always On" else "${selectedTimeout}s"}"
+                            "CONNECT" -> "CUKTECH 10: Connect BLE"
+                            "DISCONNECT" -> "CUKTECH 10: Disconnect BLE"
+                            "SET_PORT" -> "CUKTECH 10: $portLabel ${if (selectedPortState) "ON" else "OFF"}"
+                            "SET_MODE" -> "CUKTECH 10: Scenario ${modeNames[selectedMode] ?: "AI Mode"}"
+                            "SET_TIMEOUT" -> "CUKTECH 10: Screen Timeout (${timeoutNames[selectedTimeout] ?: "Always On"})"
+                            "SET_LOW_CURRENT" -> "CUKTECH 10: USB-A Low Current ${if (selectedPortState) "ON (4h)" else "OFF"}"
+                            "SET_PORT_TIMER" -> {
+                                val tLabel = if (selectedTimerMins == 0) "Always On" else "${selectedTimerMins}m"
+                                "CUKTECH 10: $portLabel Timer ($tLabel)"
+                            }
+                            "SOFT_RESET" -> "CUKTECH 10: Force Soft Port Reset"
+                            "SET_SCREEN_POWER" -> "CUKTECH 10: Display ${if (selectedPortState) "Wake ON" else "Sleep OFF"}"
                             else -> "CUKTECH 10: Action"
                         }
-                        onSave(selectedAction, selectedPort, selectedPortState, selectedMode, selectedTimeout, blurb)
+                        onSave(selectedAction, selectedPort, selectedPortState, selectedMode, selectedTimeout, selectedTimerMins, blurb)
                     }) {
                         Icon(Icons.Default.Check, contentDescription = "Save", tint = MaterialTheme.colorScheme.primary)
                     }
@@ -126,7 +152,7 @@ fun TaskerEditScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("Select Action", fontWeight = FontWeight.Bold, fontSize = 16.sp)
 
@@ -134,8 +160,12 @@ fun TaskerEditScreen(
                 "CONNECT" to "Connect Charger BLE",
                 "DISCONNECT" to "Disconnect Charger BLE",
                 "SET_PORT" to "Switch Port Power (On/Off)",
-                "SET_MODE" to "Set Power Allocation Mode",
-                "SET_TIMEOUT" to "Set Screen Timeout"
+                "SET_MODE" to "Set Power Allocation Scenario",
+                "SET_TIMEOUT" to "Set Screen Timeout",
+                "SET_SCREEN_POWER" to "Wake or Sleep Charger Display",
+                "SET_LOW_CURRENT" to "USB-A Low Current Mode (4h)",
+                "SET_PORT_TIMER" to "Set Port Delay Poweroff Timer",
+                "SOFT_RESET" to "Force Soft Port Reset (Renegotiate PD)"
             )
 
             actions.forEach { (key, label) ->
@@ -144,7 +174,7 @@ fun TaskerEditScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .clickable { selectedAction = key }
-                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                        .padding(vertical = 6.dp, horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     RadioButton(
@@ -156,11 +186,10 @@ fun TaskerEditScreen(
                 }
             }
 
-            Divider()
+            HorizontalDivider()
 
             if (selectedAction == "SET_PORT") {
                 Text("Select Port", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                val portNames = listOf(1 to "USB-C1", 2 to "USB-C2", 3 to "USB-C3", 4 to "USB-A")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     portNames.forEach { (pId, name) ->
                         FilterChip(
@@ -171,7 +200,7 @@ fun TaskerEditScreen(
                     }
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(4.dp))
                 Text("Port Power State", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     FilterChip(
@@ -188,39 +217,144 @@ fun TaskerEditScreen(
             }
 
             if (selectedAction == "SET_MODE") {
-                Text("Power Allocation Mode", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text("Power Allocation Scenario", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 val modes = listOf(
-                    1 to "Dynamic Allocation (120W Max)",
-                    2 to "Balanced Distribution",
-                    3 to "Single Port Priority Max"
+                    1 to ("AI Mode" to "Auto-balances power between USB-C and USB-A"),
+                    2 to ("Hybrid" to "Guarantees up to 100W for USB-C1 first"),
+                    3 to ("Single" to "Maximized burst wattage for one device"),
+                    4 to ("Dual" to "Equal 60W/60W or dynamic split across two active ports")
                 )
-                modes.forEach { (mId, desc) ->
+                modes.forEach { (mId, pair) ->
+                    val (title, subtitle) = pair
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
                             .clickable { selectedMode = mId }
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = 6.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(selected = (selectedMode == mId), onClick = { selectedMode = mId })
                         Spacer(Modifier.width(8.dp))
-                        Text(desc, fontSize = 14.sp)
+                        Column {
+                            Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
             }
 
             if (selectedAction == "SET_TIMEOUT") {
                 Text("Screen Timeout Duration", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                val timeouts = listOf(0 to "Always On", 1 to "60s", 2 to "5m", 3 to "60m")
+                val timeouts = listOf(
+                    4 to "Always On",
+                    5 to "1 min",
+                    1 to "5 min",
+                    2 to "10 min",
+                    3 to "30 min"
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    timeouts.forEach { (code, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { selectedTimeout = code }
+                                .padding(vertical = 4.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = (selectedTimeout == code), onClick = { selectedTimeout = code })
+                            Spacer(Modifier.width(8.dp))
+                            Text(label, fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+
+            if (selectedAction == "SET_SCREEN_POWER") {
+                Text("Charger Display State", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilterChip(
+                        selected = selectedPortState,
+                        onClick = { selectedPortState = true },
+                        label = { Text("Wake Screen ON") }
+                    )
+                    FilterChip(
+                        selected = !selectedPortState,
+                        onClick = { selectedPortState = false },
+                        label = { Text("Turn Screen OFF") }
+                    )
+                }
+            }
+
+            if (selectedAction == "SET_LOW_CURRENT") {
+                Text("USB-A Low Current Mode (4 Hours)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    "Prevents auto-cutoff for low-draw devices like smartwatches and earbuds.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilterChip(
+                        selected = selectedPortState,
+                        onClick = { selectedPortState = true },
+                        label = { Text("Enable (4 Hours)") }
+                    )
+                    FilterChip(
+                        selected = !selectedPortState,
+                        onClick = { selectedPortState = false },
+                        label = { Text("Disable") }
+                    )
+                }
+            }
+
+            if (selectedAction == "SET_PORT_TIMER") {
+                Text("Select Port", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    timeouts.forEach { (sec, label) ->
+                    portNames.forEach { (pId, name) ->
                         FilterChip(
-                            selected = (selectedTimeout == sec),
-                            onClick = { selectedTimeout = sec },
-                            label = { Text(label) }
+                            selected = (selectedPort == pId),
+                            onClick = { selectedPort = pId },
+                            label = { Text(name) }
                         )
                     }
                 }
+
+                Spacer(Modifier.height(4.dp))
+                Text("Shutoff Countdown Duration", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                val presets = listOf(
+                    0 to "Always On (Cancel Timer)",
+                    15 to "15 Minutes",
+                    30 to "30 Minutes",
+                    60 to "1 Hour",
+                    120 to "2 Hours",
+                    240 to "4 Hours"
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    presets.forEach { (mins, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { selectedTimerMins = mins }
+                                .padding(vertical = 4.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = (selectedTimerMins == mins), onClick = { selectedTimerMins = mins })
+                            Spacer(Modifier.width(8.dp))
+                            Text(label, fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+
+            if (selectedAction == "SOFT_RESET") {
+                Text("Force Soft Port Reset", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    "Momentarily cycles all 4 ports off and on (0x00 -> 0x0F) to trigger fresh USB-PD, PPS, and UFCS protocol negotiation.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

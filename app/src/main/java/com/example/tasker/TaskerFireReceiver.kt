@@ -41,8 +41,24 @@ class TaskerFireReceiver : BroadcastReceiver() {
                 mgr.setSceneMode(mode)
             }
             "SET_TIMEOUT" -> {
-                val timeout = bundle.getInt("TIMEOUT", 1)
+                val timeout = bundle.getInt("TIMEOUT", 4)
                 mgr.setScreenTimeout(timeout)
+            }
+            "SET_SCREEN_POWER" -> {
+                val state = bundle.getBoolean("STATE", true)
+                mgr.forceScreenPower(state, 4)
+            }
+            "SET_LOW_CURRENT" -> {
+                val state = bundle.getBoolean("STATE", true)
+                mgr.setUsbALowCurrent(state)
+            }
+            "SET_PORT_TIMER" -> {
+                val port = bundle.getInt("PORT", 1)
+                val mins = bundle.getInt("TIMER_MINS", 0)
+                mgr.setPortCountdown(port, mins)
+            }
+            "SOFT_RESET" -> {
+                mgr.forceSoftRestart {}
             }
         }
     }

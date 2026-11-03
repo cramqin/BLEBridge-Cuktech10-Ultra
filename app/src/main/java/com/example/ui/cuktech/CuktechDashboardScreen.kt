@@ -744,7 +744,7 @@ fun CuktechDashboardScreen(
                             )
 
                             // 1. Scene Mode (PIID 5) - Clean Column with RadioButton and Descriptions
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
                                     text = "Power Allocation Mode",
                                     fontSize = 13.sp,
@@ -758,12 +758,13 @@ fun CuktechDashboardScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 val modeDescriptions = mapOf(
-                                    1 to Pair("Dynamic Allocation", "Auto-balances power between USB-C and USB-A"),
-                                    2 to Pair("Laptop Priority", "Guarantees up to 100W for USB-C1 first"),
-                                    3 to Pair("Single Port Max", "Maximized burst wattage for one device")
+                                    1 to "Auto-balances power between USB-C and USB-A",
+                                    2 to "Guarantees up to 100W for USB-C1 first",
+                                    3 to "Maximized burst wattage for one device",
+                                    4 to "Equal 60W/60W or dynamic split across two active ports"
                                 )
                                 CuktechProtocol.SCENE_MODES.forEach { (code, label) ->
-                                    val desc = modeDescriptions[code]?.second ?: ""
+                                    val desc = modeDescriptions[code] ?: ""
                                     val isSelected = (settings.sceneMode == code)
                                     Surface(
                                         color = if (isSelected) {
@@ -783,15 +784,16 @@ fun CuktechDashboardScreen(
                                             .clickable { bleManager.setSceneMode(code) }
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             RadioButton(
                                                 selected = settings.sceneMode == code,
                                                 onClick = { bleManager.setSceneMode(code) },
-                                                colors = cuktechRadioButtonColors()
+                                                colors = cuktechRadioButtonColors(),
+                                                modifier = Modifier.size(24.dp)
                                             )
-                                            Spacer(modifier = Modifier.width(14.dp))
+                                            Spacer(modifier = Modifier.width(16.dp))
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(label, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                                 if (desc.isNotBlank()) {
@@ -1857,9 +1859,10 @@ fun CuktechDashboardScreen(
                                     colors = RadioButtonDefaults.colors(
                                         selectedColor = MaterialTheme.colorScheme.error,
                                         unselectedColor = Color(0xFF64748B)
-                                    )
+                                    ),
+                                    modifier = Modifier.size(24.dp)
                                 )
-                                Spacer(modifier = Modifier.width(14.dp))
+                                Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = option.label,
@@ -1940,9 +1943,10 @@ fun CuktechDashboardScreen(
                                 RadioButton(
                                     selected = isSelected,
                                     onClick = { pendingScreenTimeoutCode = code },
-                                    colors = cuktechRadioButtonColors()
+                                    colors = cuktechRadioButtonColors(),
+                                    modifier = Modifier.size(24.dp)
                                 )
-                                Spacer(modifier = Modifier.width(14.dp))
+                                Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = label,

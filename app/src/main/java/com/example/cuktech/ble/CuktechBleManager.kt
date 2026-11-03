@@ -1982,7 +1982,14 @@ class CuktechBleManager(
             // 1-line compact summary for collapsed view
             val compactWatts = if (activePorts.isNotEmpty()) {
                 activePorts.joinToString(" · ") { port ->
-                    String.format(java.util.Locale.US, "%s: %.1fW", port.portLabel, port.powerW)
+                    val shortLabel = when (port.portId) {
+                        1 -> "C1"
+                        2 -> "C2"
+                        3 -> "C3"
+                        4 -> "A"
+                        else -> port.portLabel
+                    }
+                    String.format(java.util.Locale.US, "%s: %.1fW", shortLabel, port.powerW)
                 }
             } else {
                 "All ports idle"
@@ -1997,10 +2004,20 @@ class CuktechBleManager(
                 if (activePorts.isNotEmpty()) {
                     activePorts.forEachIndexed { idx, port ->
                         if (idx > 0) append("\n")
-                        val protoStr = if (port.protocolName.isNotBlank() && port.protocolName != "Normal" && port.protocolName != "Idle") {
-                            " (${port.protocolName})"
+                        val shortLabel = when (port.portId) {
+                            1 -> "C1"
+                            2 -> "C2"
+                            3 -> "C3"
+                            4 -> "A"
+                            else -> port.portLabel
+                        }
+                        val cleanProto = port.protocolName
+                            .replace(Regex("\\s*\\([0-9.]+V\\)"), "")
+                            .trim()
+                        val protoSuffix = if (cleanProto.isNotBlank() && cleanProto != "Normal" && cleanProto != "Idle") {
+                            " · $cleanProto"
                         } else ""
-                        append(String.format(java.util.Locale.US, "• %s: %.1fW (%.1fV · %.2fA)%s", port.portLabel, port.powerW, port.voltageV, port.currentA, protoStr))
+                        append(String.format(java.util.Locale.US, "• %s: %.1fW · %.1fV, %.2fA%s", shortLabel, port.powerW, port.voltageV, port.currentA, protoSuffix))
                     }
                 } else {
                     append("All ports idle (No active draw)")

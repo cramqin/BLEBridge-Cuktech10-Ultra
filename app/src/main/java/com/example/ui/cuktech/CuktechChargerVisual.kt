@@ -168,18 +168,56 @@ fun CuktechChargerVisual(
             Box(
                 modifier = Modifier
                     .width(135.dp)
-                    .height(235.dp),
-                contentAlignment = Alignment.TopCenter
+                    .height(235.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFF14171E))
+                    .border(
+                        width = 2.dp,
+                        brush = Brush.verticalGradient(listOf(Color(0xFF4A5262), Color(0xFF262A34))),
+                        shape = RoundedCornerShape(20.dp)
+                    )
             ) {
-                // Photorealistic 3D rendered hardware body from official Mi Home assets
-                androidx.compose.foundation.Image(
-                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.main_charger_body_photorealistic),
-                    contentDescription = "CUKTECH 10 Ultra Hardware",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                // Background Grooved Lines Canvas
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val grooveColor = Color(0xFF1B1F28)
+                    val grooveStep = 7.dp.toPx()
+                    var y = 16.dp.toPx()
+                    while (y < size.height - 36.dp.toPx()) {
+                        drawLine(
+                            color = grooveColor,
+                            start = Offset(10.dp.toPx(), y),
+                            end = Offset(size.width - 10.dp.toPx(), y),
+                            strokeWidth = 2.dp.toPx()
+                        )
+                        y += grooveStep
+                    }
+                }
+
+                // Chrome Metallic Edge Pillars (Mi Home hardware realism)
+                Box(
+                    modifier = Modifier
+                        .width(3.5.dp)
+                        .fillMaxHeight()
+                        .align(Alignment.CenterStart)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF71717A), Color(0xFFD4D4D8), Color(0xFF3F3F46))
+                            )
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .width(3.5.dp)
+                        .fillMaxHeight()
+                        .align(Alignment.CenterEnd)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF3F3F46), Color(0xFFD4D4D8), Color(0xFF71717A))
+                            )
+                        )
                 )
 
-                // Four Physical Ports (C1, C2, C3, A) interactive overlay & active glowing ports
+                // Four Physical Ports (C1, C2, C3, A)
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -190,6 +228,7 @@ fun CuktechChargerVisual(
                         val port = portsMap[portId] ?: PortTelemetry(portId, "Port $portId")
                         val isC = portId in 1..3
                         val isCharging = port.powerW > 0.2
+                        val label = if (isC) "C$portId" else "A"
 
                         Row(
                             modifier = Modifier
@@ -198,61 +237,66 @@ fun CuktechChargerVisual(
                                 .clickable { onPortClick?.invoke(portId) },
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Invisible spacer for silkscreen label on hardware image
-                            Spacer(modifier = Modifier.width(22.dp))
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (isCharging) Color(0xFF00E5FF) else Color(0xFF8E99A8),
+                                modifier = Modifier.width(22.dp)
+                            )
 
-                            // Port Slot Geometry & Active Glow
+                            // Port Slot Geometry
                             if (isC) {
+                                // Type-C Oval Pill Slot
                                 Box(
                                     modifier = Modifier
                                         .width(42.dp)
                                         .height(12.dp)
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(
-                                            if (isCharging) Color(0xFF00E5FF).copy(alpha = 0.35f * pulseAlpha) else Color.Transparent
+                                            if (isCharging) Color(0xFF00E5FF).copy(alpha = 0.25f * pulseAlpha) else Color(0xFF0B0D11)
                                         )
                                         .border(
-                                            width = if (isCharging) 1.5.dp else 0.dp,
-                                            color = if (isCharging) Color(0xFF00E5FF).copy(alpha = pulseAlpha) else Color.Transparent,
+                                            width = if (isCharging) 1.5.dp else 1.dp,
+                                            color = if (isCharging) Color(0xFF00E5FF).copy(alpha = pulseAlpha) else Color(0xFF2C323D),
                                             shape = RoundedCornerShape(6.dp)
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (isCharging) {
-                                        Box(
-                                            modifier = Modifier
-                                                .width(24.dp)
-                                                .height(3.dp)
-                                                .clip(RoundedCornerShape(2.dp))
-                                                .background(Color(0xFF00E5FF))
-                                        )
-                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .width(24.dp)
+                                            .height(3.dp)
+                                            .clip(RoundedCornerShape(2.dp))
+                                            .background(if (isCharging) Color(0xFF00E5FF) else Color(0xFF1E222A))
+                                    )
                                 }
                             } else {
+                                // USB-A Rectangular Slot
                                 Box(
                                     modifier = Modifier
                                         .width(46.dp)
                                         .height(16.dp)
                                         .clip(RoundedCornerShape(3.dp))
                                         .background(
-                                            if (isCharging) Color(0xFF00E5FF).copy(alpha = 0.35f * pulseAlpha) else Color.Transparent
+                                            if (isCharging) Color(0xFF00E5FF).copy(alpha = 0.25f * pulseAlpha) else Color(0xFF0B0D11)
                                         )
                                         .border(
-                                            width = if (isCharging) 1.5.dp else 0.dp,
-                                            color = if (isCharging) Color(0xFF00E5FF).copy(alpha = pulseAlpha) else Color.Transparent,
+                                            width = if (isCharging) 1.5.dp else 1.dp,
+                                            color = if (isCharging) Color(0xFF00E5FF).copy(alpha = pulseAlpha) else Color(0xFF2C323D),
                                             shape = RoundedCornerShape(3.dp)
                                         ),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    if (isCharging) {
-                                        Box(
-                                            modifier = Modifier
-                                                .width(26.dp)
-                                                .height(5.dp)
-                                                .clip(RoundedCornerShape(1.dp))
-                                                .background(Color(0xFF00E5FF))
-                                        )
-                                    }
+                                    // Internal Blue Tongue
+                                    Box(
+                                        modifier = Modifier
+                                            .width(26.dp)
+                                            .height(5.dp)
+                                            .clip(RoundedCornerShape(1.dp))
+                                            .background(if (isCharging) Color(0xFF00E5FF) else Color(0xFF1E5BB5))
+                                    )
                                 }
                             }
 
@@ -266,8 +310,8 @@ fun CuktechChargerVisual(
                                     drawRect(
                                         brush = Brush.horizontalGradient(
                                             listOf(
-                                                Color(0xFF00E5FF).copy(alpha = 0.20f * pulseAlpha),
-                                                Color(0xFF00E5FF).copy(alpha = 0.38f * pulseAlpha)
+                                                Color(0xFF00E5FF).copy(alpha = 0.15f * pulseAlpha),
+                                                Color(0xFF00E5FF).copy(alpha = 0.28f * pulseAlpha)
                                             )
                                         )
                                     )
@@ -276,6 +320,50 @@ fun CuktechChargerVisual(
                                 Spacer(modifier = Modifier.weight(1f))
                             }
                         }
+                    }
+                }
+
+                // Bottom Section: Signature Glowing Cyan LED Bar & CUKTECH Brand Chin
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                ) {
+                    // Glowing LED Bar
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.5.dp)
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(
+                                        Color(0xFF00E5FF).copy(alpha = 0.2f),
+                                        Color(0xFF00E5FF).copy(alpha = if (hasActiveCharging) 0.95f * pulseAlpha else 0.4f),
+                                        Color(0xFF00E5FF).copy(alpha = 0.2f)
+                                    )
+                                )
+                            )
+                    )
+
+                    // Silver Embossed Chin
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(30.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFF2E333D), Color(0xFF1E2229))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "CUKTECH",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 2.sp,
+                            color = Color(0xFFA6B0C0)
+                        )
                     }
                 }
             }

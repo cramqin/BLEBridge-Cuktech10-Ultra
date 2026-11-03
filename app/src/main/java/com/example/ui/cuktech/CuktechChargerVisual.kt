@@ -99,73 +99,67 @@ fun CuktechChargerVisual(
             ) {
                 if (hasActiveCharging) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        val stroke = 1.8.dp.toPx()
-                        val glowCyan = Color(0xFF00E5FF).copy(alpha = 0.85f * pulseAlpha)
+                        val stroke = 1.4.dp.toPx()
+                        val wireGray = Color(0xFF475569) // Thin dark slate gray wire matching Mi Home
                         val startY = (topPadding + rowHeight / 2).toPx() // Exactly aligned with C1 port
-                        val cornerX = size.width - 28.dp.toPx()
-                        val endY = 125.dp.toPx()
+                        val cornerX = size.width - 26.dp.toPx()
+                        val endY = 138.dp.toPx()
 
                         // Horizontal line from charger faceplate left edge towards corner
                         drawLine(
-                            color = glowCyan,
+                            color = wireGray,
                             start = Offset(size.width, startY),
                             end = Offset(cornerX, startY),
                             strokeWidth = stroke
                         )
-                        // Vertical line dropping down to the lightning capsule
+                        // Vertical line dropping down to the lightning icon
                         drawLine(
-                            color = glowCyan,
+                            color = wireGray,
                             start = Offset(cornerX, startY),
                             end = Offset(cornerX, endY),
                             strokeWidth = stroke
                         )
                     }
 
-                    // Glowing Vertical Line Capsule
+                    // Glowing Vertical Line Capsule Pulse (Mi Home replica)
                     Box(
                         modifier = Modifier
-                            .offset(x = 70.dp, y = 98.dp)
-                            .width(4.dp)
-                            .height(26.dp)
-                            .clip(RoundedCornerShape(2.dp))
+                            .offset(x = 72.dp, y = 78.dp)
+                            .width(3.dp)
+                            .height(24.dp)
+                            .clip(RoundedCornerShape(1.5.dp))
                             .background(
                                 Brush.verticalGradient(
-                                    listOf(Color(0xFF00E5FF), Color(0xFF00E5FF).copy(alpha = 0.3f))
+                                    listOf(
+                                        Color(0xFF00E5FF).copy(alpha = 0.95f * pulseAlpha),
+                                        Color(0xFF00E5FF).copy(alpha = 0.25f)
+                                    )
                                 )
                             )
                     )
 
-                    // Soft Glowing Neon Lightning Badge (Mi Home replica)
+                    // Pure Floating Glowing Neon Lightning Bolt (Mi Home replica - no circle badge)
                     Box(
                         modifier = Modifier
-                            .offset(x = 50.dp, y = 103.dp)
-                            .size(44.dp)
-                            .clip(CircleShape)
+                            .offset(x = 56.dp, y = 120.dp)
+                            .size(36.dp)
                             .background(
                                 Brush.radialGradient(
                                     listOf(
-                                        Color(0xFF00E5FF).copy(alpha = 0.55f * pulseAlpha),
-                                        Color(0xFF00E5FF).copy(alpha = 0.20f * pulseAlpha),
+                                        Color(0xFF00E5FF).copy(alpha = 0.50f * pulseAlpha),
+                                        Color(0xFF00E5FF).copy(alpha = 0.15f * pulseAlpha),
                                         Color.Transparent
                                     )
                                 )
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Surface(
-                            color = Color(0xFF00E5FF).copy(alpha = 0.25f),
-                            shape = CircleShape,
-                            modifier = Modifier.size(26.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Bolt,
-                                    contentDescription = "AC Power Connected",
-                                    tint = Color(0xFF00E5FF),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = "AC Power Connected",
+                            tint = Color(0xFF00E5FF),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
@@ -307,39 +301,19 @@ fun CuktechChargerVisual(
                             }
 
                             if (isCharging) {
-                                // Soft, translucent glowing laser beam shooting out of port slot to charger edge
+                                // Soft, translucent glowing light beam shooting out of port slot to charger edge
                                 Canvas(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(rowHeight)
+                                        .height(14.dp)
                                 ) {
-                                    val cy = size.height / 2f
-                                    val w = size.width
-                                    // Outer halo glow
-                                    drawLine(
+                                    drawRect(
                                         brush = Brush.horizontalGradient(
                                             listOf(
-                                                Color(0xFF00E5FF).copy(alpha = 0.12f * pulseAlpha),
-                                                Color(0xFF00E5FF).copy(alpha = 0.35f * pulseAlpha)
+                                                Color(0xFF00E5FF).copy(alpha = 0.15f * pulseAlpha),
+                                                Color(0xFF00E5FF).copy(alpha = 0.28f * pulseAlpha)
                                             )
-                                        ),
-                                        start = Offset(0f, cy),
-                                        end = Offset(w, cy),
-                                        strokeWidth = 6.dp.toPx(),
-                                        cap = StrokeCap.Round
-                                    )
-                                    // Bright core laser line
-                                    drawLine(
-                                        brush = Brush.horizontalGradient(
-                                            listOf(
-                                                Color(0xFF00E5FF).copy(alpha = 0.70f * pulseAlpha),
-                                                Color(0xFF00E5FF).copy(alpha = 0.95f * pulseAlpha)
-                                            )
-                                        ),
-                                        start = Offset(0f, cy),
-                                        end = Offset(w, cy),
-                                        strokeWidth = 2.dp.toPx(),
-                                        cap = StrokeCap.Round
+                                        )
                                     )
                                 }
                             } else {
@@ -414,39 +388,20 @@ fun CuktechChargerVisual(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (isCharging) {
-                            // Soft, borderless glowing laser ray continuing seamlessly from edge to wattage callout
+                            // Soft, translucent glowing light beam continuing seamlessly from edge to wattage callout (Mi Home replica)
                             Canvas(
                                 modifier = Modifier
-                                    .width(28.dp)
-                                    .height(rowHeight)
+                                    .width(32.dp)
+                                    .height(14.dp)
                             ) {
-                                val cy = size.height / 2f
-                                val w = size.width
-                                // Outer halo glow fading out to right
-                                drawLine(
+                                drawRect(
                                     brush = Brush.horizontalGradient(
                                         listOf(
-                                            Color(0xFF00E5FF).copy(alpha = 0.35f * pulseAlpha),
-                                            Color(0xFF00E5FF).copy(alpha = 0.0f)
+                                            Color(0xFF00E5FF).copy(alpha = 0.28f * pulseAlpha),
+                                            Color(0xFF00E5FF).copy(alpha = 0.08f * pulseAlpha),
+                                            Color.Transparent
                                         )
-                                    ),
-                                    start = Offset(0f, cy),
-                                    end = Offset(w, cy),
-                                    strokeWidth = 6.dp.toPx(),
-                                    cap = StrokeCap.Round
-                                )
-                                // Bright core laser line
-                                drawLine(
-                                    brush = Brush.horizontalGradient(
-                                        listOf(
-                                            Color(0xFF00E5FF).copy(alpha = 0.95f * pulseAlpha),
-                                            Color(0xFF00E5FF).copy(alpha = 0.10f * pulseAlpha)
-                                        )
-                                    ),
-                                    start = Offset(0f, cy),
-                                    end = Offset(w, cy),
-                                    strokeWidth = 2.dp.toPx(),
-                                    cap = StrokeCap.Round
+                                    )
                                 )
                             }
 

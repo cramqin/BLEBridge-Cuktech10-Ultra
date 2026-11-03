@@ -210,15 +210,23 @@ class BleBridgeService : Service() {
     fun updateNotificationTelemetry(title: String, content: String) {
         runCatching {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            val openIntent = packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val openPendingIntent = PendingIntent.getActivity(
+                this, 0, openIntent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
+            )
             val stopIntent = Intent(this, BleBridgeService::class.java).apply { action = ACTION_STOP_SERVER }
             val stopPendingIntent = PendingIntent.getService(
                 this, 0, stopIntent,
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
             )
-            val notif = NotificationCompat.Builder(this, "ble_bridge_service_channel")
+            val notif = NotificationCompat.Builder(this, "BleBridgeServiceChannel")
                 .setContentTitle(title)
                 .setContentText(content)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+                .setContentIntent(openPendingIntent)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Gateway", stopPendingIntent)

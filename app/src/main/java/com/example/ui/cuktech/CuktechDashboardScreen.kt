@@ -20,7 +20,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -811,7 +814,7 @@ fun CuktechDashboardScreen(
                                             RadioButton(
                                                 selected = settings.sceneMode == code,
                                                 onClick = { bleManager.setSceneMode(code) },
-                                                colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
+                                                colors = cuktechRadioButtonColors()
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Column {
@@ -1780,7 +1783,7 @@ fun CuktechDashboardScreen(
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            WheelTimeColumn(
+                            SmoothWheelPicker(
                                 value = selectedHours,
                                 maxValue = 23,
                                 unit = "h",
@@ -1796,7 +1799,7 @@ fun CuktechDashboardScreen(
                                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                             )
 
-                            WheelTimeColumn(
+                            SmoothWheelPicker(
                                 value = selectedMins,
                                 maxValue = 59,
                                 unit = "min",
@@ -2055,7 +2058,10 @@ fun CuktechDashboardScreen(
                                 RadioButton(
                                     selected = isSelected,
                                     onClick = { selectedClearHistoryOption = option },
-                                    colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.error)
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = MaterialTheme.colorScheme.error,
+                                        unselectedColor = if (isSystemInDarkTheme()) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -2137,7 +2143,8 @@ fun CuktechDashboardScreen(
                             ) {
                                 RadioButton(
                                     selected = isSelected,
-                                    onClick = { pendingScreenTimeoutCode = code }
+                                    onClick = { pendingScreenTimeoutCode = code },
+                                    colors = cuktechRadioButtonColors()
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
@@ -2175,95 +2182,111 @@ fun CuktechDashboardScreen(
 }
 
 @Composable
-private fun WheelTimeColumn(
+private fun cuktechSwitchColors(): SwitchColors {
+    val dark = isSystemInDarkTheme()
+    return SwitchDefaults.colors(
+        checkedThumbColor = Color.White,
+        checkedTrackColor = MaterialTheme.colorScheme.primary,
+        uncheckedThumbColor = if (dark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.outline,
+        uncheckedTrackColor = if (dark) Color(0xFF1E2430) else MaterialTheme.colorScheme.surfaceVariant,
+        uncheckedBorderColor = if (dark) Color(0xFF475569) else MaterialTheme.colorScheme.outline
+    )
+}
+
+@Composable
+private fun cuktechRadioButtonColors(): RadioButtonColors {
+    val dark = isSystemInDarkTheme()
+    return RadioButtonDefaults.colors(
+        selectedColor = MaterialTheme.colorScheme.primary,
+        unselectedColor = if (dark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun SmoothWheelPicker(
     value: Int,
     maxValue: Int,
     unit: String,
     onValueChange: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var dragAccumulator by remember { mutableFloatStateOf(0f) }
-    val stepThreshold = 30f // px per increment
+    val coroutineScope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(
+        initialPage = value.coerceIn(0, maxValue),
+        pageCount = { maxValue + 1 }
+    )
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-        modifier = modifier
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragStart = { dragAccumulator = 0f },
-                    onVerticalDrag = { change, dragAmount ->
-                        change.consume()
-                        dragAccumulator -= dragAmount // Dragging UP (negative dragAmount) increases time
-                        val steps = (dragAccumulator / stepThreshold).toInt()
-                        if (steps != 0) {
-                            var newVal = (value + steps) % (maxValue + 1)
-                            if (newVal < 0) newVal += (maxValue + 1)
-                            onValueChange(newVal)
-                            dragAccumulator -= steps * stepThreshold
-                        }
-                    }
-                )
-            }
-            .padding(vertical = 4.dp)
+    LaunchedEffect(value) {
+        if (pagerState.currentPage != value && !pagerState.isScrollInProgress) {
+            pagerState.scrollToPage(value.coerceIn(0, maxValue))
+        }
+    }
+
+    LaunchedEffect(pagerState.settledPage) {
+        if (pagerState.settledPage != value) {
+            onValueChange(pagerState.settledPage)
+        }
+    }
+
+    Box(
+        modifier = modifier.height(130.dp),
+        contentAlignment = Alignment.Center
     ) {
-        FilledTonalButton(
-            onClick = {
-                val next = (value + 1) % (maxValue + 1)
-                onValueChange(next)
-            },
-            shape = CircleShape,
-            contentPadding = PaddingValues(0.dp),
-            modifier = Modifier.size(32.dp)
-        ) {
-            Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-        }
-
-        val prev = if (value > 0) value - 1 else maxValue
-        Text(
-            text = "%02d".format(prev),
-            fontSize = 15.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.clickable { onValueChange(prev) }
+        // Selection highlight band
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .height(42.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(8.dp)
+                )
         )
 
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = "%02d".format(value),
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace,
-                color = Color(0xFF00E5FF)
-            )
-            Text(
-                text = " $unit",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF00E5FF),
-                modifier = Modifier.padding(bottom = 6.dp)
-            )
-        }
-
-        val next = (value + 1) % (maxValue + 1)
-        Text(
-            text = "%02d".format(next),
-            fontSize = 15.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.clickable { onValueChange(next) }
-        )
-
-        FilledTonalButton(
-            onClick = {
-                val p = if (value > 0) value - 1 else maxValue
-                onValueChange(p)
-            },
-            shape = CircleShape,
-            contentPadding = PaddingValues(0.dp),
-            modifier = Modifier.size(32.dp)
-        ) {
-            Text("−", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        VerticalPager(
+            state = pagerState,
+            pageSize = PageSize.Fixed(42.dp),
+            contentPadding = PaddingValues(vertical = 44.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(130.dp)
+        ) { page ->
+            val isSelected = pagerState.currentPage == page
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable {
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(page)
+                        }
+                    },
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "%02d".format(page),
+                    fontSize = if (isSelected) 28.sp else 16.sp,
+                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Normal,
+                    fontFamily = FontFamily.Monospace,
+                    color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                )
+                if (isSelected) {
+                    Text(
+                        text = " $unit",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF00E5FF),
+                        modifier = Modifier.padding(start = 2.dp, top = 4.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -2397,6 +2420,7 @@ private fun PortTelemetryCard(
                     }
                     Switch(
                         checked = (countdownRemainingSec != null && countdownRemainingSec > 0) || port.countdownCode > 0,
+                        colors = cuktechSwitchColors(),
                         onCheckedChange = { checked ->
                             if (checked) {
                                 onOpenClosureTimeDialog()
@@ -2606,6 +2630,7 @@ private fun ProtocolSwitchRow(
         Switch(
             checked = checked,
             enabled = enabled,
+            colors = cuktechSwitchColors(),
             onCheckedChange = onCheckedChange
         )
     }
@@ -2641,7 +2666,11 @@ private fun SettingSwitchRow(
             Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
             Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            colors = cuktechSwitchColors(),
+            onCheckedChange = onCheckedChange
+        )
     }
 }
 
@@ -3092,7 +3121,11 @@ private fun CloudIntegrationConfigPanel(
                             }
                         }
                     }
-                    Switch(checked = bemfaEn, onCheckedChange = { bemfaEn = it })
+                    Switch(
+                        checked = bemfaEn,
+                        colors = cuktechSwitchColors(),
+                        onCheckedChange = { bemfaEn = it }
+                    )
                 }
                 if (bemfaEn) {
                     OutlinedTextField(
@@ -3133,7 +3166,11 @@ private fun CloudIntegrationConfigPanel(
                         Text("Home Assistant Webhook", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         Text("Pushes live wattage & energy telemetry", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Switch(checked = haEn, onCheckedChange = { haEn = it })
+                    Switch(
+                        checked = haEn,
+                        colors = cuktechSwitchColors(),
+                        onCheckedChange = { haEn = it }
+                    )
                 }
                 if (haEn) {
                     OutlinedTextField(

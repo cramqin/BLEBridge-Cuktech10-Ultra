@@ -1951,6 +1951,14 @@ class CuktechBleManager(
             }
 
             BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content)
+        } else {
+            val title = "BLE Cuktech10 Gateway"
+            val content = when (_authState.value) {
+                CuktechAuthState.CONNECTING, CuktechAuthState.CONNECTED -> "Connecting to CUKTECH 10 Ultra..."
+                CuktechAuthState.AUTH_FAILED -> "Auth failed · Check credentials"
+                else -> "Ready · Service active"
+            }
+            BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content)
         }
     }
 

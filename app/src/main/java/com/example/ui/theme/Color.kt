@@ -2,16 +2,16 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Light Theme Palette (Sleek Brushed Titanium & Precision Hardware - Gentle on eyes)
-val LightBackground = Color(0xFFF4F6F9)
+// Light Theme Palette (Sleek Brushed Titanium & CUKTECH Hardware - White & Cyan)
+val LightBackground = Color(0xFFF8FAFC)
 val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFE8EDF5)
+val LightSurfaceVariant = Color(0xFFEDF2F7)
 val LightBorder = Color(0xFFCBD5E1)
 val LightTextPrimary = Color(0xFF0F172A)
 val LightTextSecondary = Color(0xFF475569)
-val LightPrimary = Color(0xFF0284C7) // High-contrast precision laser cyan
-val LightPrimaryContainer = Color(0xFFE0F2FE)
-val LightOnPrimaryContainer = Color(0xFF0369A1)
+val LightPrimary = Color(0xFF009BB0) // CUKTECH Charger Signature Cyan for Light Mode
+val LightPrimaryContainer = Color(0xFFE0F7FA)
+val LightOnPrimaryContainer = Color(0xFF006064)
 
 // Dark Theme Palette (CUKTECH 10 Ultra Obsidian Gunmetal & Cyber Cyan)
 val DarkBackground = Color(0xFF0B0D13)

@@ -603,6 +603,13 @@ fun BleBridgeDashboard(
 
                             Switch(
                                 checked = isRunning,
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = appColors.primary,
+                                    uncheckedThumbColor = if (appColors.isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.outline,
+                                    uncheckedTrackColor = if (appColors.isDark) Color(0xFF1E2430) else MaterialTheme.colorScheme.surfaceVariant,
+                                    uncheckedBorderColor = if (appColors.isDark) Color(0xFF475569) else MaterialTheme.colorScheme.outline
+                                ),
                                 onCheckedChange = { start ->
                                     val port = portInput.toIntOrNull() ?: 8080
                                     val intent = Intent(context, BleBridgeService::class.java).apply {
@@ -948,283 +955,82 @@ fun BleBridgeDashboard(
                                 fontSize = 13.sp
                             )
                         }
-                    }
-                }
 
-                // --- Connected Clients (Terminal) Section ---
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = appColors.surface),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Active Clients",
-                                    fontWeight = FontWeight.Bold,
-                                    color = appColors.textPrimary,
-                                    fontSize = 15.sp
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(appColors.primary)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = connectedClients.size.toString(),
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            if (connectedClients.isNotEmpty()) {
-                                TextButton(
-                                    onClick = {
-                                        connectedClients.forEach { client ->
-                                            BleBridgeService.disconnectClientExternal(client.id)
-                                        }
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "CLEAR ALL",
-                                        color = StatusError,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        if (connectedClients.isEmpty()) {
-                            Box(
+                        // Live Telemetry Card (Shown directly below Search & Pair when paired or active)
+                        if (activeCred != null || savedDevices.isNotEmpty() || cuktechAuthState == CuktechAuthState.AUTHENTICATED) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Surface(
+                                color = appColors.surfaceVariant.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) Color(0xFF00E5FF) else appColors.border),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(appColors.surfaceVariant, RoundedCornerShape(12.dp))
-                                    .border(1.dp, appColors.border, RoundedCornerShape(12.dp))
-                                    .padding(vertical = 14.dp, horizontal = 16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (isRunning) "Ready. Connect via TCP socket:\nnc ${wifiIp ?: "127.0.0.1"} $serverPort\nOr pair CUKTECH 10 Ultra above."
-                                    else "No TCP sockets listening.\nTurn on the server to accept connections.",
-                                    color = appColors.textSecondary,
-                                    fontSize = 12.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                    lineHeight = 18.sp
-                                )
-                            }
-                        } else {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                connectedClients.forEach { client ->
-                                    if (client.isCuktechCharger) {
-                                        Surface(
-                                            color = appColors.primaryContainer.copy(alpha = 0.25f),
-                                            shape = RoundedCornerShape(14.dp),
-                                            border = androidx.compose.foundation.BorderStroke(1.5.dp, appColors.primary),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    val isBleConn = (bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED)
-                                                    val isCuktechAuth = (cuktechAuthState == CuktechAuthState.AUTHENTICATED)
-                                                    val hasClient = connectedClients.any { it.isCuktechCharger }
-                                                    val isXiaomiAuth = (accountSession != null || activeCred != null || savedDevices.isNotEmpty())
-
-                                                    if (!isRunning) {
-                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n1. ❌ Server Configuration is OFF.\nPlease turn ON the server configuration switch first."
-                                                    } else if (!isBleConn && !isCuktechAuth) {
-                                                        if (activeCred != null) {
-                                                            cuktechManager.connectToCharger(activeCred?.mac)
-                                                            showTelemetryScreen = true
-                                                        } else {
-                                                            prerequisiteWarning = "Prerequisite Check Failed:\n\n2. ❌ Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
-                                                        }
-                                                    } else if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
-                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ Authentication Failed.\nValid 12-byte MiOT Token is required. Please log into Xiaomi Account or import credentials."
-                                                    } else if (!isCuktechAuth || !hasClient) {
-                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ CUKTECH 10 Ultra is not yet authenticated.\nPlease wait for authentication to complete."
-                                                    } else if (!isXiaomiAuth) {
-                                                        prerequisiteWarning = "Prerequisite Check Failed:\n\n4. ❌ Xiaomi Account is not logged in.\nA valid Xiaomi Cloud session or 12-byte MiOT Token is required."
-                                                    } else {
-                                                        showTelemetryScreen = true
-                                                    }
-                                                }
-                                        ) {
-                                            Column(modifier = Modifier.padding(14.dp)) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        modifier = Modifier.weight(1f)
-                                                    ) {
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .size(32.dp)
-                                                                .clip(RoundedCornerShape(8.dp))
-                                                                .background(appColors.primary),
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.Bolt,
-                                                                contentDescription = null,
-                                                                tint = Color.White,
-                                                                modifier = Modifier.size(20.dp)
-                                                            )
-                                                        }
-                                                        Spacer(modifier = Modifier.width(10.dp))
-                                                        Column(modifier = Modifier.weight(1f)) {
-                                                            Text(
-                                                                text = cuktechDevInfo.name.ifBlank { "CUKTECH 10 Ultra" },
-                                                                fontWeight = FontWeight.Bold,
-                                                                color = appColors.textPrimary,
-                                                                fontSize = 14.sp
-                                                            )
-                                                            Text(
-                                                                text = "MAC: ${client.id} · Connected",
-                                                                color = StatusSuccess,
-                                                                fontWeight = FontWeight.SemiBold,
-                                                                fontSize = 11.sp,
-                                                                fontFamily = FontFamily.Monospace
-                                                            )
-                                                        }
-                                                    }
-
-                                                    Button(
-                                                        onClick = { BleBridgeService.disconnectClientExternal(client.id) },
-                                                        colors = ButtonDefaults.buttonColors(
-                                                            containerColor = StatusErrorContainer,
-                                                            contentColor = StatusOnErrorContainer
-                                                        ),
-                                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                                        shape = RoundedCornerShape(8.dp),
-                                                        modifier = Modifier.height(30.dp)
-                                                    ) {
-                                                        Text("DISCONNECT", color = StatusOnErrorContainer, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                                    }
-                                                }
-
-                                                Spacer(modifier = Modifier.height(10.dp))
-                                                HorizontalDivider(color = appColors.border.copy(alpha = 0.5f))
-                                                Spacer(modifier = Modifier.height(10.dp))
-
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text(
-                                                        text = "Connected: ${formatTime(client.connectedAt)}",
-                                                        color = appColors.textSecondary,
-                                                        fontSize = 11.sp,
-                                                        fontFamily = FontFamily.Monospace,
-                                                        modifier = Modifier.weight(1f, fill = false),
-                                                        maxLines = 1,
-                                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                                    )
-
-                                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                                    Button(
-                                                        onClick = {
-                                                            val isBleConn = (bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED)
-                                                            val isCuktechAuth = (cuktechAuthState == CuktechAuthState.AUTHENTICATED)
-                                                            val hasClient = connectedClients.any { it.isCuktechCharger }
-                                                            val isXiaomiAuth = (accountSession != null || activeCred != null || savedDevices.isNotEmpty())
-
-                                                            if (!isRunning) {
-                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n1. ❌ Server Configuration is OFF.\nPlease turn ON the server configuration switch first."
-                                                            } else if (!isBleConn && !isCuktechAuth) {
-                                                                if (activeCred != null) {
-                                                                    cuktechManager.connectToCharger(activeCred?.mac)
-                                                                    showTelemetryScreen = true
-                                                                } else {
-                                                                    prerequisiteWarning = "Prerequisite Check Failed:\n\n2. ❌ Bluetooth connection is not established.\nPlease pair or connect to CUKTECH 10 Ultra first."
-                                                                }
-                                                            } else if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
-                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ Authentication Failed.\nValid 12-byte MiOT Token is required. Please log into Xiaomi Account or import credentials."
-                                                            } else if (!isCuktechAuth || !hasClient) {
-                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n3. ❌ CUKTECH 10 Ultra is not yet authenticated.\nPlease wait for authentication to complete."
-                                                            } else if (!isXiaomiAuth) {
-                                                                prerequisiteWarning = "Prerequisite Check Failed:\n\n4. ❌ Xiaomi Account is not logged in.\nA valid Xiaomi Cloud session or 12-byte MiOT Token is required."
-                                                            } else {
-                                                                showTelemetryScreen = true
-                                                            }
-                                                        },
-                                                        colors = ButtonDefaults.buttonColors(
-                                                            containerColor = appColors.primary,
-                                                            contentColor = Color.White
-                                                        ),
-                                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                                                        shape = RoundedCornerShape(8.dp),
-                                                        modifier = Modifier.height(32.dp)
-                                                    ) {
-                                                        Text("Telemetry \u2192", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                    }
-                                                }
-                                            }
+                                    .clickable {
+                                        if (activeCred != null && cuktechAuthState != CuktechAuthState.AUTHENTICATED) {
+                                            cuktechManager.connectToCharger(activeCred?.mac)
                                         }
-                                    } else {
-                                        Row(
+                                        showTelemetryScreen = true
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Box(
                                             modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(appColors.surfaceVariant, RoundedCornerShape(12.dp))
-                                                .border(1.dp, appColors.border, RoundedCornerShape(12.dp))
-                                                .padding(12.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                                .size(38.dp)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) Color(0xFF00E5FF) else appColors.primary),
+                                            contentAlignment = Alignment.Center
                                         ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = client.id,
-                                                    color = appColors.textPrimary,
-                                                    fontSize = 13.sp,
-                                                    fontFamily = FontFamily.Monospace,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = "Connected: ${formatTime(client.connectedAt)}",
-                                                    color = appColors.textSecondary,
-                                                    fontSize = 11.sp,
-                                                    fontFamily = FontFamily.Monospace
-                                                )
-                                            }
-
-                                            Button(
-                                                onClick = { BleBridgeService.disconnectClientExternal(client.id) },
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = StatusErrorContainer,
-                                                    contentColor = StatusOnErrorContainer
-                                                ),
-                                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-                                                shape = RoundedCornerShape(8.dp),
-                                                modifier = Modifier.height(32.dp)
-                                            ) {
-                                                Text(
-                                                    text = "BOOT",
-                                                    color = StatusOnErrorContainer,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
+                                            Icon(
+                                                imageVector = Icons.Default.Bolt,
+                                                contentDescription = null,
+                                                tint = if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) Color(0xFF0A0E1A) else Color.White,
+                                                modifier = Modifier.size(24.dp)
+                                            )
                                         }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = cuktechDevInfo.name.ifBlank { activeCred?.deviceName ?: "CUKTECH 10 Ultra" },
+                                                fontWeight = FontWeight.Bold,
+                                                color = appColors.textPrimary,
+                                                fontSize = 14.sp
+                                            )
+                                            val statusStr = when (cuktechAuthState) {
+                                                CuktechAuthState.AUTHENTICATED -> "Authenticated · ${"%.1f".format(cuktechTotalWatts)}W"
+                                                CuktechAuthState.CONNECTING, CuktechAuthState.CONNECTED -> "Connecting / Handshake..."
+                                                CuktechAuthState.AUTH_FAILED -> "Auth Failed"
+                                                else -> "Saved · Ready to connect"
+                                            }
+                                            Text(
+                                                text = statusStr,
+                                                color = if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) StatusSuccess else appColors.textSecondary,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            if (activeCred != null && cuktechAuthState != CuktechAuthState.AUTHENTICATED) {
+                                                cuktechManager.connectToCharger(activeCred?.mac)
+                                            }
+                                            showTelemetryScreen = true
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) Color(0xFF00E5FF) else appColors.primary,
+                                            contentColor = if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) Color(0xFF0A0E1A) else Color.White
+                                        ),
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                        modifier = Modifier.height(34.dp)
+                                    ) {
+                                        Text("Telemetry →", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -1235,12 +1041,12 @@ fun BleBridgeDashboard(
                 // --- Unified System Console & BLE Diagnostics Card with Tabs ---
                 var terminalTab by remember { mutableStateOf(0) } // 0 = Live Console, 1 = BLE Diagnostics
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = if (appColors.isDark) Color(0xFF030712) else Color(0xFF0F172A)),
+                    colors = CardDefaults.cardColors(containerColor = if (appColors.isDark) Color(0xFF030712) else appColors.surface),
                     shape = RoundedCornerShape(24.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(300.dp)
-                        .border(1.dp, if (appColors.isDark) Color(0xFF1F2937) else Color(0xFF334155), RoundedCornerShape(24.dp))
+                        .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -1424,9 +1230,9 @@ fun BleBridgeDashboard(
                                     ) {
                                         items(logs) { msg ->
                                             val logColor = when (msg.level) {
-                                                BleBridgeService.Companion.LogLevel.LEVEL1 -> Color(0xFFFCA5A5) // Soft red
-                                                BleBridgeService.Companion.LogLevel.LEVEL2 -> Color(0xFFBAE6FD) // Light sky cyan
-                                                BleBridgeService.Companion.LogLevel.LEVEL3 -> Color(0xFFFDE68A) // Soft amber
+                                                BleBridgeService.Companion.LogLevel.LEVEL1 -> if (appColors.isDark) Color(0xFFFCA5A5) else Color(0xFFDC2626) // Red
+                                                BleBridgeService.Companion.LogLevel.LEVEL2 -> if (appColors.isDark) Color(0xFFBAE6FD) else Color(0xFF00838F) // Cyan
+                                                BleBridgeService.Companion.LogLevel.LEVEL3 -> if (appColors.isDark) Color(0xFFFDE68A) else Color(0xFFD97706) // Amber
                                             }
                                             Text(
                                                 text = "[${formatTimeHMS(msg.timestamp)}] ${msg.message}",
@@ -1479,7 +1285,7 @@ fun BleBridgeDashboard(
                                     ) {
                                         Text(
                                             text = diagStatus.lastDiagnosticOutput,
-                                            color = Color(0xFFE2E8F0),
+                                            color = if (appColors.isDark) Color(0xFFE2E8F0) else Color(0xFF1E293B),
                                             fontSize = 11.sp,
                                             fontFamily = FontFamily.Monospace,
                                             lineHeight = 16.sp

@@ -682,7 +682,6 @@ fun CuktechDashboardScreen(
                                     Text("C3 $c3Str", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
                                     Text("A $aStr", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
                                 }
-                                }
                             }
                         }
                     }
@@ -808,8 +807,8 @@ fun CuktechDashboardScreen(
 
                             // 3. USB-A Low Current Mode
                             SettingSwitchRow(
-                                title = "USB-A Low Current (Keep On 2-4 Hours)",
-                                subtitle = "Prevents auto-cutoff for low-draw devices (earbuds, fitness bands, smartwatches)",
+                                title = "USB-A Low Current (On for 4 Hours)",
+                                subtitle = "Prevents auto-cutoff for low-draw devices (smartwatches, earbuds). Automatically turns off after 4 hours.",
                                 checked = settings.usbALowCurrent,
                                 onCheckedChange = { bleManager.setUsbALowCurrent(it) }
                             )

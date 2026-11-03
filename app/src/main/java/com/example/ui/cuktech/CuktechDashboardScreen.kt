@@ -119,6 +119,7 @@ fun CuktechDashboardScreen(
     var pendingScreenTimeoutCode by remember { mutableStateOf(4) }
     var selectedSessionDetail by remember { mutableStateOf<com.example.cuktech.energy.ChargeSessionRecord?>(null) }
     var showConsolidatedTable by remember { mutableStateOf(false) }
+    var showScenariosDialog by remember { mutableStateOf(false) }
 
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
     LaunchedEffect(pagerState.currentPage) {
@@ -472,7 +473,27 @@ fun CuktechDashboardScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text("Scenarios", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    Text(activeModeLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable { showScenariosDialog = true }
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = activeModeLabel,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.MoreHoriz,
+                                            contentDescription = "Expand Scenarios",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
 
                                 Row(
@@ -754,89 +775,15 @@ fun CuktechDashboardScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
-                                text = "Hardware Power Allocation & Low Current",
+                                text = "USB-A Port Specialty Settings",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
+                                fontSize = 14.sp
                             )
 
-                            // 1. Scene Mode (PIID 5) - Clean Column with RadioButton and Descriptions
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(
-                                    text = "Power Allocation Mode",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = "Select how 120W total power is distributed across ports:",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                val modeDescriptions = mapOf(
-                                    1 to "Auto-balances power between USB-C and USB-A",
-                                    2 to "Guarantees up to 100W for USB-C1 first",
-                                    3 to "Maximized burst wattage for one device",
-                                    4 to "Equal 60W/60W or dynamic split across two active ports"
-                                )
-                                CuktechProtocol.SCENE_MODES.forEach { (code, label) ->
-                                    val desc = modeDescriptions[code] ?: ""
-                                    val isSelected = (settings.sceneMode == code)
-                                    val isDark = isSystemInDarkTheme()
-                                    Surface(
-                                        color = if (isSelected) {
-                                            if (isDark) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
-                                        } else {
-                                            if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                        },
-                                        border = BorderStroke(
-                                            if (isSelected) 1.5.dp else 1.dp,
-                                            if (isSelected) MaterialTheme.colorScheme.primary
-                                            else MaterialTheme.colorScheme.outline.copy(alpha = if (isDark) 0.25f else 0.4f)
-                                        ),
-                                        shape = RoundedCornerShape(10.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .clickable { bleManager.setSceneMode(code) }
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            RadioButton(
-                                                selected = settings.sceneMode == code,
-                                                onClick = { bleManager.setSceneMode(code) },
-                                                colors = cuktechRadioButtonColors(),
-                                                modifier = Modifier.size(24.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(16.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = label,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 12.sp,
-                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                                )
-                                                if (desc.isNotBlank()) {
-                                                    Text(
-                                                        text = desc,
-                                                        fontSize = 10.sp,
-                                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider()
-
-                            // 3. USB-A Low Current Mode
+                            // USB-A Low Current Mode
                             SettingSwitchRow(
                                 title = "USB-A Low Current (On for 4 Hours)",
                                 subtitle = "Prevents auto-cutoff for low-draw devices (smartwatches, earbuds). Automatically turns off after 4 hours.",
@@ -2018,6 +1965,89 @@ fun CuktechDashboardScreen(
             dismissButton = {
                 TextButton(onClick = { showScreenOnTimeoutDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showScenariosDialog) {
+        AlertDialog(
+            onDismissRequest = { showScenariosDialog = false },
+            icon = { Icon(Icons.Default.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Power Allocation Scenarios", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Select how 120W total power is distributed across ports:",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    val modeDescriptions = mapOf(
+                        1 to "Auto-balances power between USB-C and USB-A",
+                        2 to "Guarantees up to 100W for USB-C1 first",
+                        3 to "Maximized burst wattage for one device",
+                        4 to "Equal 60W/60W or dynamic split across two active ports"
+                    )
+                    CuktechProtocol.SCENE_MODES.forEach { (code, label) ->
+                        val desc = modeDescriptions[code] ?: ""
+                        val isSelected = (settings.sceneMode == code)
+                        Surface(
+                            onClick = {
+                                bleManager.setSceneMode(code)
+                                showScenariosDialog = false
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = BorderStroke(
+                                if (isSelected) 1.5.dp else 1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = {
+                                        bleManager.setSceneMode(code)
+                                        showScenariosDialog = false
+                                    },
+                                    colors = cuktechRadioButtonColors(),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = label,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (desc.isNotBlank()) {
+                                        Text(
+                                            text = desc,
+                                            fontSize = 11.sp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showScenariosDialog = false }) {
+                    Text("Close")
                 }
             }
         )

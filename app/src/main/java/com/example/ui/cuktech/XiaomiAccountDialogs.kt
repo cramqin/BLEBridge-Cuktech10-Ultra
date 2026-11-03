@@ -6,8 +6,10 @@ import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -20,6 +22,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -60,7 +63,7 @@ fun XiaomiAccountLoginDialog(
     onDevicesSynced: (List<CuktechDeviceCredentials>) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    var selectedTab by remember { mutableStateOf(0) } // 0 = QR Login, 1 = Password Login, 2 = Manual/JSON
+    var selectedTab by remember { mutableStateOf(0) } // 0 = Google / Web, 1 = QR Login, 2 = Password, 3 = Manual/JSON
     var selectedRegion by remember { mutableStateOf("cn") }
 
     // QR Login state
@@ -104,9 +107,9 @@ fun XiaomiAccountLoginDialog(
         onDismiss()
     }
 
-    // Automatically start QR login when tab 0 is opened
+    // Automatically start QR login when tab 1 is opened
     LaunchedEffect(selectedTab, selectedRegion) {
-        if (selectedTab == 0) {
+        if (selectedTab == 1) {
             isQrLoading = true
             qrBitmap = null
             qrSession = null
@@ -158,20 +161,20 @@ fun XiaomiAccountLoginDialog(
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
+        val scrollState = rememberScrollState()
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .heightIn(max = 680.dp),
+                .fillMaxWidth(0.95f)
+                .heightIn(max = 700.dp),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(18.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(16.dp)
+                    .then(if (selectedTab != 0) Modifier.verticalScroll(scrollState) else Modifier),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -288,22 +291,53 @@ fun XiaomiAccountLoginDialog(
                         Tab(
                             selected = selectedTab == 0,
                             onClick = { selectedTab = 0 },
-                            text = { Text("QR Code", fontSize = 13.sp) }
+                            text = { Text("Google / Web", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                         )
                         Tab(
                             selected = selectedTab == 1,
                             onClick = { selectedTab = 1 },
-                            text = { Text("Password", fontSize = 13.sp) }
+                            text = { Text("QR Code", fontSize = 11.sp) }
                         )
                         Tab(
                             selected = selectedTab == 2,
                             onClick = { selectedTab = 2 },
-                            text = { Text("Manual / Import", fontSize = 13.sp) }
+                            text = { Text("Password", fontSize = 11.sp) }
+                        )
+                        Tab(
+                            selected = selectedTab == 3,
+                            onClick = { selectedTab = 3 },
+                            text = { Text("Manual", fontSize = 11.sp) }
                         )
                     }
 
                     when (selectedTab) {
                         0 -> {
+                            // Google / Web Login Tab
+                            XiaomiWebLoginSection(
+                                cloudClient = cloudClient,
+                                selectedRegion = selectedRegion,
+                                onLoginSuccess = { finishUrl, webCookies ->
+                                    scope.launch {
+                                        isLoggingIn = true
+                                        loginStatusText = "Google/Web authentication detected! Extracting Xiaomi session..."
+                                        when (val res = cloudClient.completeWebLogin(
+                                            finishUrl = finishUrl,
+                                            cookiesIn = webCookies,
+                                            deviceId = cloudClient.generateDeviceId(),
+                                            region = selectedRegion
+                                        )) {
+                                            is XiaomiLoginResult.Success -> handleAuthenticatedSession(res.session)
+                                            is XiaomiLoginResult.Error -> loginStatusText = XiaomiCloudClient.translateXiaomiError(res.message)
+                                            is XiaomiLoginResult.Requires2FA -> active2faChallenge = res.challenge
+                                        }
+                                        isLoggingIn = false
+                                    }
+                                },
+                                statusText = loginStatusText
+                            )
+                        }
+
+                        1 -> {
                             // QR Code Login Tab
                             Column(
                                 modifier = Modifier
@@ -355,7 +389,7 @@ fun XiaomiAccountLoginDialog(
                             }
                         }
 
-                        1 -> {
+                        2 -> {
                             // Username & Password Login Tab
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
@@ -447,7 +481,7 @@ fun XiaomiAccountLoginDialog(
                             }
                         }
 
-                        2 -> {
+                        3 -> {
                             // Manual / JSON Import Tab
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
@@ -634,10 +668,14 @@ private fun TwoFactorChallengeSection(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
                         WebView(ctx).apply {
-                            settings.javaScriptEnabled = true
-                            settings.domStorageEnabled = true
                             val cm = CookieManager.getInstance()
                             cm.setAcceptCookie(true)
+                            cm.setAcceptThirdPartyCookies(this, true)
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            settings.databaseEnabled = true
+                            settings.userAgentString =
+                                "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
                             for ((k, v) in challenge.identitySessionCookies) {
                                 cm.setCookie("https://account.xiaomi.com", "$k=$v; Domain=.xiaomi.com; Path=/")
                             }
@@ -671,6 +709,161 @@ private fun TwoFactorChallengeSection(
                             loadUrl(challenge.notificationUrl)
                         }
                     }
+                )
+            }
+        }
+    }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun XiaomiWebLoginSection(
+    cloudClient: XiaomiCloudClient,
+    selectedRegion: String,
+    onLoginSuccess: (String, Map<String, String>) -> Unit,
+    statusText: String,
+    modifier: Modifier = Modifier
+) {
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Sign in with Google or Xiaomi Web. Tap the 'Google' icon on Xiaomi's page below to bypass SMS/email limits.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        lineHeight = 14.sp
+                    )
+                }
+                Row {
+                    IconButton(
+                        onClick = { webViewRef?.reload() },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Reload", modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(
+                        onClick = {
+                            CookieManager.getInstance().removeAllCookies(null)
+                            CookieManager.getInstance().flush()
+                            webViewRef?.loadUrl("https://account.xiaomi.com/pass/serviceLogin?sid=xiaomiio&_locale=en_US")
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = "Clear Session", modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+
+        if (statusText.isNotBlank()) {
+            Text(
+                text = statusText,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(440.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(10.dp))
+                .background(Color.White)
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        webViewRef = this
+                        val cm = CookieManager.getInstance()
+                        cm.setAcceptCookie(true)
+                        cm.setAcceptThirdPartyCookies(this, true)
+
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.databaseEnabled = true
+                        settings.javaScriptCanOpenWindowsAutomatically = true
+                        settings.setSupportMultipleWindows(false)
+                        // Standard Chrome Mobile User-Agent to avoid Google OAuth "disallowed_useragent" block
+                        settings.userAgentString =
+                            "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
+
+                        var sessionCaptured = false
+
+                        fun checkAuthAndFinish(url: String) {
+                            if (sessionCaptured) return
+                            val miCookie = cm.getCookie("https://account.xiaomi.com").orEmpty()
+                            val stsCookie = cm.getCookie("https://sts.api.io.mi.com").orEmpty()
+                            val urlCookie = cm.getCookie(url).orEmpty()
+                            val rawCookie = "$miCookie; $stsCookie; $urlCookie"
+                            val cookieMap = parseCookieString(rawCookie)
+
+                            val hasServiceToken = cookieMap.containsKey("serviceToken")
+                            val hasPassToken = cookieMap.containsKey("passToken") &&
+                                (cookieMap.containsKey("userId") || cookieMap.containsKey("cUserId"))
+                            val isStsRedirect = url.contains("sts.api.io.mi.com/sts") || url.contains("serviceToken=")
+
+                            if (hasServiceToken || hasPassToken || isStsRedirect) {
+                                sessionCaptured = true
+                                onLoginSuccess(url, cookieMap)
+                            }
+                        }
+
+                        webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(
+                                view: WebView?,
+                                request: WebResourceRequest?
+                            ): Boolean {
+                                val url = request?.url?.toString() ?: return false
+                                checkAuthAndFinish(url)
+                                return false
+                            }
+
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                isLoading = false
+                                val u = url ?: return
+                                checkAuthAndFinish(u)
+                            }
+                        }
+
+                        loadUrl("https://account.xiaomi.com/pass/serviceLogin?sid=xiaomiio&_locale=en_US")
+                    }
+                }
+            )
+
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .align(Alignment.Center)
                 )
             }
         }

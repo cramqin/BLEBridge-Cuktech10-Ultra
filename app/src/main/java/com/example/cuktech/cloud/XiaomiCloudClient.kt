@@ -607,6 +607,33 @@ class XiaomiCloudClient {
             cloudLog("Exception in 2FA redirect completion: ${e.message}", isError = true)
             XiaomiLoginResult.Error(e.message ?: "Failed to complete 2FA verification session")
         }
+    /**
+     * Complete authentication from Google OAuth or Web login in an Android WebView.
+     * Extracts passToken, userId, and serviceToken to establish a fully authenticated session.
+     */
+    suspend fun completeWebLogin(
+        finishUrl: String,
+        cookiesIn: Map<String, String>,
+        deviceId: String = generateDeviceId(),
+        region: String = "cn"
+    ): XiaomiLoginResult = withContext(Dispatchers.IO) {
+        val cookies = cookiesIn.toMutableMap()
+        val passToken = cookies["passToken"].orEmpty()
+        val userId = cookies["userId"] ?: cookies["cUserId"].orEmpty()
+
+        cloudLog("Processing Web/Google login callback. URL: $finishUrl, Cookies: ${cookies.keys}")
+
+        // 1. If passToken and userId are available, exchange via serviceLogin
+        if (passToken.isNotBlank() && userId.isNotBlank()) {
+            cloudLog("Found passToken and userId in web cookies. Exchanging for serviceToken...")
+            val session = serviceLoginWithPassToken(cookies, deviceId, region)
+            if (session != null) {
+                return@withContext XiaomiLoginResult.Success(session)
+            }
+        }
+
+        // 2. Delegate to finish redirect / STS handler
+        complete2faFinishRedirect(finishUrl, cookiesIn, deviceId, region)
     }
 
     private fun serviceLoginWithPassToken(

@@ -791,8 +791,8 @@ fun CuktechDashboardScreen(
                                                 onClick = { bleManager.setSceneMode(code) },
                                                 colors = cuktechRadioButtonColors()
                                             )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column {
+                                            Spacer(modifier = Modifier.width(14.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
                                                 Text(label, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                                 if (desc.isNotBlank()) {
                                                     Text(desc, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1859,7 +1859,7 @@ fun CuktechDashboardScreen(
                                         unselectedColor = Color(0xFF64748B)
                                     )
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(14.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = option.label,
@@ -1942,8 +1942,8 @@ fun CuktechDashboardScreen(
                                     onClick = { pendingScreenTimeoutCode = code },
                                     colors = cuktechRadioButtonColors()
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = label,
                                         fontWeight = FontWeight.Bold,

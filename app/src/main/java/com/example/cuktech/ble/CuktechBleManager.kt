@@ -1979,25 +1979,35 @@ class CuktechBleManager(
                 String.format(java.util.Locale.US, "%s: %d:%02d", pLabel, m, s)
             }
 
-            val portWatts = if (activePorts.isNotEmpty()) {
+            // 1-line compact summary for collapsed view
+            val compactWatts = if (activePorts.isNotEmpty()) {
                 activePorts.joinToString(" · ") { port ->
-                    if (port.protocolName.isNotBlank() && port.protocolName != "Normal" && port.protocolName != "Idle") {
-                        String.format(java.util.Locale.US, "%s: %.1fW (%s)", port.portLabel, port.powerW, port.protocolName)
-                    } else {
-                        String.format(java.util.Locale.US, "%s: %.1fW", port.portLabel, port.powerW)
-                    }
+                    String.format(java.util.Locale.US, "%s: %.1fW", port.portLabel, port.powerW)
                 }
             } else {
                 "All ports idle"
             }
+            val content = if (timers.isNotEmpty()) "⏱️ $timers | $compactWatts" else compactWatts
 
-            val content = if (timers.isNotEmpty()) {
-                "⏱️ $timers | $portWatts"
-            } else {
-                portWatts
+            // Multi-line detailed lines for expanded bigText view
+            val bigText = buildString {
+                if (timers.isNotEmpty()) {
+                    append("⏱️ Timers: ").append(timers).append("\n")
+                }
+                if (activePorts.isNotEmpty()) {
+                    activePorts.forEachIndexed { idx, port ->
+                        if (idx > 0) append("\n")
+                        val protoStr = if (port.protocolName.isNotBlank() && port.protocolName != "Normal" && port.protocolName != "Idle") {
+                            " (${port.protocolName})"
+                        } else ""
+                        append(String.format(java.util.Locale.US, "• %s: %.1fW (%.1fV · %.2fA)%s", port.portLabel, port.powerW, port.voltageV, port.currentA, protoStr))
+                    }
+                } else {
+                    append("All ports idle (No active draw)")
+                }
             }
 
-            BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content, totalW)
+            BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content, bigText, totalW)
         } else {
             val isServerRunning = BleBridgeService.isServerRunning.value
             if (!isServerRunning && _authState.value == CuktechAuthState.DISCONNECTED) {

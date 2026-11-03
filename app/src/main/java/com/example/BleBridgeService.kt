@@ -184,6 +184,7 @@ class BleBridgeService : Service() {
     private val serviceStartTimeMs = System.currentTimeMillis()
     private var lastNotifTitle: String = ""
     private var lastNotifContent: String = ""
+    private var lastNotifBigText: String = ""
     private var notificationBuilderInstance: NotificationCompat.Builder? = null
 
     private fun createNotificationChannelAndStartForeground() {
@@ -205,10 +206,19 @@ class BleBridgeService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        val openIntent = packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val openPendingIntent = PendingIntent.getActivity(
+            this, 0, openIntent,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
             .setContentTitle("BLE to Network Bridge")
             .setContentText("Listening socket & BLE state engines active")
             .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+            .setContentIntent(openPendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setWhen(serviceStartTimeMs)
@@ -252,25 +262,27 @@ class BleBridgeService : Service() {
      * This performs in-place content updates like FDE.AI without resetting the notification post timestamp,
      * permanently preventing the notification from jumping or interchanging with other monitoring apps (e.g. Scene).
      */
-    fun updateNotificationTelemetry(title: String, content: String, totalWatts: Double = -1.0) {
-        if (title == lastNotifTitle && content == lastNotifContent) {
+    fun updateNotificationTelemetry(title: String, content: String, bigText: String? = null, totalWatts: Double = -1.0) {
+        if (title == lastNotifTitle && content == lastNotifContent && bigText == lastNotifBigText) {
             return
         }
 
         lastNotifTitle = title
         lastNotifContent = content
+        lastNotifBigText = bigText ?: content
 
         runCatching {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            val openIntent = packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            val openPendingIntent = PendingIntent.getActivity(
+                this, 0, openIntent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
             var builder = notificationBuilderInstance
             if (builder == null) {
-                val openIntent = packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                }
-                val openPendingIntent = PendingIntent.getActivity(
-                    this, 0, openIntent,
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
-                )
                 val stopIntent = Intent(this, BleBridgeService::class.java).apply { action = ACTION_STOP_SERVER }
                 val stopPendingIntent = PendingIntent.getService(
                     this, 0, stopIntent,
@@ -288,11 +300,18 @@ class BleBridgeService : Service() {
                     .setSortKey("cuktech_gateway")
                     .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Gateway", stopPendingIntent)
                 notificationBuilderInstance = builder
+            } else {
+                builder.setContentIntent(openPendingIntent)
             }
+
+            val style = NotificationCompat.BigTextStyle()
+                .setBigContentTitle(title)
+                .bigText(bigText ?: content)
 
             val notif = builder
                 .setContentTitle(title)
                 .setContentText(content)
+                .setStyle(style)
                 .build()
             nm.notify(NOTIFICATION_ID, notif)
         }

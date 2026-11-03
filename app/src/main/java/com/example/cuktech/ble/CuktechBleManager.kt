@@ -120,7 +120,7 @@ class CuktechBleManager(
     private var reconnectJob: Job? = null
 
     private var autoReconnectEnabled: Boolean = true
-    private var lastConnectedMac: String? = null
+    var lastConnectedMac: String? = null
     private var consecutiveFailures: Int = 0
     private var totalTxCommands: Int = 0
     private var successfulTxCommands: Int = 0

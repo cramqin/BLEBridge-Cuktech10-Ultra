@@ -48,6 +48,12 @@ data class CuktechDeviceCredentials(
             return (clean.length == 24 || clean.length == 32) && clean.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
         }
 
+    val hasValidBleKey: Boolean
+        get() {
+            val clean = bleKeyHex.trim().replace(":", "").replace("-", "").replace(" ", "")
+            return clean.length == 32 && clean.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }
+        }
+
     fun tokenBytes(): ByteArray {
         val clean = tokenHex.trim().replace(":", "").replace("-", "").replace(" ", "")
         val hex24 = if (clean.length >= 24) clean.substring(0, 24) else clean

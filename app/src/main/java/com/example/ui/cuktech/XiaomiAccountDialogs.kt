@@ -1,11 +1,15 @@
 package com.example.ui.cuktech
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Job
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -162,20 +166,19 @@ fun XiaomiAccountLoginDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        val scrollState = rememberScrollState()
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .heightIn(max = 700.dp),
+                .heightIn(max = 680.dp),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .then(if (selectedTab != 0) Modifier.verticalScroll(scrollState) else Modifier),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(18.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -292,7 +295,7 @@ fun XiaomiAccountLoginDialog(
                         Tab(
                             selected = selectedTab == 0,
                             onClick = { selectedTab = 0 },
-                            text = { Text("Google / Web", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                            text = { Text("Web / Browser", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                         )
                         Tab(
                             selected = selectedTab == 1,
@@ -313,17 +316,22 @@ fun XiaomiAccountLoginDialog(
 
                     when (selectedTab) {
                         0 -> {
-                            // Google / Web Login Tab
+                            // Web / Browser Login Tab
                             XiaomiWebLoginSection(
                                 cloudClient = cloudClient,
                                 selectedRegion = selectedRegion,
-                                onLoginSuccess = { finishUrl, webCookies ->
+                                onSessionAuthenticated = { session ->
+                                    scope.launch {
+                                        handleAuthenticatedSession(session)
+                                    }
+                                },
+                                onPasteFinishUrl = { finishUrl ->
                                     scope.launch {
                                         isLoggingIn = true
-                                        loginStatusText = "Google/Web authentication detected! Extracting Xiaomi session..."
+                                        loginStatusText = "Verifying pasted login URL..."
                                         when (val res = cloudClient.completeWebLogin(
                                             finishUrl = finishUrl,
-                                            cookiesIn = webCookies,
+                                            cookiesIn = emptyMap(),
                                             deviceId = cloudClient.generateDeviceId(),
                                             region = selectedRegion
                                         )) {
@@ -716,156 +724,250 @@ private fun TwoFactorChallengeSection(
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun XiaomiWebLoginSection(
     cloudClient: XiaomiCloudClient,
     selectedRegion: String,
-    onLoginSuccess: (String, Map<String, String>) -> Unit,
+    onSessionAuthenticated: (XiaomiAccountSession) -> Unit,
+    onPasteFinishUrl: (String) -> Unit,
     statusText: String,
     modifier: Modifier = Modifier
 ) {
-    var webViewRef by remember { mutableStateOf<WebView?>(null) }
-    var isLoading by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isStartingSession by remember { mutableStateOf(false) }
+    var activeSession by remember { mutableStateOf<QrLoginSession?>(null) }
+    var pollJob by remember { mutableStateOf<Job?>(null) }
+    var browserStatus by remember { mutableStateOf("") }
+    var showManualPaste by remember { mutableStateOf(false) }
+    var pastedUrl by remember { mutableStateOf("") }
+
+    fun openBrowserLogin() {
+        scope.launch {
+            isStartingSession = true
+            browserStatus = "Preparing secure web session for region [${selectedRegion.uppercase()}]..."
+            pollJob?.cancel()
+
+            val res = cloudClient.startQrLogin(selectedRegion)
+            isStartingSession = false
+
+            res.onSuccess { session ->
+                activeSession = session
+                browserStatus = "Browser opened. Sign in with Google, Facebook, or Xiaomi, then switch back here."
+
+                // Launch default web browser
+                runCatching {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(session.loginUrl)).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                }.onFailure {
+                    browserStatus = "Could not open browser: ${it.message}"
+                }
+
+                // Poll longPolling endpoint in background
+                pollJob = scope.launch {
+                    while (isActive && activeSession == session) {
+                        when (val poll = cloudClient.pollQrLogin(session, selectedRegion)) {
+                            is QrPollResult.Waiting -> {
+                                // continue polling
+                            }
+                            is QrPollResult.Timeout -> {
+                                browserStatus = "Web session expired. Tap below to re-open."
+                                break
+                            }
+                            is QrPollResult.Requires2FA -> {
+                                browserStatus = "2FA required. Please complete verification."
+                                break
+                            }
+                            is QrPollResult.Success -> {
+                                browserStatus = "Authentication confirmed! Syncing devices..."
+                                onSessionAuthenticated(poll.session)
+                                break
+                            }
+                            is QrPollResult.Error -> {
+                                browserStatus = "Status: ${poll.message}"
+                                break
+                            }
+                        }
+                    }
+                }
+            }.onFailure { err ->
+                browserStatus = "Failed to start web session: ${err.message}"
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            pollJob?.cancel()
+        }
+    }
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth()
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.AccountCircle,
+                        imageVector = Icons.Default.Language,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(24.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Web & Social Sign-In",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Opens account.xiaomi.com in your default browser. Sign in using Google, Facebook, or Xiaomi Account, then return here.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = { openBrowserLogin() },
+                    enabled = !isStartingSession,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    if (isStartingSession) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
                     Text(
-                        text = "Sign in with Google or Xiaomi Web. Tap the 'Google' icon on Xiaomi's page below to bypass SMS/email limits.",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        lineHeight = 14.sp
+                        text = if (activeSession == null) "Open Login in Browser (Google / FB / Xiaomi)" else "Re-open Browser Login",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
                     )
                 }
-                Row {
-                    IconButton(
-                        onClick = { webViewRef?.reload() },
-                        modifier = Modifier.size(28.dp)
+
+                if (activeSession != null) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Reload", modifier = Modifier.size(16.dp))
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = browserStatus.ifBlank { "Waiting for browser login... Return to this app after signing in." },
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
-                    IconButton(
-                        onClick = {
-                            CookieManager.getInstance().removeAllCookies(null)
-                            CookieManager.getInstance().flush()
-                            webViewRef?.loadUrl("https://account.xiaomi.com/pass/serviceLogin?sid=xiaomiio&_locale=en_US")
-                        },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(Icons.Default.DeleteOutline, contentDescription = "Clear Session", modifier = Modifier.size(16.dp))
-                    }
+                } else if (browserStatus.isNotBlank()) {
+                    Text(
+                        text = browserStatus,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                if (statusText.isNotBlank()) {
+                    Text(
+                        text = statusText,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             }
         }
 
-        if (statusText.isNotBlank()) {
-            Text(
-                text = statusText,
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Medium
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(440.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(10.dp))
-                .background(Color.White)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    WebView(ctx).apply {
-                        webViewRef = this
-                        val cm = CookieManager.getInstance()
-                        cm.setAcceptCookie(true)
-                        cm.setAcceptThirdPartyCookies(this, true)
-
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.databaseEnabled = true
-                        settings.javaScriptCanOpenWindowsAutomatically = true
-                        settings.setSupportMultipleWindows(false)
-                        // Standard Chrome Mobile User-Agent to avoid Google OAuth "disallowed_useragent" block
-                        settings.userAgentString =
-                            "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
-
-                        var sessionCaptured = false
-
-                        fun checkAuthAndFinish(url: String) {
-                            if (sessionCaptured) return
-                            val miCookie = cm.getCookie("https://account.xiaomi.com").orEmpty()
-                            val stsCookie = cm.getCookie("https://sts.api.io.mi.com").orEmpty()
-                            val urlCookie = cm.getCookie(url).orEmpty()
-                            val rawCookie = "$miCookie; $stsCookie; $urlCookie"
-                            val cookieMap = parseCookieString(rawCookie)
-
-                            val hasServiceToken = cookieMap.containsKey("serviceToken")
-                            val hasPassToken = cookieMap.containsKey("passToken") &&
-                                (cookieMap.containsKey("userId") || cookieMap.containsKey("cUserId"))
-                            val isStsRedirect = url.contains("sts.api.io.mi.com/sts") || url.contains("serviceToken=")
-
-                            if (hasServiceToken || hasPassToken || isStsRedirect) {
-                                sessionCaptured = true
-                                onLoginSuccess(url, cookieMap)
-                            }
+            TextButton(
+                onClick = {
+                    runCatching {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://account.xiaomi.com")).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
-
-                        webViewClient = object : WebViewClient() {
-                            override fun shouldOverrideUrlLoading(
-                                view: WebView?,
-                                request: WebResourceRequest?
-                            ): Boolean {
-                                val url = request?.url?.toString() ?: return false
-                                checkAuthAndFinish(url)
-                                return false
-                            }
-
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                super.onPageFinished(view, url)
-                                isLoading = false
-                                val u = url ?: return
-                                checkAuthAndFinish(u)
-                            }
-                        }
-
-                        loadUrl("https://account.xiaomi.com/pass/serviceLogin?sid=xiaomiio&_locale=en_US")
+                        context.startActivity(intent)
                     }
                 }
-            )
+            ) {
+                Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Open account.xiaomi.com", fontSize = 11.sp)
+            }
 
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .align(Alignment.Center)
+            TextButton(
+                onClick = { showManualPaste = !showManualPaste }
+            ) {
+                Text(
+                    text = if (showManualPaste) "Hide URL paste" else "Paste redirect URL",
+                    fontSize = 11.sp
                 )
+            }
+        }
+
+        if (showManualPaste) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedTextField(
+                    value = pastedUrl,
+                    onValueChange = { pastedUrl = it },
+                    label = { Text("Pasted STS / Redirect URL or cookies") },
+                    placeholder = { Text("https://sts.api.io.mi.com/sts?d=...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Button(
+                    onClick = {
+                        if (pastedUrl.isNotBlank()) {
+                            onPasteFinishUrl(pastedUrl.trim())
+                        }
+                    },
+                    enabled = pastedUrl.isNotBlank(),
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text("Submit URL")
+                }
             }
         }
     }

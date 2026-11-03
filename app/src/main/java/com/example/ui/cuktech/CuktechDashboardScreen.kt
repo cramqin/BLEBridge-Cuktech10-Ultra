@@ -784,6 +784,7 @@ fun CuktechDashboardScreen(
                                 )
                                 CuktechProtocol.SCENE_MODES.forEach { (code, label) ->
                                     val desc = modeDescriptions[code] ?: ""
+                                    val isSelected = (settings.sceneMode == code)
                                     val isDark = isSystemInDarkTheme()
                                     Surface(
                                         color = if (isSelected) {

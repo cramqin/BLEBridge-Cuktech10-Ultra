@@ -1017,8 +1017,12 @@ fun BleBridgeDashboard(
                     }
                 }
 
-                // --- Unified System Console & BLE Diagnostics Card with Tabs ---
                 var terminalTab by remember { mutableStateOf(0) } // 0 = Live Console, 1 = BLE Diagnostics
+                LaunchedEffect(terminalTab) {
+                    if (terminalTab == 1 && diagStatus.lastDiagnosticOutput.isBlank()) {
+                        bleDiagnostics.runBluetoothStackDiagnostics()
+                    }
+                }
                 Card(
                     colors = CardDefaults.cardColors(containerColor = if (appColors.isDark) Color(0xFF030712) else appColors.surface),
                     shape = RoundedCornerShape(24.dp),

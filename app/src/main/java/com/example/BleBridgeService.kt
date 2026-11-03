@@ -45,6 +45,8 @@ class BleBridgeService : Service() {
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var bluetoothGatt: BluetoothGatt? = null
 
+    fun getBluetoothGatt(): BluetoothGatt? = bluetoothGatt
+
     private var serverSocket: ServerSocket? = null
     private var serverJob: Job? = null
     private val activeClients = ConcurrentHashMap<String, ClientHandler>()

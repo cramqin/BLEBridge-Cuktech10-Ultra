@@ -19,8 +19,7 @@ class TaskerFireReceiver : BroadcastReceiver() {
         val bundle = intent.getBundleExtra("com.twofortyfouram.locale.intent.extra.BUNDLE") ?: return
         val taskAction = bundle.getString("ACTION") ?: return
 
-        val svc = BleBridgeService.getInstance()
-        val mgr = svc?.cuktechManager ?: BleBridgeService.ensureCuktechManagersInitialized(context.applicationContext)
+        val mgr = BleBridgeService.cuktechManager ?: BleBridgeService.ensureCuktechManagersInitialized(context.applicationContext)
 
         Log.d("TaskerFireReceiver", "Firing Tasker setting: action=$taskAction")
 
@@ -42,8 +41,8 @@ class TaskerFireReceiver : BroadcastReceiver() {
                 mgr.setSceneMode(mode)
             }
             "SET_TIMEOUT" -> {
-                val timeout = bundle.getInt("TIMEOUT", 30)
-                mgr.setScreenTimeoutSeconds(timeout)
+                val timeout = bundle.getInt("TIMEOUT", 1)
+                mgr.setScreenTimeout(timeout)
             }
         }
     }

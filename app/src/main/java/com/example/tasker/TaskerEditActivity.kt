@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.BLEBridgeTheme
+import com.example.ui.theme.MyApplicationTheme
 
 class TaskerEditActivity : ComponentActivity() {
 
@@ -36,10 +36,10 @@ class TaskerEditActivity : ComponentActivity() {
         val initialPort = existingBundle?.getInt("PORT", 1) ?: 1
         val initialState = existingBundle?.getBoolean("STATE", true) ?: true
         val initialMode = existingBundle?.getInt("MODE", 1) ?: 1
-        val initialTimeout = existingBundle?.getInt("TIMEOUT", 30) ?: 30
+        val initialTimeout = existingBundle?.getInt("TIMEOUT", 1) ?: 1
 
         setContent {
-            BLEBridgeTheme {
+            MyApplicationTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -211,7 +211,7 @@ fun TaskerEditScreen(
 
             if (selectedAction == "SET_TIMEOUT") {
                 Text("Screen Timeout Duration", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                val timeouts = listOf(10 to "10 Seconds", 30 to "30 Seconds", 60 to "60 Seconds", 0 to "Always On")
+                val timeouts = listOf(0 to "Always On", 1 to "60s", 2 to "5m", 3 to "60m")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     timeouts.forEach { (sec, label) ->
                         FilterChip(

@@ -2,6 +2,7 @@ package com.example.cuktech.integrations
 
 import android.content.Context
 import android.content.pm.PackageManager
+import com.example.BleBridgeService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -118,14 +119,13 @@ class ShizukuCompanion(private val context: Context) {
             }
         }
 
-        val svc = BleBridgeService.getInstance()
         sb.appendLine("\n=== BLE GATT & PERIPHERAL ===")
-        val connState = svc?.companionBleState ?: BleBridgeService.Companion.BleConnectionState.DISCONNECTED
-        val addr = svc?.companionBleAddress ?: "None"
+        val connState = BleBridgeService.bleConnectionState.value
+        val addr = BleBridgeService.bleDeviceAddress.value ?: "None"
         sb.appendLine("Connection State: $connState")
         sb.appendLine("Target MAC: $addr")
 
-        val gatt = svc?.bluetoothGatt
+        val gatt = BleBridgeService.getInstance()?.getBluetoothGatt()
         if (gatt != null) {
             val services = gatt.services
             sb.appendLine("GATT Services Discovered: ${services.size}")
@@ -142,7 +142,7 @@ class ShizukuCompanion(private val context: Context) {
             sb.appendLine("GATT Instance: Not currently connected")
         }
 
-        val mgr = svc?.cuktechManager
+        val mgr = BleBridgeService.cuktechManager
         if (mgr != null) {
             sb.appendLine("\n=== CUKTECH MIOT PROTOCOL ===")
             sb.appendLine("Auth State: ${mgr.authState.value}")

@@ -117,7 +117,7 @@ class CuktechPersistence(private val context: Context) :
         }.getOrDefault(-1L)
     }
 
-    fun getRecentSessions(limit: Int = 50): List<ChargeSessionRecord> {
+    fun getRecentSessions(limit: Int = 200): List<ChargeSessionRecord> {
         val result = mutableListOf<ChargeSessionRecord>()
         runCatching {
             readableDatabase.rawQuery(

@@ -1,6 +1,7 @@
 package com.example.cuktech.ble
 
 import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.os.ParcelUuid
@@ -195,7 +196,7 @@ class CuktechBleManager(
 
     init {
         credentialStore.tryAutoImportLocalCredentialsFile()
-        _completedSessions.value = persistence.getRecentSessions(50)
+        _completedSessions.value = persistence.getRecentSessions(200)
         _chargeLimits.value = persistence.loadPortChargeLimits()
         credentialStore.activeDevice.value?.let { cred ->
             _deviceInfo.value = _deviceInfo.value.copy(
@@ -1364,7 +1365,7 @@ class CuktechBleManager(
         val finishedSession = detector.onSample(decoded.powerW, deltaWh, decoded.protocolName, nowSec)
         if (finishedSession != null) {
             persistence.insertCompletedSession(finishedSession)
-            _completedSessions.value = persistence.getRecentSessions(50)
+            _completedSessions.value = persistence.getRecentSessions(200)
         }
 
         val updatedActive = _activeSessions.value.toMutableMap()
@@ -2283,7 +2284,7 @@ class CuktechBleManager(
 
     fun clearHistory(option: com.example.cuktech.db.CuktechPersistence.ClearHistoryOption) {
         persistence.clearHistory(option)
-        _completedSessions.value = persistence.getRecentSessions(50)
+        _completedSessions.value = persistence.getRecentSessions(200)
         when (option) {
             com.example.cuktech.db.CuktechPersistence.ClearHistoryOption.CLEAR_ALL -> {
                 sessionDetectors.values.forEach { it.reset() }

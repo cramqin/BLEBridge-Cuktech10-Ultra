@@ -106,10 +106,10 @@ class BleDiagnostics(private val context: Context) {
         val devInfo = mgr?.deviceInfo?.value
         val isConnected = mgr?.authState?.value == CuktechAuthState.AUTHENTICATED
         val fw = if (devInfo?.firmwareVersion.isNullOrBlank() || devInfo?.firmwareVersion == "--") {
-            if (isConnected) "v1.0" else "Available once connected"
+            if (isConnected) "Unknown / Not reported over BLE" else "Available once connected"
         } else devInfo?.firmwareVersion
         val sn = if (devInfo?.serialNumber.isNullOrBlank() || devInfo?.serialNumber == "--") {
-            if (isConnected) "N/A" else "Available once connected"
+            if (isConnected) "Unknown / Not reported over BLE" else "Available once connected"
         } else devInfo?.serialNumber
 
         sb.appendLine("Model: CUKTECH 10 Ultra (AD1204 / AD1204U)")

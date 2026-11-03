@@ -21,6 +21,8 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
 import androidx.compose.foundation.pager.VerticalPager
@@ -132,6 +134,10 @@ fun CuktechDashboardScreen(
     val scrollTab1 = rememberScrollState()
     val scrollTab2 = rememberScrollState()
     val scrollTab3 = rememberScrollState()
+
+    val portRequesters = remember { List(4) { BringIntoViewRequester() } }
+    var highlightedPortId by remember { mutableStateOf<Int?>(null) }
+    var historyPageIndex by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = Modifier
@@ -410,7 +416,16 @@ fun CuktechDashboardScreen(
                         CuktechChargerVisual(
                             portsMap = portsMap,
                             modeLabel = activeModeLabel,
-                            onPortClick = { scope.launch { pagerState.animateScrollToPage(1) } },
+                            onPortClick = { portId ->
+                                scope.launch {
+                                    highlightedPortId = portId
+                                    pagerState.animateScrollToPage(1)
+                                    kotlinx.coroutines.delay(120)
+                                    portRequesters.getOrNull(portId - 1)?.bringIntoView()
+                                    kotlinx.coroutines.delay(2000)
+                                    if (highlightedPortId == portId) highlightedPortId = null
+                                }
+                            },
                             modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
                         )
 
@@ -748,6 +763,8 @@ fun CuktechDashboardScreen(
                                 settings = settings,
                                 chargeLimit = limit,
                                 countdownRemainingSec = countdownRemainingSeconds[portId],
+                                isHighlighted = (highlightedPortId == portId),
+                                bringIntoViewRequester = portRequesters.getOrNull(portId - 1),
                                 onToggleEnabled = { enabled -> bleManager.setPortEnabled(portId, enabled) },
                                 onSelectCountdown = { code -> bleManager.setPortCountdown(portId, code) },
                                 onSetProtocol = { proto, en -> bleManager.setPortProtocol(portId, proto, en) },
@@ -795,12 +812,18 @@ fun CuktechDashboardScreen(
                                 )
                                 CuktechProtocol.SCENE_MODES.forEach { (code, label) ->
                                     val desc = modeDescriptions[code]?.second ?: ""
+                                    val isSelected = (settings.sceneMode == code)
                                     Surface(
-                                        color = if (settings.sceneMode == code) {
+                                        color = if (isSelected) {
                                             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
                                         } else {
                                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                                         },
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                                        ),
                                         shape = RoundedCornerShape(10.dp),
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -954,7 +977,12 @@ fun CuktechDashboardScreen(
                                     }
                                 }
 
-                                completedSessions.take(6).forEach { s ->
+                                val pageSize = 5
+                                val totalPages = (completedSessions.size + pageSize - 1) / pageSize
+                                val safePage = historyPageIndex.coerceIn(0, (totalPages - 1).coerceAtLeast(0))
+                                val pagedSessions = completedSessions.drop(safePage * pageSize).take(pageSize)
+
+                                pagedSessions.forEach { s ->
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -989,7 +1017,41 @@ fun CuktechDashboardScreen(
                                     }
                                 }
 
-                                if (completedSessions.size > 6) {
+                                if (totalPages > 1) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 6.dp, bottom = 2.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = { if (historyPageIndex > 0) historyPageIndex-- },
+                                            enabled = safePage > 0,
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text("◀ Prev", fontSize = 11.sp)
+                                        }
+
+                                        Text(
+                                            text = "Page ${safePage + 1} of $totalPages (${completedSessions.size} total)",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+
+                                        OutlinedButton(
+                                            onClick = { if (safePage < totalPages - 1) historyPageIndex++ },
+                                            enabled = safePage < totalPages - 1,
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text("Next ▶", fontSize = 11.sp)
+                                        }
+                                    }
+                                }
+
+                                if (completedSessions.isNotEmpty()) {
                                     TextButton(
                                         onClick = { showConsolidatedTable = true },
                                         modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -1534,6 +1596,33 @@ fun CuktechDashboardScreen(
                                 }
                             }
 
+                            // Explanatory ADC Information Callout
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp).padding(top = 1.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "What is ADC? Adaptive Dynamic Current (ADC) intelligently balances real-time wattage across all active ports based on each device's charging curve. Unlike standard chargers that briefly cut power to renegotiate, ADC seamlessly adjusts power contracts and displays dynamic allocation on Screen Page 2 without disconnecting devices.",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        lineHeight = 15.sp
+                                    )
+                                }
+                            }
+
                             if (isAdcRunning) {
                                 Column(
                                     modifier = Modifier
@@ -2046,7 +2135,7 @@ fun CuktechDashboardScreen(
                             onClick = { selectedClearHistoryOption = option },
                             shape = RoundedCornerShape(10.dp),
                             color = if (isSelected) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.error) else null,
+                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.error) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -2060,7 +2149,7 @@ fun CuktechDashboardScreen(
                                     onClick = { selectedClearHistoryOption = option },
                                     colors = RadioButtonDefaults.colors(
                                         selectedColor = MaterialTheme.colorScheme.error,
-                                        unselectedColor = if (isSystemInDarkTheme()) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                                        unselectedColor = Color(0xFF64748B)
                                     )
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -2132,7 +2221,7 @@ fun CuktechDashboardScreen(
                             onClick = { pendingScreenTimeoutCode = code },
                             shape = RoundedCornerShape(10.dp),
                             color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -2195,10 +2284,10 @@ private fun cuktechSwitchColors(): SwitchColors {
 
 @Composable
 private fun cuktechRadioButtonColors(): RadioButtonColors {
-    val dark = isSystemInDarkTheme()
+    val appColors = com.example.ui.theme.LocalAppColors.current
     return RadioButtonDefaults.colors(
-        selectedColor = MaterialTheme.colorScheme.primary,
-        unselectedColor = if (dark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+        selectedColor = appColors.primary,
+        unselectedColor = Color(0xFF64748B)
     )
 }
 
@@ -2291,12 +2380,56 @@ private fun SmoothWheelPicker(
     }
 }
 
+private fun detectDeviceType(port: PortTelemetry): String? {
+    if (port.powerW < 0.2 && port.voltageV < 1.0) return null
+    val proto = port.protocolName
+    val w = port.powerW
+    val v = port.voltageV
+    val code = port.mijiaProtocolCode ?: 0
+
+    return when {
+        // Xiaomi proprietary HyperCharge / Fast Charge (67W, 90W, 120W)
+        code in listOf(17, 18, 19) || proto.contains("Xiaomi", ignoreCase = true) ->
+            "Xiaomi HyperCharge Device (Mi / Redmi / POCO)"
+        // Apple 2.4A or Apple PD negotiation
+        code == 12 || proto.contains("Apple", ignoreCase = true) ->
+            "Apple Device (iPhone / iPad)"
+        // Oppo / OnePlus
+        code in listOf(23, 24) || proto.contains("VOOC", ignoreCase = true) ->
+            "OPPO / OnePlus Device (VOOC)"
+        // Huawei / Honor
+        code in listOf(15, 16) || proto.contains("SCP", ignoreCase = true) || proto.contains("FCP", ignoreCase = true) ->
+            "Huawei / Honor Device (SuperCharge)"
+        // Samsung Adaptive Fast Charge
+        code == 14 || proto.contains("AFC", ignoreCase = true) ->
+            "Samsung Device (Adaptive Fast Charging)"
+        // PPS (Samsung Super Fast Charging or high-speed PPS)
+        code in listOf(7, 9) || proto.contains("PPS", ignoreCase = true) ->
+            if (w >= 20.0) "Samsung / PPS Fast Charge (Super Fast)" else "PPS Fast Charge Device"
+        // UFCS
+        code == 20 || proto.contains("UFCS", ignoreCase = true) ->
+            "UFCS Universal Fast Charge Device"
+        // High-power USB-PD (Laptop / MacBook)
+        proto.contains("PD", ignoreCase = true) && (w >= 45.0 || v >= 19.0) ->
+            "Laptop / MacBook (USB-PD High Power)"
+        proto.contains("PD", ignoreCase = true) && w in 15.0..44.0 ->
+            "USB-PD Fast Charge (Phone / Tablet)"
+        proto.contains("PD", ignoreCase = true) ->
+            "USB-PD Device"
+        port.isCharging ->
+            "USB Powered Device"
+        else -> null
+    }
+}
+
 @Composable
 private fun PortTelemetryCard(
     port: PortTelemetry,
     settings: ChargerSettingsState,
     chargeLimit: PortChargeLimit?,
     countdownRemainingSec: Long? = null,
+    isHighlighted: Boolean = false,
+    bringIntoViewRequester: BringIntoViewRequester? = null,
     onToggleEnabled: (Boolean) -> Unit,
     onSelectCountdown: (Int) -> Unit,
     onSetProtocol: (String, Boolean) -> Unit,
@@ -2310,16 +2443,23 @@ private fun PortTelemetryCard(
         else -> Color(0xFFFBBF24)
     }
 
+    val cardModifier = if (bringIntoViewRequester != null) {
+        Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoViewRequester)
+    } else {
+        Modifier.fillMaxWidth()
+    }
+
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = cardModifier
             .border(
-                width = if (port.isCharging) 1.5.dp else 0.5.dp,
-                color = if (port.isCharging) accentColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                width = if (isHighlighted) 2.dp else if (port.isCharging) 1.5.dp else 0.5.dp,
+                color = if (isHighlighted) Color(0xFF00E5FF) else if (port.isCharging) accentColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
                 shape = RoundedCornerShape(16.dp)
             ),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(
+            containerColor = if (isHighlighted) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
             modifier = Modifier
@@ -2362,6 +2502,34 @@ private fun PortTelemetryCard(
                             color = accentColor,
                             modifier = Modifier.padding(start = 18.dp, top = 2.dp)
                         )
+                    }
+                    val detectedDevice = detectDeviceType(port)
+                    if (detectedDevice != null) {
+                        Surface(
+                            color = accentColor.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
+                            modifier = Modifier.padding(start = 18.dp, top = 3.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Devices,
+                                    contentDescription = null,
+                                    tint = accentColor,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = detectedDevice,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = accentColor
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -3299,6 +3467,11 @@ private fun ConsolidatedSessionsTableDialog(
 ) {
     val context = LocalContext.current
     val timeFormat = remember { java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault()) }
+    var pageIndex by remember { mutableIntStateOf(0) }
+    val pageSize = 10
+    val totalPages = ((allSessions.size + pageSize - 1) / pageSize).coerceAtLeast(1)
+    val safePage = pageIndex.coerceIn(0, totalPages - 1)
+    val pageSessions = allSessions.drop(safePage * pageSize).take(pageSize)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -3349,7 +3522,7 @@ private fun ConsolidatedSessionsTableDialog(
                             }
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                            allSessions.forEachIndexed { idx, s ->
+                            pageSessions.forEachIndexed { idx, s ->
                                 val bg = if (idx % 2 == 0) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
                                 Row(
                                     modifier = Modifier
@@ -3369,6 +3542,38 @@ private fun ConsolidatedSessionsTableDialog(
                                     val startStr = timeFormat.format(java.util.Date((s.startTimeSec * 1000).toLong()))
                                     Text(startStr, fontSize = 9.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1.0f))
                                 }
+                            }
+                        }
+                    }
+
+                    if (totalPages > 1) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { if (pageIndex > 0) pageIndex-- },
+                                enabled = safePage > 0,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text("◀ Prev", fontSize = 11.sp)
+                            }
+                            Text(
+                                "Page ${safePage + 1} of $totalPages",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            OutlinedButton(
+                                onClick = { if (safePage < totalPages - 1) pageIndex++ },
+                                enabled = safePage < totalPages - 1,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text("Next ▶", fontSize = 11.sp)
                             }
                         }
                     }

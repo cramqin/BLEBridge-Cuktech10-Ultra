@@ -203,11 +203,28 @@ class BleBridgeService : Service() {
         }
     }
 
+    private var lastNotifTitle: String = ""
+    private var lastNotifContent: String = ""
+    private var lastNotifPostMs: Long = 0L
+
     /**
      * Updates the ongoing foreground service notification with live CUKTECH charger telemetry,
      * per-port wattage, and active delay poweroff countdown timers.
+     * Throttles updates and sets setShowWhen(false) to prevent jumping/flickering with other apps (e.g. Scene).
      */
     fun updateNotificationTelemetry(title: String, content: String) {
+        val now = System.currentTimeMillis()
+        if (title == lastNotifTitle && content == lastNotifContent) {
+            return
+        }
+        // Throttle updates: don't re-post more often than every 3 seconds unless title (status) changed
+        if (title == lastNotifTitle && (now - lastNotifPostMs) < 3000L) {
+            return
+        }
+        lastNotifTitle = title
+        lastNotifContent = content
+        lastNotifPostMs = now
+
         runCatching {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
             val openIntent = packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java).apply {
@@ -229,6 +246,8 @@ class BleBridgeService : Service() {
                 .setContentIntent(openPendingIntent)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
+                .setShowWhen(false)
+                .setSortKey("cuktech_gateway")
                 .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Gateway", stopPendingIntent)
                 .build()
             nm.notify(NOTIFICATION_ID, notif)

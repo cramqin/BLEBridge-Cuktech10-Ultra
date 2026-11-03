@@ -46,12 +46,25 @@ data class ChargerSettingsState(
     val orientationDegrees: Int = -1, // -1 = Auto, 0 = 0°, 90 = 90°, 180 = 180°, 270 = 270°
     val activeLcdPage: Int = 1, // 1=Total Power, 2=ADC Assistant, 3=AI Temp, 4=Ports Detail, 5=System Info
     val portSwitchBitmap: Int = 0x0F, // Bit 0=C1, 1=C2, 2=C3, 3=A
-    val pdEnabled: Boolean = true,
-    val ppsEnabled: Boolean = true,
-    val ufcsEnabled: Boolean = true,
-    val scpEnabled: Boolean = true,
+    // Per-port fast charge protocol flags (PIID 21 uint32):
+    val c1Pd: Boolean = true,
+    val c1Pps: Boolean = true,
+    val c1Ufcs: Boolean = true,
+    val c2Pd: Boolean = true,
+    val c2Pps: Boolean = true,
+    val c2Ufcs: Boolean = true,
+    val c3Ufcs: Boolean = true,
+    val c3Scp: Boolean = true,
+    val aUfcs: Boolean = true,
+    val aScp: Boolean = true,
+    val rawProtocolExtendVal: Long = 0x03030F0FL,
     val rawProtocolExtend: ByteArray? = null
-)
+) {
+    val pdEnabled: Boolean get() = c1Pd && c2Pd
+    val ppsEnabled: Boolean get() = c1Pps && c2Pps
+    val ufcsEnabled: Boolean get() = c1Ufcs && c2Ufcs && c3Ufcs && aUfcs
+    val scpEnabled: Boolean get() = c3Scp && aScp
+}
 
 data class DecodedMiotFrame(
     val reqId: Int,

@@ -50,6 +50,7 @@ import com.example.cuktech.diagnostics.BleDiagnostics
 import com.example.cuktech.energy.PortChargeLimit
 import com.example.cuktech.integrations.CloudIntegrations
 import com.example.cuktech.integrations.IntegrationConfig
+import com.example.cuktech.protocol.ChargerSettingsState
 import com.example.cuktech.protocol.CuktechProtocol
 import com.example.cuktech.protocol.PortTelemetry
 import kotlinx.coroutines.launch
@@ -89,6 +90,7 @@ fun CuktechDashboardScreen(
     var showXiaomiLoginDialog by remember { mutableStateOf(false) }
     var showPairingDialog by remember { mutableStateOf(false) }
     var chargeLimitDialogPort by remember { mutableStateOf<Int?>(null) }
+    var closureTimeDialogPort by remember { mutableStateOf<Int?>(null) }
     var showTaskerDocs by remember { mutableStateOf(false) }
     var showCloudConfig by remember { mutableStateOf(false) }
     var showMiHomeWarningDialog by remember { mutableStateOf(false) }
@@ -713,10 +715,13 @@ fun CuktechDashboardScreen(
                             val limit = chargeLimits[portId]
                             PortTelemetryCard(
                                 port = port,
+                                settings = settings,
                                 chargeLimit = limit,
                                 onToggleEnabled = { enabled -> bleManager.setPortEnabled(portId, enabled) },
                                 onSelectCountdown = { code -> bleManager.setPortCountdown(portId, code) },
-                                onOpenChargeLimit = { chargeLimitDialogPort = portId }
+                                onSetProtocol = { proto, en -> bleManager.setPortProtocol(portId, proto, en) },
+                                onOpenChargeLimit = { chargeLimitDialogPort = portId },
+                                onOpenClosureTimeDialog = { closureTimeDialogPort = portId }
                             )
                         }
                     }
@@ -733,7 +738,7 @@ fun CuktechDashboardScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                text = "Hardware Power & Display Settings",
+                                text = "Hardware Power Allocation & Low Current",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 15.sp
                             )
@@ -789,51 +794,6 @@ fun CuktechDashboardScreen(
                                             }
                                         }
                                     }
-                                }
-                            }
-
-                            HorizontalDivider()
-
-                            // 2. Fast-Charge Protocols (PIID 21) - 2x2 Clean Grid
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                    text = "Fast-Charge Protocol Extensions",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    FilterChip(
-                                        selected = settings.pdEnabled,
-                                        onClick = { bleManager.setFastChargeProtocols(pd = !settings.pdEnabled) },
-                                        label = { Text("PD 3.0 (100W)", fontSize = 11.sp) },
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    FilterChip(
-                                        selected = settings.ppsEnabled,
-                                        onClick = { bleManager.setFastChargeProtocols(pps = !settings.ppsEnabled) },
-                                        label = { Text("PPS / Mi Turbo", fontSize = 11.sp) },
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    FilterChip(
-                                        selected = settings.ufcsEnabled,
-                                        onClick = { bleManager.setFastChargeProtocols(ufcs = !settings.ufcsEnabled) },
-                                        label = { Text("UFCS Fusion", fontSize = 11.sp) },
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    FilterChip(
-                                        selected = settings.scpEnabled,
-                                        onClick = { bleManager.setFastChargeProtocols(scp = !settings.scpEnabled) },
-                                        label = { Text("SCP Fast Charge", fontSize = 11.sp) },
-                                        modifier = Modifier.weight(1f)
-                                    )
                                 }
                             }
 
@@ -1234,7 +1194,7 @@ fun CuktechDashboardScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Button(
                                 onClick = {
-                                    val logs = BleBridgeService.getLogMessages().joinToString("\n") { it.message }
+                                    val logs = BleBridgeService.logs.value.joinToString("\n") { it.message }
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                                     val clip = ClipData.newPlainText("CUKTECH BLE Logs", logs)
                                     clipboard?.setPrimaryClip(clip)
@@ -1889,6 +1849,70 @@ fun CuktechDashboardScreen(
         )
     }
 
+    closureTimeDialogPort?.let { portId ->
+        val port = portsMap[portId]
+        val currentCode = port?.countdownCode ?: 0
+        AlertDialog(
+            onDismissRequest = { closureTimeDialogPort = null },
+            icon = { Icon(Icons.Default.Timer, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Select Closure Time (${port?.portLabel ?: "Port $portId"})") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Automatically shut off port power when timer expires:",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    CuktechProtocol.COUNTDOWN_OPTIONS.forEach { (code, label) ->
+                        val isSelected = currentCode == code
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    bleManager.setPortCountdown(portId, code)
+                                    closureTimeDialogPort = null
+                                },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (code == 0) "Unset (Always On)" else label,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { closureTimeDialogPort = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     if (showSoftRestartDialog) {
         AlertDialog(
             onDismissRequest = { showSoftRestartDialog = false },
@@ -2153,10 +2177,13 @@ fun CuktechDashboardScreen(
 @Composable
 private fun PortTelemetryCard(
     port: PortTelemetry,
+    settings: ChargerSettingsState,
     chargeLimit: PortChargeLimit?,
     onToggleEnabled: (Boolean) -> Unit,
     onSelectCountdown: (Int) -> Unit,
-    onOpenChargeLimit: () -> Unit
+    onSetProtocol: (String, Boolean) -> Unit,
+    onOpenChargeLimit: () -> Unit,
+    onOpenClosureTimeDialog: () -> Unit
 ) {
     val accentColor = when (port.portId) {
         1 -> Color(0xFF38BDF8)
@@ -2171,65 +2198,201 @@ private fun PortTelemetryCard(
             .border(
                 width = if (port.isCharging) 1.5.dp else 0.5.dp,
                 color = if (port.isCharging) accentColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(16.dp)
             ),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // 1. Port Header Row with Title + Circular Power Toggle Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(if (port.isCharging) accentColor else Color.Gray)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = port.portLabel,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 15.sp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Surface(
-                        color = accentColor.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(if (port.isCharging) accentColor else if (port.enabled) Color.Gray else Color.Red.copy(alpha = 0.5f))
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        val headerText = if (port.isCharging) {
+                            "${port.portLabel}  |  ${"%.1f".format(port.powerW)}W ${"%.1f".format(port.voltageV)}V ${"%.2f".format(port.currentA)}A"
+                        } else {
+                            "${port.portLabel}  |  No output"
+                        }
                         Text(
-                            text = port.protocolName,
-                            fontSize = 11.sp,
+                            text = headerText,
                             fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                    if (port.protocolName.isNotBlank() && port.protocolName != "Normal") {
+                        Text(
+                            text = "Protocol: ${port.protocolName}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
                             color = accentColor,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            modifier = Modifier.padding(start = 18.dp, top = 2.dp)
                         )
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = if (port.enabled) "ENABLED" else "DISABLED",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Switch(
-                        checked = port.enabled,
-                        onCheckedChange = onToggleEnabled
+                // Circular Power Toggle Button (Mi Home style)
+                IconButton(
+                    onClick = { onToggleEnabled(!port.enabled) },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (port.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PowerSettingsNew,
+                        contentDescription = if (port.enabled) "Turn Port Off" else "Turn Port On",
+                        tint = if (port.enabled) Color.White else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
 
-            // V / A / W / Wh Metrics Row
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // 2. Delay Poweroff & Closure Time Rows
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Delay Poweroff Switch Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Delay Poweroff",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "Cut off port power after set duration",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = port.countdownCode > 0,
+                        onCheckedChange = { checked ->
+                            if (checked) {
+                                onOpenClosureTimeDialog()
+                            } else {
+                                onSelectCountdown(0)
+                            }
+                        }
+                    )
+                }
+
+                // Closure Time Clickable Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onOpenClosureTimeDialog() }
+                        .padding(vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Closure Time",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val durationText = CuktechProtocol.COUNTDOWN_OPTIONS[port.countdownCode] ?: "Unset"
+                        Text(
+                            text = if (port.countdownCode == 0) "Unset" else durationText,
+                            fontSize = 13.sp,
+                            color = if (port.countdownCode > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // 3. Discharging Protocols Section
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Discharging protocols",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                if (port.portId == 1 || port.portId == 2) {
+                    val ufcsChecked = if (port.portId == 1) settings.c1Ufcs else settings.c2Ufcs
+                    val pdChecked = if (port.portId == 1) settings.c1Pd else settings.c2Pd
+                    val ppsChecked = if (port.portId == 1) settings.c1Pps else settings.c2Pps
+
+                    ProtocolSwitchRow(
+                        title = "UFCS",
+                        subtitle = "Universal Fast Charging Specification (China unified fast-charge standard)",
+                        checked = ufcsChecked,
+                        onCheckedChange = { onSetProtocol("ufcs", it) }
+                    )
+
+                    ProtocolSwitchRow(
+                        title = "PD",
+                        subtitle = "USB Power Delivery (100W/140W). Disabling PD also disables PPS.",
+                        checked = pdChecked,
+                        onCheckedChange = { onSetProtocol("pd", it) }
+                    )
+
+                    ProtocolSwitchRow(
+                        title = "PPS",
+                        subtitle = "Programmable Power Supply (Samsung Super Fast & Xiaomi Mi Turbo)",
+                        checked = ppsChecked,
+                        enabled = pdChecked,
+                        onCheckedChange = { onSetProtocol("pps", it) }
+                    )
+                } else {
+                    // C3 or USB-A
+                    val ufcsChecked = if (port.portId == 3) settings.c3Ufcs else settings.aUfcs
+                    val scpChecked = if (port.portId == 3) settings.c3Scp else settings.aScp
+
+                    ProtocolSwitchRow(
+                        title = "UFCS",
+                        subtitle = "Universal Fast Charging Specification. Take effect after re-plugging.",
+                        checked = ufcsChecked,
+                        onCheckedChange = { onSetProtocol("ufcs", it) }
+                    )
+
+                    ProtocolSwitchRow(
+                        title = "SCP",
+                        subtitle = "Huawei SuperCharge Protocol (high current). Take effect after re-plugging.",
+                        checked = scpChecked,
+                        onCheckedChange = { onSetProtocol("scp", it) }
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            // 4. V / A / W / Wh Metrics Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -2280,41 +2443,62 @@ private fun PortTelemetryCard(
                 }
             }
 
-            // Port Controls Row: Countdown Timer + Wh Charge Limit
+            // Wh Charge Limit button
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Timer:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    CuktechProtocol.COUNTDOWN_OPTIONS.forEach { (code, label) ->
-                        FilterChip(
-                            selected = port.countdownCode == code,
-                            onClick = { onSelectCountdown(code) },
-                            label = { Text(label, fontSize = 10.sp) }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
                 OutlinedButton(
                     onClick = onOpenChargeLimit,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = if (chargeLimit?.enabled == true) "Limit ${"%.0f".format(chargeLimit.whTarget)}Wh" else "Energy Limit",
+                        text = if (chargeLimit?.enabled == true) "Limit: ${"%.0f".format(chargeLimit.whTarget)}Wh Active" else "Set Wh Cutoff Limit",
                         fontSize = 11.sp
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ProtocolSwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            )
+            Text(
+                text = subtitle,
+                fontSize = 11.sp,
+                lineHeight = 14.sp,
+                color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
+        }
+        Switch(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange
+        )
     }
 }
 

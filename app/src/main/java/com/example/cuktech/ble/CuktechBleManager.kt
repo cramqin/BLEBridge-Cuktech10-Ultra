@@ -1475,18 +1475,29 @@ class CuktechBleManager(
             }
 
             CuktechProtocol.PIID_PROTOCOL_EXTEND -> {
-                val d = if (frame.payload.size >= 15 && (frame.payload[0].toInt() and 0xFF) == 14) {
-                    frame.payload.copyOfRange(1, 15)
-                } else {
-                    frame.payload
-                }
-                if (d.size >= 5) {
+                if (frame.payload.size >= 4) {
+                    val val32 = (frame.payload[0].toLong() and 0xFF) or
+                        ((frame.payload[1].toLong() and 0xFF) shl 8) or
+                        ((frame.payload[2].toLong() and 0xFF) shl 16) or
+                        ((frame.payload[3].toLong() and 0xFF) shl 24)
+
+                    val c1 = (val32 and 0xFF).toInt()
+                    val c2 = ((val32 shr 8) and 0xFF).toInt()
+                    val c3 = ((val32 shr 16) and 0xFF).toInt()
+                    val a = ((val32 shr 24) and 0xFF).toInt()
+
                     _settings.value = _settings.value.copy(
-                        pdEnabled = d[0].toInt() != 0,
-                        ppsEnabled = d[1].toInt() != 0,
-                        ufcsEnabled = d[2].toInt() != 0,
-                        scpEnabled = d[4].toInt() != 0,
-                        rawProtocolExtend = if (d.size == 14) d.copyOf() else null
+                        rawProtocolExtendVal = val32,
+                        c1Pd = (c1 and 0x01) != 0,
+                        c1Pps = (c1 and 0x02) != 0,
+                        c1Ufcs = (c1 and 0x04) != 0,
+                        c2Pd = (c2 and 0x01) != 0,
+                        c2Pps = (c2 and 0x02) != 0,
+                        c2Ufcs = (c2 and 0x04) != 0,
+                        c3Ufcs = (c3 and 0x01) != 0,
+                        c3Scp = (c3 and 0x02) != 0,
+                        aUfcs = (a and 0x01) != 0,
+                        aScp = (a and 0x02) != 0
                     )
                 }
             }
@@ -1945,6 +1956,100 @@ class CuktechBleManager(
         setOrientationLock(degrees != -1)
     }
 
+    fun setPortProtocol(portId: Int, protocol: String, enabled: Boolean) {
+        if (portId !in 1..4) return
+        scope.launch {
+            var c1Pd = _settings.value.c1Pd
+            var c1Pps = _settings.value.c1Pps
+            var c1Ufcs = _settings.value.c1Ufcs
+
+            var c2Pd = _settings.value.c2Pd
+            var c2Pps = _settings.value.c2Pps
+            var c2Ufcs = _settings.value.c2Ufcs
+
+            var c3Ufcs = _settings.value.c3Ufcs
+            var c3Scp = _settings.value.c3Scp
+
+            var aUfcs = _settings.value.aUfcs
+            var aScp = _settings.value.aScp
+
+            when (portId) {
+                1 -> {
+                    when (protocol.lowercase()) {
+                        "pd" -> {
+                            c1Pd = enabled
+                            if (!enabled) c1Pps = false // Disabling PD also disables PPS
+                        }
+                        "pps" -> {
+                            c1Pps = enabled
+                            if (enabled) c1Pd = true // Enabling PPS requires PD
+                        }
+                        "ufcs" -> c1Ufcs = enabled
+                    }
+                }
+                2 -> {
+                    when (protocol.lowercase()) {
+                        "pd" -> {
+                            c2Pd = enabled
+                            if (!enabled) c2Pps = false
+                        }
+                        "pps" -> {
+                            c2Pps = enabled
+                            if (enabled) c2Pd = true
+                        }
+                        "ufcs" -> c2Ufcs = enabled
+                    }
+                }
+                3 -> {
+                    when (protocol.lowercase()) {
+                        "ufcs" -> c3Ufcs = enabled
+                        "scp" -> c3Scp = enabled
+                    }
+                }
+                4 -> {
+                    when (protocol.lowercase()) {
+                        "ufcs" -> aUfcs = enabled
+                        "scp" -> aScp = enabled
+                    }
+                }
+            }
+
+            val c1Byte = (if (c1Pd) 1 else 0) or ((if (c1Pps) 1 else 0) shl 1) or ((if (c1Ufcs) 1 else 0) shl 2) or (1 shl 3)
+            val c2Byte = (if (c2Pd) 1 else 0) or ((if (c2Pps) 1 else 0) shl 1) or ((if (c2Ufcs) 1 else 0) shl 2) or (1 shl 3)
+            val c3Byte = (if (c3Ufcs) 1 else 0) or ((if (c3Scp) 1 else 0) shl 1)
+            val aByte = (if (aUfcs) 1 else 0) or ((if (aScp) 1 else 0) shl 1)
+
+            val val32 = (c1Byte.toLong() and 0xFF) or
+                ((c2Byte.toLong() and 0xFF) shl 8) or
+                ((c3Byte.toLong() and 0xFF) shl 16) or
+                ((aByte.toLong() and 0xFF) shl 24)
+
+            _settings.value = _settings.value.copy(
+                rawProtocolExtendVal = val32,
+                c1Pd = c1Pd, c1Pps = c1Pps, c1Ufcs = c1Ufcs,
+                c2Pd = c2Pd, c2Pps = c2Pps, c2Ufcs = c2Ufcs,
+                c3Ufcs = c3Ufcs, c3Scp = c3Scp,
+                aUfcs = aUfcs, aScp = aScp
+            )
+
+            sendMiotCommand(
+                siid = CuktechProtocol.SIID_CHARGER,
+                piid = CuktechProtocol.PIID_PROTOCOL_EXTEND,
+                isSet = true,
+                valueBytes = byteArrayOf(
+                    (val32 and 0xFF).toByte(),
+                    ((val32 shr 8) and 0xFF).toByte(),
+                    ((val32 shr 16) and 0xFF).toByte(),
+                    ((val32 shr 24) and 0xFF).toByte()
+                )
+            )
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL1,
+                "[Cuktech] Set Port $portId Protocol $protocol = $enabled (val32=0x${val32.toString(16)})"
+            )
+        }
+    }
+
     fun setFastChargeProtocols(
         pd: Boolean = _settings.value.pdEnabled,
         pps: Boolean = _settings.value.ppsEnabled,
@@ -1952,29 +2057,16 @@ class CuktechBleManager(
         scp: Boolean = _settings.value.scpEnabled
     ) {
         scope.launch {
-            val cur = _settings.value
-            val encoded14 = CuktechProtocol.encodeProtocolExtend(
-                pd = pd,
-                pps = pps,
-                ufcs = ufcs,
-                scp = scp,
-                rawExisting = cur.rawProtocolExtend
-            )
-            _settings.value = cur.copy(
-                pdEnabled = pd,
-                ppsEnabled = pps,
-                ufcsEnabled = ufcs,
-                scpEnabled = scp,
-                rawProtocolExtend = encoded14
-            )
-            val lengthPrefixed = byteArrayOf(encoded14.size.toByte()) + encoded14
-            sendMiotCommand(
-                siid = CuktechProtocol.SIID_CHARGER,
-                piid = CuktechProtocol.PIID_PROTOCOL_EXTEND,
-                isSet = true,
-                valueBytes = lengthPrefixed,
-                fmtOverride = 0x09
-            )
+            setPortProtocol(1, "pd", pd)
+            setPortProtocol(1, "pps", pps)
+            setPortProtocol(1, "ufcs", ufcs)
+            setPortProtocol(2, "pd", pd)
+            setPortProtocol(2, "pps", pps)
+            setPortProtocol(2, "ufcs", ufcs)
+            setPortProtocol(3, "ufcs", ufcs)
+            setPortProtocol(3, "scp", scp)
+            setPortProtocol(4, "ufcs", ufcs)
+            setPortProtocol(4, "scp", scp)
         }
     }
 

@@ -96,6 +96,8 @@ fun CuktechDashboardScreen(
     var selectedExportScope by remember { mutableStateOf(CuktechPersistence.ExportScope.ALL) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
     var selectedClearHistoryOption by remember { mutableStateOf(CuktechPersistence.ClearHistoryOption.KEEP_ACTIVE) }
+    var showScreenOnTimeoutDialog by remember { mutableStateOf(false) }
+    var pendingScreenTimeoutCode by remember { mutableStateOf(4) }
 
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     val tabItems = listOf(
@@ -660,38 +662,85 @@ fun CuktechDashboardScreen(
 
                             HorizontalDivider()
 
-                            // 2. Screen Sleep Timeout (PIID 6)
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                    text = "Screen Sleep Timeout",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
+                            // 2. Screen Power & Sleep Timeout (PIID 6)
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "Charger Screen Display",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = if (settings.screenTimeout == 0) "Status: Force Off (Standby)" else "Status: Active (${if (settings.screenTimeout == 4) "Always On" else "Auto-Sleep"})",
+                                            fontSize = 11.sp,
+                                            color = if (settings.screenTimeout == 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+
+                                    FilledTonalButton(
+                                        onClick = {
+                                            if (settings.screenTimeout == 0) {
+                                                showScreenOnTimeoutDialog = true
+                                            } else {
+                                                bleManager.forceScreenPower(false)
+                                            }
+                                        },
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = if (settings.screenTimeout == 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (settings.screenTimeout == 0) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(Modifier.width(4.dp))
+                                        Text(
+                                            text = if (settings.screenTimeout == 0) "Turn Screen ON" else "Force Screen OFF",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     val timeoutList = listOf(
+                                        0 to "Off (0)",
+                                        4 to "Always On",
                                         5 to "1 min",
                                         1 to "5 min",
                                         2 to "10 min",
-                                        3 to "30 min",
-                                        4 to "Always On"
+                                        3 to "30 min"
                                     )
                                     timeoutList.forEach { (code, label) ->
                                         FilterChip(
                                             selected = settings.screenTimeout == code,
-                                            onClick = { bleManager.setScreenTimeout(code) },
+                                            onClick = {
+                                                if (code == 0) {
+                                                    bleManager.forceScreenPower(false)
+                                                } else {
+                                                    bleManager.forceScreenPower(true, code)
+                                                }
+                                            },
                                             label = {
                                                 Text(
                                                     text = label,
-                                                    fontSize = 10.sp,
-                                                    fontWeight = if (settings.screenTimeout == code) FontWeight.Bold else FontWeight.Normal,
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    maxLines = 1
+                                                    fontSize = 11.sp,
+                                                    fontWeight = if (settings.screenTimeout == code) FontWeight.Bold else FontWeight.Normal
                                                 )
-                                            },
-                                            modifier = Modifier.weight(1f)
+                                            }
                                         )
                                     }
                                 }
@@ -1929,6 +1978,83 @@ fun CuktechDashboardScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearHistoryDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    if (showScreenOnTimeoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showScreenOnTimeoutDialog = false },
+            icon = { Icon(Icons.Default.LightMode, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Turn Screen On") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Select how long the charger display should stay illuminated before sleeping:",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    val options = listOf(
+                        4 to ("Always On (Default)" to "Display stays illuminated continuously"),
+                        5 to ("1 Minute" to "Turns off display after 1 min of inactivity"),
+                        1 to ("5 Minutes" to "Turns off display after 5 min of inactivity"),
+                        2 to ("10 Minutes" to "Turns off display after 10 min of inactivity"),
+                        3 to ("30 Minutes" to "Turns off display after 30 min of inactivity")
+                    )
+
+                    options.forEach { (code, pair) ->
+                        val (label, desc) = pair
+                        val isSelected = (pendingScreenTimeoutCode == code)
+                        Surface(
+                            onClick = { pendingScreenTimeoutCode = code },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { pendingScreenTimeoutCode = code }
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = label,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(text = desc, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showScreenOnTimeoutDialog = false
+                        bleManager.forceScreenPower(true, pendingScreenTimeoutCode)
+                        Toast.makeText(context, "Screen turned ON (Timeout: ${CuktechProtocol.SCREEN_TIMEOUTS[pendingScreenTimeoutCode] ?: "Always On"})", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Text("Turn On Screen")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showScreenOnTimeoutDialog = false }) {
                     Text("Cancel")
                 }
             }

@@ -23,10 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import android.os.Build
-import android.view.autofill.AutofillManager
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -64,16 +60,8 @@ fun XiaomiAccountLoginDialog(
     onDevicesSynced: (List<CuktechDeviceCredentials>) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val localView = LocalView.current
     var selectedTab by remember { mutableStateOf(0) } // 0 = QR Login, 1 = Password Login, 2 = Manual/JSON
     var selectedRegion by remember { mutableStateOf("cn") }
-
-    LaunchedEffect(selectedTab) {
-        if (selectedTab == 1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            kotlinx.coroutines.delay(200)
-            localView.requestAutofill()
-        }
-    }
 
     // QR Login state
     var qrSession by remember { mutableStateOf<QrLoginSession?>(null) }
@@ -382,13 +370,7 @@ fun XiaomiAccountLoginDialog(
                                         keyboardType = KeyboardType.Email,
                                         imeAction = ImeAction.Next
                                     ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .onFocusChanged {
-                                            if (it.isFocused && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                                localView.requestAutofill()
-                                            }
-                                        }
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                                 var passwordVisible by remember { mutableStateOf(false) }
                                 OutlinedTextField(
@@ -409,13 +391,7 @@ fun XiaomiAccountLoginDialog(
                                             )
                                         }
                                     },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .onFocusChanged {
-                                            if (it.isFocused && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                                localView.requestAutofill()
-                                            }
-                                        }
+                                    modifier = Modifier.fillMaxWidth()
                                 )
 
                                 Text(

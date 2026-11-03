@@ -1717,6 +1717,19 @@ class CuktechBleManager(
         }
     }
 
+    fun forceScreenPower(turnOn: Boolean, timeoutCode: Int = 4) {
+        scope.launch {
+            if (turnOn) {
+                setIdleScreenOff(false)
+                setScreenTimeout(timeoutCode)
+                gotoScreen(1)
+            } else {
+                setScreenTimeout(0)
+                setIdleScreenOff(true)
+            }
+        }
+    }
+
     fun setPortCountdown(portId: Int, countdownCode: Int) {
         if (portId !in 1..4 || countdownCode !in CuktechProtocol.COUNTDOWN_OPTIONS.keys) return
         val piid = CuktechProtocol.PIID_COUNTDOWN_C1 + (portId - 1)

@@ -1954,7 +1954,8 @@ class CuktechBleManager(
         } else {
             val title = "BLE Cuktech10 Gateway"
             val content = when (_authState.value) {
-                CuktechAuthState.CONNECTING, CuktechAuthState.CONNECTED -> "Connecting to CUKTECH 10 Ultra..."
+                CuktechAuthState.CONNECTING_GATT, CuktechAuthState.DISCOVERING_SERVICES,
+                CuktechAuthState.PHASE_A_INIT_A4, CuktechAuthState.PHASE_B_HANDSHAKE -> "Connecting to CUKTECH 10 Ultra..."
                 CuktechAuthState.AUTH_FAILED -> "Auth failed · Check credentials"
                 else -> "Ready · Service active"
             }

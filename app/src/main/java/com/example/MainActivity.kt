@@ -120,6 +120,7 @@ fun BleBridgeDashboard(
     val activeCred by cuktechManager.credentialStore.activeDevice.collectAsState()
     val cuktechAuthState by cuktechManager.authState.collectAsState()
     val cuktechDevInfo by cuktechManager.deviceInfo.collectAsState()
+    val cuktechTotalWatts by cuktechManager.totalPowerWatts.collectAsState()
     val diagStatus by bleDiagnostics.status.collectAsState()
 
     BackHandler(enabled = showTelemetryScreen) {
@@ -625,13 +626,7 @@ fun BleBridgeDashboard(
                                     } else {
                                         context.stopService(intent)
                                     }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = appColors.primary,
-                                    uncheckedThumbColor = appColors.textSecondary,
-                                    uncheckedTrackColor = appColors.surfaceVariant
-                                )
+                                }
                             )
                         }
 
@@ -995,14 +990,15 @@ fun BleBridgeDashboard(
                                         Spacer(modifier = Modifier.width(12.dp))
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = cuktechDevInfo.name.ifBlank { activeCred?.deviceName ?: "CUKTECH 10 Ultra" },
+                                                text = cuktechDevInfo.name.ifBlank { activeCred?.name ?: "CUKTECH 10 Ultra" },
                                                 fontWeight = FontWeight.Bold,
                                                 color = appColors.textPrimary,
                                                 fontSize = 14.sp
                                             )
                                             val statusStr = when (cuktechAuthState) {
                                                 CuktechAuthState.AUTHENTICATED -> "Authenticated · ${"%.1f".format(cuktechTotalWatts)}W"
-                                                CuktechAuthState.CONNECTING, CuktechAuthState.CONNECTED -> "Connecting / Handshake..."
+                                                CuktechAuthState.CONNECTING_GATT, CuktechAuthState.DISCOVERING_SERVICES,
+                                                CuktechAuthState.PHASE_A_INIT_A4, CuktechAuthState.PHASE_B_HANDSHAKE -> "Connecting / Handshake..."
                                                 CuktechAuthState.AUTH_FAILED -> "Auth Failed"
                                                 else -> "Saved · Ready to connect"
                                             }

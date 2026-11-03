@@ -113,11 +113,31 @@ class CuktechPersistence(private val context: Context) :
                 put("avg_watts", session.avgWatts)
                 put("protocol_used", session.protocolUsed)
             }
-            writableDatabase.insert("charge_sessions", null, cv)
+            val id = writableDatabase.insert("charge_sessions", null, cv)
+            pruneOldSessions(maxRetained = 300)
+            id
         }.getOrDefault(-1L)
     }
 
-    fun getRecentSessions(limit: Int = 200): List<ChargeSessionRecord> {
+    /**
+     * Auto-prunes older completed sessions beyond [maxRetained] (default 300).
+     * Keeps the most recent records based on start_ts so the database never grows unbounded.
+     */
+    fun pruneOldSessions(maxRetained: Int = 300) {
+        runCatching {
+            writableDatabase.execSQL(
+                """
+                DELETE FROM charge_sessions 
+                WHERE id NOT IN (
+                    SELECT id FROM charge_sessions ORDER BY start_ts DESC LIMIT ?
+                )
+                """.trimIndent(),
+                arrayOf(maxRetained.toString())
+            )
+        }
+    }
+
+    fun getRecentSessions(limit: Int = 300): List<ChargeSessionRecord> {
         val result = mutableListOf<ChargeSessionRecord>()
         runCatching {
             readableDatabase.rawQuery(

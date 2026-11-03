@@ -174,14 +174,6 @@ fun BleBridgeDashboard(
     ) {
         val btManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         if (btManager?.adapter?.isEnabled == true) {
-            val svcIntent = Intent(context, BleBridgeService::class.java)
-            runCatching {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(svcIntent)
-                } else {
-                    context.startService(svcIntent)
-                }
-            }
             pendingPermissionCallback?.invoke()
             pendingPermissionCallback = null
         } else {
@@ -199,14 +191,6 @@ fun BleBridgeDashboard(
             if (btManager?.adapter?.isEnabled != true) {
                 showBluetoothOffDialog = true
                 return@rememberLauncherForActivityResult
-            }
-            val svcIntent = Intent(context, BleBridgeService::class.java)
-            runCatching {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(svcIntent)
-                } else {
-                    context.startService(svcIntent)
-                }
             }
             pendingPermissionCallback?.invoke()
             pendingPermissionCallback = null
@@ -233,14 +217,6 @@ fun BleBridgeDashboard(
         }
 
         permissionsGranted = true
-        val svcIntent = Intent(context, BleBridgeService::class.java)
-        runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(svcIntent)
-            } else {
-                context.startService(svcIntent)
-            }
-        }
         onReady()
     }
 
@@ -252,14 +228,6 @@ fun BleBridgeDashboard(
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
         } else {
             permissionsGranted = true
-            val svcIntent = Intent(context, BleBridgeService::class.java)
-            runCatching {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(svcIntent)
-                } else {
-                    context.startService(svcIntent)
-                }
-            }
         }
         BleBridgeService.checkForUpdates()
     }

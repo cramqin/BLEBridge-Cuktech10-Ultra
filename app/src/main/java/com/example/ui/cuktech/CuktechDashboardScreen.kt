@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.example.ui.cuktech
 
 import android.content.ClipData
@@ -67,6 +68,7 @@ import com.example.cuktech.protocol.PortTelemetry
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun CuktechDashboardScreen(
     bleManager: CuktechBleManager,
@@ -1057,6 +1059,33 @@ fun CuktechDashboardScreen(
                                         modifier = Modifier.align(Alignment.CenterHorizontally)
                                     ) {
                                         Text("View All Consolidated Sessions (${completedSessions.size}) ➔", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+
+                                if (completedSessions.size >= 300) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        shape = RoundedCornerShape(6.dp),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Info,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "300-session rolling history limit reached: oldest sessions are automatically purged as new ones complete.",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -2388,40 +2417,32 @@ private fun detectDeviceType(port: PortTelemetry): String? {
     val code = port.mijiaProtocolCode ?: 0
 
     return when {
-        // Xiaomi proprietary HyperCharge / Fast Charge (67W, 90W, 120W)
+        // Xiaomi proprietary HyperCharge / Fast Charge (67W, 90W, 120W) detected by charger
         code in listOf(17, 18, 19) || proto.contains("Xiaomi", ignoreCase = true) ->
-            "Xiaomi HyperCharge Device (Mi / Redmi / POCO)"
-        // Apple 2.4A or Apple PD negotiation
+            "Xiaomi HyperCharge Device"
+        // Apple 2.4A detected by charger hardware divider
         code == 12 || proto.contains("Apple", ignoreCase = true) ->
             "Apple Device (iPhone / iPad)"
-        // Oppo / OnePlus
-        code in listOf(23, 24) || proto.contains("VOOC", ignoreCase = true) ->
-            "OPPO / OnePlus Device (VOOC)"
-        // Huawei / Honor
-        code in listOf(15, 16) || proto.contains("SCP", ignoreCase = true) || proto.contains("FCP", ignoreCase = true) ->
-            "Huawei / Honor Device (SuperCharge)"
-        // Samsung Adaptive Fast Charge
-        code == 14 || proto.contains("AFC", ignoreCase = true) ->
-            "Samsung Device (Adaptive Fast Charging)"
-        // PPS (Samsung Super Fast Charging or high-speed PPS)
+        // PPS (Programmable Power Supply) negotiated
         code in listOf(7, 9) || proto.contains("PPS", ignoreCase = true) ->
-            if (w >= 20.0) "Samsung / PPS Fast Charge (Super Fast)" else "PPS Fast Charge Device"
-        // UFCS
-        code == 20 || proto.contains("UFCS", ignoreCase = true) ->
-            "UFCS Universal Fast Charge Device"
+            "PPS Fast Charge Device"
         // High-power USB-PD (Laptop / MacBook)
         proto.contains("PD", ignoreCase = true) && (w >= 45.0 || v >= 19.0) ->
-            "Laptop / MacBook (USB-PD High Power)"
-        proto.contains("PD", ignoreCase = true) && w in 15.0..44.0 ->
-            "USB-PD Fast Charge (Phone / Tablet)"
+            "USB-PD High Power (Laptop / MacBook)"
+        // Standard USB-PD
         proto.contains("PD", ignoreCase = true) ->
-            "USB-PD Device"
-        port.isCharging ->
-            "USB Powered Device"
+            "USB-PD Fast Charge"
+        // UFCS (Universal Fast Charging Spec)
+        code == 20 || proto.contains("UFCS", ignoreCase = true) ->
+            "UFCS Fast Charge"
+        // General active protocol reported by charger
+        port.isCharging && proto.isNotBlank() && proto != "Idle" && proto != "Normal" ->
+            "$proto Device"
         else -> null
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun PortTelemetryCard(
     port: PortTelemetry,
@@ -3481,7 +3502,10 @@ private fun ConsolidatedSessionsTableDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Consolidated Charging History (${allSessions.size})", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Column {
+                    Text("Consolidated Charging History (${allSessions.size})", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Rolling history: up to 300 sessions retained (oldest deleted upon exceeding 300)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         },
         text = {

@@ -196,7 +196,7 @@ class CuktechBleManager(
 
     init {
         credentialStore.tryAutoImportLocalCredentialsFile()
-        _completedSessions.value = persistence.getRecentSessions(200)
+        _completedSessions.value = persistence.getRecentSessions(300)
         _chargeLimits.value = persistence.loadPortChargeLimits()
         credentialStore.activeDevice.value?.let { cred ->
             _deviceInfo.value = _deviceInfo.value.copy(
@@ -1365,7 +1365,7 @@ class CuktechBleManager(
         val finishedSession = detector.onSample(decoded.powerW, deltaWh, decoded.protocolName, nowSec)
         if (finishedSession != null) {
             persistence.insertCompletedSession(finishedSession)
-            _completedSessions.value = persistence.getRecentSessions(200)
+            _completedSessions.value = persistence.getRecentSessions(300)
         }
 
         val updatedActive = _activeSessions.value.toMutableMap()
@@ -1995,12 +1995,17 @@ class CuktechBleManager(
 
             BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content)
         } else {
+            val isServerRunning = BleBridgeService.getInstance()?.isServerRunning?.value == true
+            if (!isServerRunning && _authState.value == CuktechAuthState.DISCONNECTED) {
+                BleBridgeService.getInstance()?.dismissForegroundNotificationIfIdle()
+                return
+            }
             val title = "BLE Cuktech10 Gateway"
             val content = when (_authState.value) {
                 CuktechAuthState.CONNECTING_GATT, CuktechAuthState.DISCOVERING_SERVICES,
                 CuktechAuthState.PHASE_A_INIT_A4, CuktechAuthState.PHASE_B_HANDSHAKE -> "Connecting to CUKTECH 10 Ultra..."
                 CuktechAuthState.AUTH_FAILED -> "Auth failed · Check credentials"
-                else -> "Ready · Service active"
+                else -> if (isServerRunning) "TCP Server Active · Listening" else "Ready"
             }
             BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content)
         }
@@ -2284,7 +2289,7 @@ class CuktechBleManager(
 
     fun clearHistory(option: com.example.cuktech.db.CuktechPersistence.ClearHistoryOption) {
         persistence.clearHistory(option)
-        _completedSessions.value = persistence.getRecentSessions(200)
+        _completedSessions.value = persistence.getRecentSessions(300)
         when (option) {
             com.example.cuktech.db.CuktechPersistence.ClearHistoryOption.CLEAR_ALL -> {
                 sessionDetectors.values.forEach { it.reset() }

@@ -88,9 +88,11 @@ class BleBridgeService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        createNotificationChannelAndStartForeground()
-
         val action = intent?.action
+        if (action == ACTION_START_SERVER || action == ACTION_CONNECT_CUKTECH) {
+            createNotificationChannelAndStartForeground()
+        }
+
         if (action == ACTION_START_SERVER) {
             val port = intent.getIntExtra(EXTRA_PORT, 8080)
             startTcpServer(port)
@@ -98,17 +100,42 @@ class BleBridgeService : Service() {
             stopTcpServer()
             closeGattClean()
             stopBleScan()
-            stopSelf()
+            dismissForegroundNotificationIfIdle()
         } else if (action == ACTION_CONNECT_CUKTECH) {
             val mac = intent.getStringExtra(EXTRA_MAC)
             cuktechManager?.connectToCharger(mac)
         } else if (action == ACTION_DISCONNECT_CUKTECH) {
             cuktechManager?.disconnectCharger()
+            dismissForegroundNotificationIfIdle()
         } else if (action == ACTION_SCAN_CUKTECH) {
             cuktechManager?.startSearchForCuktechChargers(10000L)
+        } else {
+            dismissForegroundNotificationIfIdle()
         }
 
         return START_STICKY
+    }
+
+    fun dismissForegroundNotificationIfIdle() {
+        val isServerActive = serverJob != null && serverJob?.isActive == true
+        val isBleActive = cuktechManager?.authState?.value != null &&
+                cuktechManager?.authState?.value != com.example.cuktech.ble.CuktechAuthState.DISCONNECTED
+        if (!isServerActive && !isBleActive) {
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                nm?.cancel(NOTIFICATION_ID)
+                lastNotifTitle = ""
+                lastNotifContent = ""
+                releaseWakeLock()
+                stopSelf()
+            }
+        }
     }
 
     private var wakeLock: PowerManager.WakeLock? = null

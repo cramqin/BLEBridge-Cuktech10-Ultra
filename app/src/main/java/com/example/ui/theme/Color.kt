@@ -9,9 +9,9 @@ val LightSurfaceVariant = Color(0xFFEDF2F7)
 val LightBorder = Color(0xFFCBD5E1)
 val LightTextPrimary = Color(0xFF0F172A)
 val LightTextSecondary = Color(0xFF475569)
-val LightPrimary = Color(0xFF009BB0) // CUKTECH Charger Signature Cyan for Light Mode
+val LightPrimary = Color(0xFF007A87) // Refined Deep High-Contrast Cyan for Light Mode readability
 val LightPrimaryContainer = Color(0xFFE0F7FA)
-val LightOnPrimaryContainer = Color(0xFF006064)
+val LightOnPrimaryContainer = Color(0xFF004D56)
 
 // Dark Theme Palette (CUKTECH 10 Ultra Obsidian Gunmetal & Cyber Cyan)
 val DarkBackground = Color(0xFF0B0D13)

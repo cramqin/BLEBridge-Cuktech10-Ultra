@@ -286,8 +286,8 @@ fun CuktechDashboardScreen(
                                 pagerState.animateScrollToPage(idx)
                             }
                         },
-                        selectedContentColor = Color(0xFF00E5FF),
-                        unselectedContentColor = Color(0xFF64748B)
+                        selectedContentColor = MaterialTheme.colorScheme.primary,
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ) {
                         Column(
                             modifier = Modifier
@@ -472,7 +472,7 @@ fun CuktechDashboardScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text("Scenarios", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    Text(activeModeLabel, fontSize = 12.sp, color = Color(0xFF00E5FF), fontWeight = FontWeight.SemiBold)
+                                    Text(activeModeLabel, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                                 }
 
                                 Row(
@@ -496,11 +496,11 @@ fun CuktechDashboardScreen(
                                                     .size(52.dp)
                                                     .clip(CircleShape)
                                                     .background(
-                                                        if (isSelected) Color(0xFF00E5FF).copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceVariant
+                                                        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant
                                                     )
                                                     .border(
                                                         width = if (isSelected) 1.5.dp else 0.dp,
-                                                        color = if (isSelected) Color(0xFF00E5FF) else Color.Transparent,
+                                                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                                                         shape = CircleShape
                                                     ),
                                                 contentAlignment = Alignment.Center
@@ -516,7 +516,7 @@ fun CuktechDashboardScreen(
                                                 text = label,
                                                 fontSize = 11.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
                                     }
@@ -784,17 +784,17 @@ fun CuktechDashboardScreen(
                                 )
                                 CuktechProtocol.SCENE_MODES.forEach { (code, label) ->
                                     val desc = modeDescriptions[code] ?: ""
-                                    val isSelected = (settings.sceneMode == code)
+                                    val isDark = isSystemInDarkTheme()
                                     Surface(
                                         color = if (isSelected) {
-                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                                            if (isDark) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                                         } else {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                            if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                         },
                                         border = BorderStroke(
-                                            1.dp,
-                                            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                                            else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                                            if (isSelected) 1.5.dp else 1.dp,
+                                            if (isSelected) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.outline.copy(alpha = if (isDark) 0.25f else 0.4f)
                                         ),
                                         shape = RoundedCornerShape(10.dp),
                                         modifier = Modifier
@@ -814,9 +814,18 @@ fun CuktechDashboardScreen(
                                             )
                                             Spacer(modifier = Modifier.width(16.dp))
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(label, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                Text(
+                                                    text = label,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                                )
                                                 if (desc.isNotBlank()) {
-                                                    Text(desc, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Text(
+                                                        text = desc,
+                                                        fontSize = 10.sp,
+                                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
                                                 }
                                             }
                                         }
@@ -1279,8 +1288,8 @@ fun CuktechDashboardScreen(
                                                 )
                                             },
                                             colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = Color(0xFF00E5FF),
-                                                selectedLabelColor = Color(0xFF0A0E1A)
+                                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                             )
                                         )
                                     }
@@ -1315,12 +1324,17 @@ fun CuktechDashboardScreen(
                                 ) {
                                     CuktechProtocol.LANGUAGE_OPTIONS.forEach { (code, name) ->
                                         val isSelected = (localLanguage == code)
+                                        val isDark = isSystemInDarkTheme()
                                         Surface(
                                             shape = RoundedCornerShape(10.dp),
-                                            color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.surfaceVariant,
+                                            color = if (isSelected) {
+                                                if (isDark) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+                                            } else {
+                                                MaterialTheme.colorScheme.surfaceVariant
+                                            },
                                             border = BorderStroke(
                                                 width = if (isSelected) 1.5.dp else 1.dp,
-                                                color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
                                             ),
                                             modifier = Modifier
                                                 .weight(1f)
@@ -1339,14 +1353,14 @@ fun CuktechDashboardScreen(
                                                     Icon(
                                                         imageVector = Icons.Default.Check,
                                                         contentDescription = null,
-                                                        tint = Color(0xFF0A0E1A),
+                                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                                         modifier = Modifier.size(16.dp)
                                                     )
                                                     Spacer(Modifier.width(6.dp))
                                                 }
                                                 Text(
                                                     text = name,
-                                                    color = if (isSelected) Color(0xFF0A0E1A) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                                                     fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
                                                     fontSize = 13.sp
                                                 )
@@ -1695,8 +1709,8 @@ fun CuktechDashboardScreen(
                     },
                     shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF00E5FF),
-                        contentColor = Color.Black
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                     modifier = Modifier.height(38.dp)
                 ) {
@@ -1946,11 +1960,16 @@ fun CuktechDashboardScreen(
                     options.forEach { (code, pair) ->
                         val (label, desc) = pair
                         val isSelected = (pendingScreenTimeoutCode == code)
+                        val isDark = isSystemInDarkTheme()
                         Surface(
                             onClick = { pendingScreenTimeoutCode = code },
                             shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
+                            color = if (isSelected) {
+                                if (isDark) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+                            } else {
+                                if (isDark) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            },
+                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (isDark) 0.25f else 0.4f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -1971,9 +1990,13 @@ fun CuktechDashboardScreen(
                                         text = label,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                     )
-                                    Text(text = desc, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        text = desc,
+                                        fontSize = 11.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }
@@ -2014,10 +2037,10 @@ private fun cuktechSwitchColors(): SwitchColors {
 
 @Composable
 private fun cuktechRadioButtonColors(): RadioButtonColors {
-    val appColors = com.example.ui.theme.LocalAppColors.current
+    val dark = isSystemInDarkTheme()
     return RadioButtonDefaults.colors(
-        selectedColor = appColors.primary,
-        unselectedColor = Color(0xFF64748B)
+        selectedColor = MaterialTheme.colorScheme.primary,
+        unselectedColor = if (dark) Color(0xFF64748B) else MaterialTheme.colorScheme.outline
     )
 }
 
@@ -2125,11 +2148,21 @@ private fun PortTelemetryCard(
     onOpenChargeLimit: () -> Unit,
     onOpenClosureTimeDialog: () -> Unit
 ) {
-    val accentColor = when (port.portId) {
-        1 -> Color(0xFF38BDF8)
-        2 -> Color(0xFF818CF8)
-        3 -> Color(0xFF34D399)
-        else -> Color(0xFFFBBF24)
+    val isDark = isSystemInDarkTheme()
+    val accentColor = if (isDark) {
+        when (port.portId) {
+            1 -> Color(0xFF38BDF8)
+            2 -> Color(0xFF818CF8)
+            3 -> Color(0xFF34D399)
+            else -> Color(0xFFFBBF24)
+        }
+    } else {
+        when (port.portId) {
+            1 -> Color(0xFF0284C7) // Sky 600 - crisp on white
+            2 -> Color(0xFF6366F1) // Indigo 500 - crisp on white
+            3 -> Color(0xFF059669) // Emerald 600 - crisp on white
+            else -> Color(0xFFD97706) // Amber 600 - crisp on white
+        }
     }
 
     val cardModifier = if (bringIntoViewRequester != null) {
@@ -3084,7 +3117,7 @@ private fun SessionDetailDialog(
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Protocol:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(session.protocolUsed, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00E5FF))
+                            Text(session.protocolUsed, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Energy Delivered:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -3220,7 +3253,7 @@ private fun ConsolidatedSessionsTableDialog(
                                         Text(
                                             text = cleanProto,
                                             fontSize = 9.sp,
-                                            color = Color(0xFF00E5FF),
+                                            color = MaterialTheme.colorScheme.primary,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )

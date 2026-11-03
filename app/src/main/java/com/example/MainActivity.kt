@@ -813,87 +813,6 @@ fun BleBridgeDashboard(
                     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
 
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = appColors.surface),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = "BACKGROUND KEEPALIVE & SYSTEM INTEGRATION",
-                            fontWeight = FontWeight.Bold,
-                            color = appColors.textSecondary,
-                            fontSize = 10.sp,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "Keeps the background BLE bridge and TCP server active when screen turns off or when switching apps.",
-                            fontSize = 12.sp,
-                            color = appColors.textSecondary,
-                            lineHeight = 16.sp
-                        )
-
-                        Surface(
-                            color = if (isBatteryIgnored) Color(0xFF10B981).copy(alpha = 0.12f) else appColors.surfaceVariant,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (isBatteryIgnored) Icons.Default.CheckCircle else Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = if (isBatteryIgnored) Color(0xFF10B981) else Color(0xFFF59E0B),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (isBatteryIgnored) {
-                                        "Battery optimizations ignored (Keepalive active)"
-                                    } else {
-                                        "Battery optimization active (May be throttled by OS)"
-                                    },
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = if (isBatteryIgnored) Color(0xFF10B981) else appColors.textPrimary
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                if (isBatteryIgnored) {
-                                    Toast.makeText(context, "Battery optimizations are already disabled for this app.", Toast.LENGTH_SHORT).show()
-                                }
-                                bleDiagnostics.requestIgnoreBatteryOptimizations()
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isBatteryIgnored) appColors.surfaceVariant else appColors.primary,
-                                contentColor = if (isBatteryIgnored) appColors.textPrimary else Color.White
-                            ),
-                            modifier = Modifier.fillMaxWidth().height(44.dp)
-                        ) {
-                            Icon(Icons.Default.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isBatteryIgnored) "Battery Settings (Already Set)" else "Ignore Battery Optimization",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
                 // --- CUKTECH 10 Ultra & Xiaomi Cloud Section ---
                 Card(
                     colors = CardDefaults.cardColors(containerColor = appColors.surface),
@@ -1132,6 +1051,88 @@ fun BleBridgeDashboard(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+
+                // --- Background Keepalive & System Integration Section ---
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = appColors.surface),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = "BACKGROUND KEEPALIVE & SYSTEM INTEGRATION",
+                            fontWeight = FontWeight.Bold,
+                            color = appColors.textSecondary,
+                            fontSize = 10.sp,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "Keeps the background BLE bridge and TCP server active when screen turns off or when switching apps.",
+                            fontSize = 12.sp,
+                            color = appColors.textSecondary,
+                            lineHeight = 16.sp
+                        )
+
+                        Surface(
+                            color = if (isBatteryIgnored) Color(0xFF10B981).copy(alpha = 0.12f) else appColors.surfaceVariant,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (isBatteryIgnored) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = if (isBatteryIgnored) Color(0xFF10B981) else Color(0xFFF59E0B),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (isBatteryIgnored) {
+                                        "Battery optimizations ignored (Keepalive active)"
+                                    } else {
+                                        "Battery optimization active (May be throttled by OS)"
+                                    },
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (isBatteryIgnored) Color(0xFF10B981) else appColors.textPrimary
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                if (isBatteryIgnored) {
+                                    Toast.makeText(context, "Battery optimizations are already disabled for this app.", Toast.LENGTH_SHORT).show()
+                                }
+                                bleDiagnostics.requestIgnoreBatteryOptimizations()
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isBatteryIgnored) appColors.surfaceVariant else appColors.primary,
+                                contentColor = if (isBatteryIgnored) appColors.textPrimary else Color.White
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(44.dp)
+                        ) {
+                            Icon(Icons.Default.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isBatteryIgnored) "Battery Settings (Already Set)" else "Ignore Battery Optimization",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

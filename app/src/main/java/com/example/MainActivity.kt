@@ -951,21 +951,16 @@ fun BleBridgeDashboard(
                             )
                         }
 
-                        // Live Telemetry Card (Shown directly below Search & Pair when paired or active)
-                        if (activeCred != null || savedDevices.isNotEmpty() || cuktechAuthState == CuktechAuthState.AUTHENTICATED) {
+                        // Live Telemetry Card (Shown directly below Search & Pair on successful pair / connected)
+                        if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) {
                             Spacer(modifier = Modifier.height(12.dp))
                             Surface(
                                 color = appColors.surfaceVariant.copy(alpha = 0.5f),
                                 shape = RoundedCornerShape(14.dp),
-                                border = BorderStroke(1.dp, if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) Color(0xFF00E5FF) else appColors.border),
+                                border = BorderStroke(1.dp, Color(0xFF00E5FF)),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable {
-                                        if (activeCred != null && cuktechAuthState != CuktechAuthState.AUTHENTICATED) {
-                                            cuktechManager.connectToCharger(activeCred?.mac)
-                                        }
-                                        showTelemetryScreen = true
-                                    }
+                                    .clickable { showTelemetryScreen = true }
                             ) {
                                 Row(
                                     modifier = Modifier.padding(14.dp),
@@ -977,13 +972,13 @@ fun BleBridgeDashboard(
                                             modifier = Modifier
                                                 .size(38.dp)
                                                 .clip(RoundedCornerShape(10.dp))
-                                                .background(if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) Color(0xFF00E5FF) else appColors.primary),
+                                                .background(Color(0xFF00E5FF)),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Bolt,
                                                 contentDescription = null,
-                                                tint = if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) Color(0xFF0A0E1A) else Color.White,
+                                                tint = Color(0xFF0A0E1A),
                                                 modifier = Modifier.size(24.dp)
                                             )
                                         }
@@ -995,16 +990,9 @@ fun BleBridgeDashboard(
                                                 color = appColors.textPrimary,
                                                 fontSize = 14.sp
                                             )
-                                            val statusStr = when (cuktechAuthState) {
-                                                CuktechAuthState.AUTHENTICATED -> "Authenticated · ${"%.1f".format(cuktechTotalWatts)}W"
-                                                CuktechAuthState.CONNECTING_GATT, CuktechAuthState.DISCOVERING_SERVICES,
-                                                CuktechAuthState.PHASE_A_INIT_A4, CuktechAuthState.PHASE_B_HANDSHAKE -> "Connecting / Handshake..."
-                                                CuktechAuthState.AUTH_FAILED -> "Auth Failed"
-                                                else -> "Saved · Ready to connect"
-                                            }
                                             Text(
-                                                text = statusStr,
-                                                color = if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) StatusSuccess else appColors.textSecondary,
+                                                text = "Authenticated · ${"%.1f".format(cuktechTotalWatts)}W",
+                                                color = StatusSuccess,
                                                 fontWeight = FontWeight.SemiBold,
                                                 fontSize = 12.sp
                                             )
@@ -1012,15 +1000,10 @@ fun BleBridgeDashboard(
                                     }
 
                                     Button(
-                                        onClick = {
-                                            if (activeCred != null && cuktechAuthState != CuktechAuthState.AUTHENTICATED) {
-                                                cuktechManager.connectToCharger(activeCred?.mac)
-                                            }
-                                            showTelemetryScreen = true
-                                        },
+                                        onClick = { showTelemetryScreen = true },
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) Color(0xFF00E5FF) else appColors.primary,
-                                            contentColor = if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) Color(0xFF0A0E1A) else Color.White
+                                            containerColor = Color(0xFF00E5FF),
+                                            contentColor = Color(0xFF0A0E1A)
                                         ),
                                         shape = RoundedCornerShape(10.dp),
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
@@ -1227,7 +1210,7 @@ fun BleBridgeDashboard(
                                         items(logs) { msg ->
                                             val logColor = when (msg.level) {
                                                 BleBridgeService.Companion.LogLevel.LEVEL1 -> if (appColors.isDark) Color(0xFFFCA5A5) else Color(0xFFDC2626) // Red
-                                                BleBridgeService.Companion.LogLevel.LEVEL2 -> if (appColors.isDark) Color(0xFFBAE6FD) else Color(0xFF00838F) // Cyan
+                                                BleBridgeService.Companion.LogLevel.LEVEL2 -> if (appColors.isDark) Color(0xFFE2E8F0) else Color(0xFF1E293B) // Dark charcoal in light mode, off-white in dark mode
                                                 BleBridgeService.Companion.LogLevel.LEVEL3 -> if (appColors.isDark) Color(0xFFFDE68A) else Color(0xFFD97706) // Amber
                                             }
                                             Text(

@@ -2021,7 +2021,7 @@ class CuktechBleManager(
                 CuktechAuthState.AUTH_FAILED -> "Auth failed · Check credentials"
                 else -> if (isServerRunning) "TCP Server Active · Listening" else "Ready"
             }
-            BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content, -1.0)
+            BleBridgeService.getInstance()?.updateNotificationTelemetry(title = title, content = content, totalWatts = -1.0)
         }
     }
 

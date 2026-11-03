@@ -358,18 +358,20 @@ class CuktechBleManager(
             pendingMiotResponses.clear()
 
             _authState.value = CuktechAuthState.DISCONNECTED
-            _statusMessage.value = "Disconnected (status=$status)"
+            val isError = (status != BluetoothGatt.GATT_SUCCESS && status != 0)
+            _statusMessage.value = if (isError) "Disconnected (GATT status=$status). Retrying..." else "Disconnected (status=$status)"
 
             if (autoReconnectEnabled && !lastConnectedMac.isNullOrBlank()) {
-                scheduleAutoReconnect(lastConnectedMac!!)
+                val delayMs = if (isError) 4500L else 3000L
+                scheduleAutoReconnect(lastConnectedMac!!, delayMs)
             }
         }
     }
 
-    private fun scheduleAutoReconnect(mac: String) {
+    private fun scheduleAutoReconnect(mac: String, delayMs: Long = 3000L) {
         reconnectJob?.cancel()
         reconnectJob = scope.launch {
-            delay(3500L)
+            delay(delayMs)
             if (autoReconnectEnabled && _authState.value != CuktechAuthState.AUTHENTICATED) {
                 _statusMessage.value = "Attempting auto-reconnect to $mac..."
                 BleBridgeService.getInstance()?.connectBleNative(mac)
@@ -1223,7 +1225,7 @@ class CuktechBleManager(
 
         if (abs(oldTotalW - roundedTotalW) >= 0.5 || System.currentTimeMillis() - lastHistoryWriteMs >= 5000L) {
             BleBridgeService.addLogMessage(
-                BleBridgeService.Companion.LogLevel.LEVEL2,
+                BleBridgeService.Companion.LogLevel.LEVEL3,
                 "[Cuktech] Telemetry: Total=%.1fW (C1=%.1fW, C2=%.1fW, C3=%.1fW, A=%.1fW)".format(
                     roundedTotalW,
                     curPorts[1]?.powerW ?: 0.0,

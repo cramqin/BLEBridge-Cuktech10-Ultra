@@ -548,10 +548,24 @@ class BleBridgeService : Service() {
         closeGattClean()
     }
 
+    fun refreshGattCache(gatt: BluetoothGatt?): Boolean {
+        if (gatt == null) return false
+        return try {
+            val refreshMethod = gatt.javaClass.getMethod("refresh")
+            (refreshMethod.invoke(gatt) as? Boolean) ?: false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun closeGattClean() {
         val gatt = bluetoothGatt
         if (gatt != null) {
             log(LogLevel.LEVEL2, "Executing GATT leak protection & handle teardown...")
+            try {
+                refreshGattCache(gatt)
+            } catch (_: Exception) {}
+
             try {
                 gatt.disconnect()
             } catch (e: SecurityException) {

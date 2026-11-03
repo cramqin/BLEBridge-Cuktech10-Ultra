@@ -1,6 +1,12 @@
 package com.example.ui.cuktech
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
 import android.widget.Toast
+import com.example.BleBridgeService
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -78,6 +84,7 @@ fun CuktechDashboardScreen(
     var chargeLimitDialogPort by remember { mutableStateOf<Int?>(null) }
     var showTaskerDocs by remember { mutableStateOf(false) }
     var showCloudConfig by remember { mutableStateOf(false) }
+    var showMiHomeWarningDialog by remember { mutableStateOf(false) }
 
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     val tabItems = listOf(
@@ -163,7 +170,10 @@ fun CuktechDashboardScreen(
                     if (authState == CuktechAuthState.AUTHENTICATED) {
                         Spacer(modifier = Modifier.width(4.dp))
                         OutlinedButton(
-                            onClick = { bleManager.disconnectCharger() },
+                            onClick = {
+                                bleManager.disconnectCharger()
+                                onNavigateBack?.invoke()
+                            },
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             modifier = Modifier.height(28.dp),
@@ -220,6 +230,93 @@ fun CuktechDashboardScreen(
                             .padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        val activeModeLabel = when (settings.sceneMode) {
+                            1 -> "AI Mode"
+                            2 -> "Hybrid Mode"
+                            3 -> "Single Port Max"
+                            4 -> "Dual Port Mode"
+                            else -> "AI Mode"
+                        }
+
+                        // 1. Hardware Visual Panel (Mi Home Style Charger Graphic)
+                        CuktechChargerVisual(
+                            portsMap = portsMap,
+                            modeLabel = activeModeLabel,
+                            onPortClick = { selectedTab = 1 },
+                            modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
+                        )
+
+                        // 2. Scenarios Mode Selector (Mi Home Style Circular Chips)
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Scenarios", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text(activeModeLabel, fontSize = 12.sp, color = Color(0xFF00E5FF), fontWeight = FontWeight.SemiBold)
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    val modes = listOf(
+                                        Triple(1, "AI", "AI Mode"),
+                                        Triple(2, "Laptop", "Hybrid"),
+                                        Triple(3, "Bolt", "Single"),
+                                        Triple(4, "Dual", "Dual")
+                                    )
+                                    modes.forEach { (code, iconType, label) ->
+                                        val isSelected = settings.sceneMode == code
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            modifier = Modifier.clickable { bleManager.setSceneMode(code) }
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(48.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        if (isSelected) Color(0xFF00E5FF).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant
+                                                    )
+                                                    .border(
+                                                        width = if (isSelected) 1.5.dp else 0.dp,
+                                                        color = if (isSelected) Color(0xFF00E5FF) else Color.Transparent,
+                                                        shape = CircleShape
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                when (iconType) {
+                                                    "AI" -> Text("AI", fontWeight = FontWeight.Black, fontSize = 14.sp, color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    "Laptop" -> Icon(Icons.Default.Laptop, contentDescription = null, tint = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                                                    "Bolt" -> Icon(Icons.Default.Bolt, contentDescription = null, tint = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                                                    "Dual" -> Icon(Icons.Default.Tune, contentDescription = null, tint = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                                                }
+                                            }
+                                            Spacer(Modifier.height(4.dp))
+                                            Text(
+                                                text = label,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) Color(0xFF00E5FF) else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         // Total Output Power Hero Card (Streamlined, no wasted space)
                         Card(
                             modifier = Modifier.fillMaxWidth(),
@@ -239,7 +336,7 @@ fun CuktechDashboardScreen(
                                 ) {
                                     Column {
                                         Text(
-                                            text = "TOTAL OUTPUT POWER",
+                                            text = "CURRENT POWER",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -270,22 +367,89 @@ fun CuktechDashboardScreen(
                                             fontFamily = FontFamily.Monospace,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
+                                        if (devInfo.firmwareVersion.isNotBlank() && devInfo.firmwareVersion != "--" && !devInfo.firmwareVersion.contains('\uFFFD')) {
+                                            Text(
+                                                text = "FW: ${devInfo.firmwareVersion}",
+                                                fontSize = 11.sp,
+                                                fontFamily = FontFamily.Monospace,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Multi-color Port Breakdown Legend (Mi Home Palette)
+                                val p1 = portsMap[1]?.powerW ?: 0.0
+                                val p2 = portsMap[2]?.powerW ?: 0.0
+                                val p3 = portsMap[3]?.powerW ?: 0.0
+                                val p4 = portsMap[4]?.powerW ?: 0.0
+                                val sumW = p1 + p2 + p3 + p4
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFF7A00)))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("C1: ${if (p1 > 0.1) "%.1fW".format(p1) else "--"}", fontSize = 11.sp)
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF3B82F6)))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("C2: ${if (p2 > 0.1) "%.1fW".format(p2) else "--"}", fontSize = 11.sp)
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF00E5FF)))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("C3: ${if (p3 > 0.1) "%.1fW".format(p3) else "--"}", fontSize = 11.sp)
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFBBF24)))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("A: ${if (p4 > 0.1) "%.1fW".format(p4) else "--"}", fontSize = 11.sp)
+                                    }
+                                }
+
+                                // Stacked Power Proportion Bar
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Power Proportion",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (sumW > 0.1) {
                                         Text(
-                                            text = "FW: ${devInfo.firmwareVersion}",
-                                            fontSize = 11.sp,
+                                            text = "C1: ${(p1/sumW*100).toInt()}% · C2: ${(p2/sumW*100).toInt()}% · C3: ${(p3/sumW*100).toInt()}% · A: ${(p4/sumW*100).toInt()}%",
+                                            fontSize = 10.sp,
                                             fontFamily = FontFamily.Monospace,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                 }
 
-                                LinearProgressIndicator(
-                                    progress = { (totalWatts.toFloat() / 120f).coerceIn(0f, 1f) },
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(8.dp)
                                         .clip(RoundedCornerShape(4.dp))
-                                )
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    if (sumW > 0.1) {
+                                        val f1 = (p1 / sumW).toFloat()
+                                        val f2 = (p2 / sumW).toFloat()
+                                        val f3 = (p3 / sumW).toFloat()
+                                        val f4 = (p4 / sumW).toFloat()
+                                        if (f1 > 0f) Box(Modifier.fillMaxHeight().weight(f1).background(Color(0xFFFF7A00)))
+                                        if (f2 > 0f) Box(Modifier.fillMaxHeight().weight(f2).background(Color(0xFF3B82F6)))
+                                        if (f3 > 0f) Box(Modifier.fillMaxHeight().weight(f3).background(Color(0xFF00E5FF)))
+                                        if (f4 > 0f) Box(Modifier.fillMaxHeight().weight(f4).background(Color(0xFFFBBF24)))
+                                    }
+                                }
                             }
                         }
 
@@ -361,6 +525,27 @@ fun CuktechDashboardScreen(
                         .padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    Text(
+                        text = "Individual Port Controls & Protocols",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        for (portId in 1..4) {
+                            val port = portsMap[portId] ?: PortTelemetry(portId, "Port $portId")
+                            val limit = chargeLimits[portId]
+                            PortTelemetryCard(
+                                port = port,
+                                chargeLimit = limit,
+                                onToggleEnabled = { enabled -> bleManager.setPortEnabled(portId, enabled) },
+                                onSelectCountdown = { code -> bleManager.setPortCountdown(portId, code) },
+                                onOpenChargeLimit = { chargeLimitDialogPort = portId }
+                            )
+                        }
+                    }
+
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
@@ -520,60 +705,23 @@ fun CuktechDashboardScreen(
 
                             // 4. Boolean Switches
                             SettingSwitchRow(
-                                title = "USB-A Low Current Mode (PIID 15)",
+                                title = "USB-A Low Current Mode",
                                 subtitle = "Prevents auto-cutoff for earbuds, fitness bands and smartwatches",
                                 checked = settings.usbALowCurrent,
                                 onCheckedChange = { bleManager.setUsbALowCurrent(it) }
                             )
                             SettingSwitchRow(
-                                title = "Idle Screen Off (PIID 19)",
+                                title = "Idle Screen Off",
                                 subtitle = "Turns off charger's color LCD when all ports are idle",
                                 checked = settings.idleScreenOff,
                                 onCheckedChange = { bleManager.setIdleScreenOff(it) }
                             )
                             SettingSwitchRow(
-                                title = "Screen Orientation Lock (PIID 20)",
+                                title = "Screen Orientation Lock",
                                 subtitle = "Locks the charger's physical screen orientation",
                                 checked = settings.orientationLock,
                                 onCheckedChange = { bleManager.setOrientationLock(it) }
                             )
-
-                            HorizontalDivider()
-
-                            // 5. Charger LCD Screen Language (PIID 13)
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                    text = "Charger LCD Screen Language",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "Changes the language displayed on the charger's physical color LCD screen.",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    CuktechProtocol.LANGUAGE_OPTIONS.forEach { (code, label) ->
-                                        FilterChip(
-                                            selected = settings.language == code,
-                                            onClick = { bleManager.setLanguage(code) },
-                                            label = {
-                                                Text(
-                                                    text = label,
-                                                    fontSize = 12.sp,
-                                                    fontWeight = if (settings.language == code) FontWeight.Bold else FontWeight.Normal,
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    maxLines = 1
-                                                )
-                                            },
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
-                                }
-                            }
                         }
                     }
                 }
@@ -606,18 +754,29 @@ fun CuktechDashboardScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "Charging Session Statistics (Wh)",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Charging Session History",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
+                                    Text(
+                                        text = "Energy (Wh) & power records",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     OutlinedButton(
                                         onClick = {
                                             val file = bleManager.persistence.exportSessionsAndHistoryCsv()
-                                            Toast.makeText(context, "Exported CSV: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(context, "Saved to Downloads: ${file.name}", Toast.LENGTH_LONG).show()
                                         },
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        shape = RoundedCornerShape(8.dp)
                                     ) {
                                         Text("Export CSV", fontSize = 11.sp)
                                     }
@@ -625,7 +784,8 @@ fun CuktechDashboardScreen(
                                         onClick = {
                                             bleManager.persistence.clearSessions()
                                             Toast.makeText(context, "Cleared session history", Toast.LENGTH_SHORT).show()
-                                        }
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text("Clear", fontSize = 11.sp, color = MaterialTheme.colorScheme.error)
                                     }
@@ -820,7 +980,14 @@ fun CuktechDashboardScreen(
                         }
                     }
 
-                    // Background Keepalive & Battery Whitelist Card
+                    val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
+                    val isBatteryIgnored = remember(shizukuStatus) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+                        } else true
+                    }
+
+                    // 1. Background Keepalive & Battery Optimization Card
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
@@ -837,67 +1004,164 @@ fun CuktechDashboardScreen(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             )
-
                             Text(
-                                text = "Prevents Android from killing the background BLE server or dropping Bluetooth connection when your phone screen turns off.",
+                                text = "Keeps BLE gateway connected when screen turns off or when you switch apps.",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            Surface(
+                                color = if (isBatteryIgnored) Color(0xFF10B981).copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Button(
-                                    onClick = { shizukuCompanion.requestIgnoreBatteryOptimizations() },
-                                    modifier = Modifier.weight(1.3f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Ignore Battery Optimization", fontSize = 11.sp, maxLines = 1)
-                                }
-                                OutlinedButton(
-                                    onClick = {
-                                        scope.launch {
-                                            shizukuCompanion.runBluetoothStackDiagnostics()
-                                        }
-                                    },
-                                    modifier = Modifier.weight(0.9f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
-                                ) {
-                                    Text("BLE Diagnostics", fontSize = 11.sp, maxLines = 1)
+                                    Icon(
+                                        imageVector = if (isBatteryIgnored) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = if (isBatteryIgnored) Color(0xFF10B981) else Color(0xFFF59E0B),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isBatteryIgnored) {
+                                            "Battery optimizations ignored (Keepalive active)"
+                                        } else {
+                                            "Battery optimization active (May be throttled by OS)"
+                                        },
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (isBatteryIgnored) Color(0xFF10B981) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
 
-                            if (shizukuStatus.lastDiagnosticOutput.isNotBlank()) {
+                            Button(
+                                onClick = {
+                                    if (isBatteryIgnored) {
+                                        Toast.makeText(context, "Battery optimizations are already disabled for this app.", Toast.LENGTH_SHORT).show()
+                                    }
+                                    shizukuCompanion.requestIgnoreBatteryOptimizations()
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isBatteryIgnored) "Battery Settings (Already Set)" else "Ignore Battery Optimization",
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // 2. Bluetooth Low Energy Diagnostics Card
+                    val hasDiagOutput = shizukuStatus.lastDiagnosticOutput.isNotBlank()
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "Bluetooth Low Energy Diagnostics",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Inspect hardware adapter state, BLE connection parameters, and MiOT protocol status.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Button(
+                                onClick = {
+                                    if (hasDiagOutput) {
+                                        shizukuCompanion.clearDiagnosticOutput()
+                                    } else {
+                                        scope.launch {
+                                            shizukuCompanion.runBluetoothStackDiagnostics()
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = if (hasDiagOutput) ButtonDefaults.filledTonalButtonColors() else ButtonDefaults.buttonColors()
+                            ) {
+                                Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (hasDiagOutput) "Hide BLE Diagnostics" else "Run BLE Diagnostics",
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            if (hasDiagOutput) {
                                 Surface(
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Column(modifier = Modifier.padding(10.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text("Diagnostic Output", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                            TextButton(
-                                                onClick = { shizukuCompanion.clearDiagnosticOutput() },
-                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                                            ) {
-                                                Text("Dismiss", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
-                                            }
-                                        }
+                                    Text(
+                                        text = shizukuStatus.lastDiagnosticOutput,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier.padding(10.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Tasker & Automation Integration Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "Tasker & Automation Integration",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Extension,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text("Tasker Action Plugin Ready", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                         Text(
-                                            text = shizukuStatus.lastDiagnosticOutput,
+                                            "In Tasker: Add Action ➔ Plugin ➔ CUKTECH 10 Ultra",
                                             fontSize = 11.sp,
-                                            fontFamily = FontFamily.Monospace,
-                                            maxLines = 6,
-                                            overflow = TextOverflow.Ellipsis
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -905,22 +1169,12 @@ fun CuktechDashboardScreen(
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                TextButton(onClick = { showCloudConfig = !showCloudConfig }) {
-                                    Text(if (showCloudConfig) "Hide Cloud Bridge (Bemfa/HA)" else "Configure Cloud Bridge (Bemfa/HA)")
-                                }
                                 TextButton(onClick = { showTaskerDocs = !showTaskerDocs }) {
-                                    Text(if (showTaskerDocs) "Hide Tasker Docs" else "View Tasker Broadcast API")
+                                    Text(if (showTaskerDocs) "Hide Broadcast Intent API" else "View Broadcast Intent API (Send Intent)", fontSize = 11.sp)
                                 }
-                            }
-
-                            if (showCloudConfig) {
-                                CloudIntegrationConfigPanel(
-                                    config = integrationCfg,
-                                    bemfaConnected = bemfaConnected,
-                                    onSave = { cloudIntegrations.updateConfig(it) }
-                                )
                             }
 
                             if (showTaskerDocs) {
@@ -955,6 +1209,106 @@ fun CuktechDashboardScreen(
                             }
                         }
                     }
+
+                    // 4. Cloud Bridge Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Cloud Voice & Automation Bridges",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "Bemfa (XiaoAI/Siri) & Home Assistant webhooks",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                TextButton(onClick = { showCloudConfig = !showCloudConfig }) {
+                                    Text(if (showCloudConfig) "Hide" else "Configure", fontSize = 12.sp)
+                                }
+                            }
+
+                            if (showCloudConfig) {
+                                CloudIntegrationConfigPanel(
+                                    config = integrationCfg,
+                                    bemfaConnected = bemfaConnected,
+                                    onSave = { cloudIntegrations.updateConfig(it) }
+                                )
+                            }
+                        }
+                    }
+
+                    // 5. Charger Firmware & Xiaomi Mi Home Updates Card
+                    val miHomePkg = "com.xiaomi.smarthome"
+                    val miHomeLaunchIntent = remember { context.packageManager.getLaunchIntentForPackage(miHomePkg) }
+                    val isMiHomeInstalled = (miHomeLaunchIntent != null)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "Charger Firmware & Official Updates",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Text(
+                                text = "Official firmware upgrades for the CUKTECH 10 Ultra GaN charger require Xiaomi's proprietary Mi Home cloud OTA infrastructure.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Button(
+                                onClick = {
+                                    if (isMiHomeInstalled) {
+                                        showMiHomeWarningDialog = true
+                                    } else {
+                                        try {
+                                            val playIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$miHomePkg")).apply {
+                                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                            }
+                                            context.startActivity(playIntent)
+                                        } catch (_: Exception) {
+                                            Toast.makeText(context, "Xiaomi Mi Home app is not installed.", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6900))
+                            ) {
+                                Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isMiHomeInstalled) "Open in Xiaomi Mi Home" else "Install Mi Home (Play Store)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -964,6 +1318,38 @@ fun CuktechDashboardScreen(
     // =========================================================================
     // DIALOGS
     // =========================================================================
+    if (showMiHomeWarningDialog) {
+        val miHomePkg = "com.xiaomi.smarthome"
+        val miHomeLaunchIntent = context.packageManager.getLaunchIntentForPackage(miHomePkg)
+        AlertDialog(
+            onDismissRequest = { showMiHomeWarningDialog = false },
+            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFF59E0B)) },
+            title = { Text("Switch to Xiaomi Mi Home?") },
+            text = {
+                Text("Xiaomi Mi Home requires exclusive Bluetooth access to check for and install official charger firmware updates.\n\nOpening Mi Home will safely disconnect the BLE Bridge gateway and release the charger handle.\n\nWhen you return to this app, you will be on the Gateway screen ready to reconnect.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showMiHomeWarningDialog = false
+                        bleManager.disconnectCharger()
+                        BleBridgeService.getInstance()?.closeGattClean()
+                        onNavigateBack?.invoke()
+                        miHomeLaunchIntent?.let { context.startActivity(it) }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6900))
+                ) {
+                    Text("Disconnect & Open Mi Home")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMiHomeWarningDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     if (showXiaomiLoginDialog) {
         XiaomiAccountLoginDialog(
             cloudClient = cloudClient,
@@ -1317,44 +1703,95 @@ private fun CloudIntegrationConfigPanel(
     var haEn by remember(config) { mutableStateOf(config.haWebhookEnabled) }
     var haUrl by remember(config) { mutableStateOf(config.haWebhookUrl) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Bemfa Section
+        Card(
+            shape = RoundedCornerShape(10.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
         ) {
-            Text("Bemfa Cloud Voice Bridge (XiaoAI / Siri · ${if (bemfaConnected) "Connected" else "Disconnected"})", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Switch(checked = bemfaEn, onCheckedChange = { bemfaEn = it })
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Bemfa Cloud Voice Bridge", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("XiaoAI & Siri Control", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Surface(
+                                color = if (bemfaConnected) Color(0xFF10B981).copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = if (bemfaConnected) "Connected" else "Disconnected",
+                                    fontSize = 10.sp,
+                                    color = if (bemfaConnected) Color(0xFF10B981) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                    Switch(checked = bemfaEn, onCheckedChange = { bemfaEn = it })
+                }
+                if (bemfaEn) {
+                    OutlinedTextField(
+                        value = bemfaUid,
+                        onValueChange = { bemfaUid = it },
+                        label = { Text("Bemfa Secret UID") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = bemfaTopic,
+                        onValueChange = { bemfaTopic = it },
+                        label = { Text("Bemfa Topic (e.g. cuktech10002)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
-        OutlinedTextField(
-            value = bemfaUid,
-            onValueChange = { bemfaUid = it },
-            label = { Text("Bemfa Secret UID") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-        OutlinedTextField(
-            value = bemfaTopic,
-            onValueChange = { bemfaTopic = it },
-            label = { Text("Bemfa Topic (e.g. cuktech10002)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+
+        // Home Assistant Section
+        Card(
+            shape = RoundedCornerShape(10.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
         ) {
-            Text("Home Assistant Webhook Telemetry Push", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Switch(checked = haEn, onCheckedChange = { haEn = it })
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Home Assistant Webhook", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("Pushes live wattage & energy telemetry", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = haEn, onCheckedChange = { haEn = it })
+                }
+                if (haEn) {
+                    OutlinedTextField(
+                        value = haUrl,
+                        onValueChange = { haUrl = it },
+                        label = { Text("HA Webhook URL (http://.../api/webhook/...)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
-        OutlinedTextField(
-            value = haUrl,
-            onValueChange = { haUrl = it },
-            label = { Text("HA Webhook URL (http://.../api/webhook/...)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+
         Button(
             onClick = {
                 onSave(
@@ -1367,9 +1804,10 @@ private fun CloudIntegrationConfigPanel(
                     )
                 )
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp)
         ) {
-            Text("Save Cloud Bridge Settings")
+            Text("Save Cloud Settings")
         }
     }
 }

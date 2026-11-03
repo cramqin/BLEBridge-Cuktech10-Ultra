@@ -97,17 +97,81 @@ class ShizukuCompanion(private val context: Context) {
     }
 
     /**
-     * Collects Android Bluetooth GATT & HCI stack summary for troubleshooting.
+     * Collects Android Bluetooth GATT, adapter capabilities, connection state, and stack summary.
      */
     suspend fun runBluetoothStackDiagnostics(): String = withContext(Dispatchers.IO) {
-        val cmd = "dumpsys bluetooth_manager | grep -E 'enabled|ConnectionState|AdapterProperties|BondState|GattService' | head -n 25"
+        val sb = StringBuilder()
+        val btManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+        val adapter = btManager?.adapter
+
+        sb.appendLine("=== ANDROID BLUETOOTH STACK ===")
+        if (adapter == null) {
+            sb.appendLine("Bluetooth Adapter: Unavailable / Hardware missing")
+        } else {
+            sb.appendLine("State: ${if (adapter.isEnabled) "ENABLED (Active)" else "DISABLED"}")
+            sb.appendLine("Adapter Name: ${adapter.name ?: "Unknown"}")
+            sb.appendLine("Hardware Address: ${adapter.address}")
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                sb.appendLine("LE 2M PHY: ${if (adapter.isLe2MPhySupported) "Supported" else "Not Supported"}")
+                sb.appendLine("LE Coded PHY: ${if (adapter.isLeCodedPhySupported) "Supported" else "Not Supported"}")
+                sb.appendLine("Extended Advertising: ${if (adapter.isLeExtendedAdvertisingSupported) "Supported (Max: ${adapter.maxAdvertisingDataLength}B)" else "Not Supported"}")
+            }
+        }
+
+        val svc = BleBridgeService.getInstance()
+        sb.appendLine("\n=== BLE GATT & PERIPHERAL ===")
+        val connState = svc?.companionBleState ?: BleBridgeService.Companion.BleConnectionState.DISCONNECTED
+        val addr = svc?.companionBleAddress ?: "None"
+        sb.appendLine("Connection State: $connState")
+        sb.appendLine("Target MAC: $addr")
+
+        val gatt = svc?.bluetoothGatt
+        if (gatt != null) {
+            val services = gatt.services
+            sb.appendLine("GATT Services Discovered: ${services.size}")
+            for (s in services) {
+                val name = when (s.uuid.toString().uppercase()) {
+                    "0000FE95-0000-1000-8000-00805F9B34FB" -> "Xiaomi Mi Service (MiOT FE95)"
+                    "00001800-0000-1000-8000-00805F9B34FB" -> "Generic Access"
+                    "00001801-0000-1000-8000-00805F9B34FB" -> "Generic Attribute"
+                    else -> "GATT Service (${s.characteristics.size} chars)"
+                }
+                sb.appendLine("  • ${s.uuid}: $name")
+            }
+        } else {
+            sb.appendLine("GATT Instance: Not currently connected")
+        }
+
+        val mgr = svc?.cuktechManager
+        if (mgr != null) {
+            sb.appendLine("\n=== CUKTECH MIOT PROTOCOL ===")
+            sb.appendLine("Auth State: ${mgr.authState.value}")
+            sb.appendLine("Total Power Output: ${mgr.totalPowerWatts.value}W")
+            sb.appendLine("Device Info: ${mgr.deviceInfo.value.model} (FW: ${mgr.deviceInfo.value.firmwareVersion})")
+            val p1 = mgr.ports.value[1]
+            val p2 = mgr.ports.value[2]
+            val p3 = mgr.ports.value[3]
+            val p4 = mgr.ports.value[4]
+            sb.appendLine("Live Ports: C1=${p1?.powerW ?: 0.0}W, C2=${p2?.powerW ?: 0.0}W, C3=${p3?.powerW ?: 0.0}W, A=${p4?.powerW ?: 0.0}W")
+        }
+
+        val powerMgr = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        val isWhitelisted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            powerMgr?.isIgnoringBatteryOptimizations(context.packageName) == true
+        } else true
+        sb.appendLine("\n=== POWER & DOZE STATUS ===")
+        sb.appendLine("Battery Whitelist Exemption: ${if (isWhitelisted) "ACTIVE (Unrestricted Keepalive)" else "OPTIMIZED (May be throttled by OS)"}")
+
+        // Check Shizuku/rish dump if available
+        val cmd = "dumpsys bluetooth_manager | grep -E 'enabled|ConnectionState|AdapterProperties|BondState' | head -n 10"
         val res = runElevatedOrLocalCommand(cmd)
         val raw = res.getOrNull() ?: ""
-        val out = if (res.isSuccess && !raw.contains("Permission Denial") && !raw.contains("SecurityException")) {
-            raw.ifBlank { "Bluetooth stack status normal (Native Android BLE API is ready)" }
-        } else {
-            "Shizuku ADB permission required to read full bluetooth dumpsys."
+        if (res.isSuccess && !raw.contains("Permission Denial") && !raw.contains("SecurityException") && raw.isNotBlank()) {
+            sb.appendLine("\n=== SYSTEM BLUETOOTH DUMP (Shizuku) ===")
+            sb.appendLine(raw)
         }
+
+        val out = sb.toString().trim()
         _status.value = _status.value.copy(lastDiagnosticOutput = out)
         out
     }

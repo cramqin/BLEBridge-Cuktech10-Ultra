@@ -23,6 +23,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Storage permissions for CSV export to Downloads/cuktech10/history -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
@@ -72,6 +75,26 @@
                 <action android:name="com.cramqin.blecuktech10.QUERY_STATUS" />
                 <action android:name="com.example.action.START_SERVER" />
                 <action android:name="com.example.action.STOP_SERVER" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Tasker / Locale Action Plugin Activity -->
+        <activity
+            android:name=".tasker.TaskerEditActivity"
+            android:icon="@mipmap/ic_launcher"
+            android:label="CUKTECH 10 Ultra"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
+            </intent-filter>
+        </activity>
+
+        <!-- Tasker / Locale Action Plugin Receiver -->
+        <receiver
+            android:name=".tasker.TaskerFireReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.twofortyfouram.locale.intent.action.FIRE_SETTING" />
             </intent-filter>
         </receiver>
 

@@ -201,15 +201,26 @@ class CuktechPersistence(private val context: Context) :
     }
 
     /**
-     * Exports charging sessions and recent port history to a CSV file in the app's external files
-     * or cache directory and returns the exported `File`.
+     * Exports charging sessions and recent port history to a CSV file in the public
+     * Downloads/cuktech10/history folder and returns the exported `File`.
      */
     fun exportSessionsAndHistoryCsv(): File {
-        val dir = context.getExternalFilesDir(null) ?: context.cacheDir
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val outFile = File(dir, "cuktech10_telemetry_$stamp.csv")
-        val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+        val fileName = "cuktech10_telemetry_$stamp.csv"
 
+        val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+        val targetDir = File(downloadsDir, "cuktech10/history")
+        var outFile = try {
+            if (!targetDir.exists()) {
+                targetDir.mkdirs()
+            }
+            File(targetDir, fileName)
+        } catch (_: Exception) {
+            val appDir = context.getExternalFilesDir("cuktech10/history") ?: context.cacheDir
+            File(appDir, fileName)
+        }
+
+        val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         val sb = StringBuilder()
         sb.appendLine("# CUKTECH 10 Ultra Charging Sessions")
         sb.appendLine("session_id,port,start_time,end_time,duration_sec,energy_wh,peak_watts,avg_watts,protocol")
@@ -239,7 +250,29 @@ class CuktechPersistence(private val context: Context) :
             }
         }
 
-        outFile.writeText(sb.toString(), Charsets.UTF_8)
+        val content = sb.toString()
+        try {
+            outFile.writeText(content, Charsets.UTF_8)
+        } catch (e: Exception) {
+            // Android 10+ MediaStore fallback
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "text/csv")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, "Download/cuktech10/history")
+                }
+                val uri = context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    context.contentResolver.openOutputStream(uri)?.use { os ->
+                        os.write(content.toByteArray(Charsets.UTF_8))
+                    }
+                }
+            } else {
+                val fallbackDir = context.getExternalFilesDir(null) ?: context.cacheDir
+                outFile = File(fallbackDir, fileName)
+                outFile.writeText(content, Charsets.UTF_8)
+            }
+        }
         return outFile
     }
 

@@ -323,9 +323,25 @@ object PortTelemetryDecoder {
     fun decodeAsciiInfo(payload: ByteArray): String {
         if (payload.isEmpty()) return ""
         val startIdx = if (payload.size > 1 && (payload[0].toInt() and 0xFF) == payload.size - 1) 1 else 0
-        val slice = payload.copyOfRange(startIdx, payload.size)
-        val cleanBytes = slice.takeWhile { it != 0.toByte() }.toByteArray()
-        return String(cleanBytes, Charsets.UTF_8).trim()
+        val slice = payload.copyOfRange(startIdx, payload.size).takeWhile { it != 0.toByte() }.toByteArray()
+        if (slice.isEmpty()) return ""
+
+        // Check if slice is clean printable ASCII
+        val isPrintable = slice.all { it.toInt() and 0xFF in 32..126 }
+        if (isPrintable) {
+            val s = String(slice, Charsets.US_ASCII).trim()
+            if (s.isNotBlank() && !s.contains('\uFFFD')) return s
+        }
+
+        // If slice is 1-4 small binary integers (e.g. version bytes [1, 0, 5])
+        if (slice.size in 1..4 && slice.all { (it.toInt() and 0xFF) < 32 }) {
+            return slice.joinToString(".") { (it.toInt() and 0xFF).toString() }
+        }
+
+        // Filter printable characters
+        val filtered = slice.filter { it.toInt() and 0xFF in 32..126 }.toByteArray()
+        val s = String(filtered, Charsets.US_ASCII).trim()
+        return if (s.isNotBlank() && !s.contains('\uFFFD')) s else ""
     }
 
     private fun round2(value: Double): Double = (value * 100.0).roundToInt() / 100.0

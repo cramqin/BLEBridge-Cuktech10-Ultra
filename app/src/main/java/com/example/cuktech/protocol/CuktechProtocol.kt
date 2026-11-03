@@ -86,7 +86,6 @@ object CuktechProtocol {
     )
 
     val SCREEN_TIMEOUTS = mapOf(
-        0 to "Screen Off",
         4 to "Always On",
         5 to "1 min",
         1 to "5 min",

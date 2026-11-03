@@ -44,6 +44,7 @@ data class ChargerSettingsState(
     val idleScreenOff: Boolean = false,
     val orientationLock: Boolean = false,
     val orientationDegrees: Int = -1, // -1 = Auto, 0 = 0°, 90 = 90°, 180 = 180°, 270 = 270°
+    val activeLcdPage: Int = 1, // 1=Total Power, 2=ADC Assistant, 3=AI Temp, 4=Ports Detail, 5=System Info
     val portSwitchBitmap: Int = 0x0F, // Bit 0=C1, 1=C2, 2=C3, 3=A
     val pdEnabled: Boolean = true,
     val ppsEnabled: Boolean = true,

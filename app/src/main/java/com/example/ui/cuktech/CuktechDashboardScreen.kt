@@ -792,93 +792,7 @@ fun CuktechDashboardScreen(
 
                             HorizontalDivider()
 
-                            // 2. Screen Power & Sleep Timeout (PIID 6)
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "Charger Screen Display",
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = if (settings.screenTimeout == 0) "Status: Force Off (Standby)" else "Status: Active (${if (settings.screenTimeout == 4) "Always On" else "Auto-Sleep"})",
-                                            fontSize = 11.sp,
-                                            color = if (settings.screenTimeout == 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-
-                                    FilledTonalButton(
-                                        onClick = {
-                                            if (settings.screenTimeout == 0) {
-                                                showScreenOnTimeoutDialog = true
-                                            } else {
-                                                bleManager.forceScreenPower(false)
-                                            }
-                                        },
-                                        colors = ButtonDefaults.filledTonalButtonColors(
-                                            containerColor = if (settings.screenTimeout == 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
-                                        ),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                        modifier = Modifier.height(32.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (settings.screenTimeout == 0) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(Modifier.width(4.dp))
-                                        Text(
-                                            text = if (settings.screenTimeout == 0) "Turn Screen ON" else "Force Screen OFF",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    val timeoutList = listOf(
-                                        0 to "Off (0)",
-                                        4 to "Always On",
-                                        5 to "1 min",
-                                        1 to "5 min",
-                                        2 to "10 min",
-                                        3 to "30 min"
-                                    )
-                                    timeoutList.forEach { (code, label) ->
-                                        FilterChip(
-                                            selected = settings.screenTimeout == code,
-                                            onClick = {
-                                                if (code == 0) {
-                                                    bleManager.forceScreenPower(false)
-                                                } else {
-                                                    bleManager.forceScreenPower(true, code)
-                                                }
-                                            },
-                                            label = {
-                                                Text(
-                                                    text = label,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = if (settings.screenTimeout == code) FontWeight.Bold else FontWeight.Normal
-                                                )
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
-                            HorizontalDivider()
-
-                            // 3. Fast-Charge Protocols (PIID 21) - 2x2 Clean Grid
+                            // 2. Fast-Charge Protocols (PIID 21) - 2x2 Clean Grid
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(
                                     text = "Fast-Charge Protocol Extensions",
@@ -923,71 +837,13 @@ fun CuktechDashboardScreen(
 
                             HorizontalDivider()
 
-                            // 4. Boolean Switches
+                            // 3. USB-A Low Current Mode
                             SettingSwitchRow(
                                 title = "USB-A Low Current (Keep On 2-4 Hours)",
                                 subtitle = "Prevents auto-cutoff for low-draw devices (earbuds, fitness bands, smartwatches)",
                                 checked = settings.usbALowCurrent,
                                 onCheckedChange = { bleManager.setUsbALowCurrent(it) }
                             )
-                            SettingSwitchRow(
-                                title = "Idle Screen Off",
-                                subtitle = "Turns off charger's color LCD when all ports are idle",
-                                checked = settings.idleScreenOff,
-                                onCheckedChange = { bleManager.setIdleScreenOff(it) }
-                            )
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = "Screen Orientation (Degrees & G-Sensor)",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "Auto-rotates with G-sensor or lock to specific angle (0°, 90°, 180°, 270°)",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    val currentDeg = settings.orientationDegrees
-                                    val isAuto = !settings.orientationLock && currentDeg == -1
-                                    FilterChip(
-                                        selected = isAuto,
-                                        onClick = { bleManager.setOrientation(-1) },
-                                        label = {
-                                            Text(
-                                                text = "🔄 Auto",
-                                                fontWeight = if (isAuto) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 11.sp
-                                            )
-                                        }
-                                    )
-                                    listOf(
-                                        0 to "0° (Normal)",
-                                        90 to "90° (Vertical)",
-                                        180 to "180° (Invert)",
-                                        270 to "270° (Vertical)"
-                                    ).forEach { (deg, label) ->
-                                        val isSelected = (settings.orientationLock && currentDeg == deg)
-                                        FilterChip(
-                                            selected = isSelected,
-                                            onClick = { bleManager.setOrientation(deg) },
-                                            label = {
-                                                Text(
-                                                    text = label,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                    fontSize = 11.sp
-                                                )
-                                            }
-                                        )
-                                    }
-                                }
-                            }
                         }
                     }
                 }
@@ -1543,7 +1399,7 @@ fun CuktechDashboardScreen(
                         }
                     }
 
-                    // 5. Charger Physical LCD Language & Screen Orientation Card
+                    // 5. Charger Screen & Display Settings Card (Consolidated)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
@@ -1559,7 +1415,7 @@ fun CuktechDashboardScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Language,
+                                    imageVector = Icons.Default.Tv,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp)
@@ -1567,34 +1423,119 @@ fun CuktechDashboardScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Charger Display Language",
+                                        text = "Charger Screen & Display Settings",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
                                     )
                                     Text(
-                                        text = "Physical LCD screen language on the CUKTECH 10 Ultra",
+                                        text = "Manage timeout, idle power saving, orientation, LCD pages, and language",
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                CuktechProtocol.LANGUAGE_OPTIONS.forEach { (code, name) ->
-                                    val isSelected = (settings.language == code)
+                            // A. Screen Sleep Timeout (PIID 6)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "Screen-Off Sleep Timeout",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    val timeoutList = listOf(
+                                        4 to "Always On",
+                                        5 to "1 min",
+                                        1 to "5 min",
+                                        2 to "10 min",
+                                        3 to "30 min"
+                                    )
+                                    timeoutList.forEach { (code, label) ->
+                                        val isSelected = (settings.screenTimeout == code)
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = { bleManager.setScreenTimeout(code) },
+                                            label = {
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color(0xFF00E5FF),
+                                                selectedLabelColor = Color(0xFF0A0E1A)
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                            // B. Idle Screen Off (PIID 19)
+                            SettingSwitchRow(
+                                title = "Idle Screen-Off",
+                                subtitle = "Turns off charger's color LCD when all ports are idle",
+                                checked = settings.idleScreenOff,
+                                onCheckedChange = { bleManager.setIdleScreenOff(it) }
+                            )
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                            // C. Screen Orientation Lock (PIID 20)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "Screen Orientation (Gravity Sensor)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Auto-rotates with internal G-sensor when plugged into wall outlets, or lock orientation",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    val isAuto = !settings.orientationLock
                                     FilterChip(
-                                        selected = isSelected,
-                                        onClick = { bleManager.setLanguage(code) },
+                                        selected = isAuto,
+                                        onClick = { bleManager.setOrientationLock(false) },
                                         label = {
                                             Text(
-                                                text = name,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 12.sp
+                                                text = "🔄 Auto-Rotate (G-Sensor)",
+                                                fontWeight = if (isAuto) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 11.sp
                                             )
                                         },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = Color(0xFF00E5FF),
+                                            selectedLabelColor = Color(0xFF0A0E1A)
+                                        ),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    val isLocked = settings.orientationLock
+                                    FilterChip(
+                                        selected = isLocked,
+                                        onClick = { bleManager.setOrientationLock(true) },
+                                        label = {
+                                            Text(
+                                                text = "🔒 Direction Locked",
+                                                fontWeight = if (isLocked) FontWeight.Bold else FontWeight.Normal,
+                                                fontSize = 11.sp
+                                            )
+                                        },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = Color(0xFF00E5FF),
+                                            selectedLabelColor = Color(0xFF0A0E1A)
+                                        ),
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
@@ -1602,67 +1543,90 @@ fun CuktechDashboardScreen(
 
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ScreenRotation,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                            // D. Physical LCD Screen Page Quick-Switch (PIID 14)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "Physical LCD Screen Navigation",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = "Screen Orientation (Gravity Sensor)",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
+                                Text(
+                                    text = "Select view to display on charger's 1.57-inch color screen",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    val lcdPages = listOf(
+                                        1 to "⚡ Total Power (P1)",
+                                        2 to "🤖 ADC Assistant (P2)",
+                                        3 to "🌡️ AI Temp (P3)",
+                                        4 to "📊 Ports Detail (P4)",
+                                        5 to "ℹ️ System Info (P5)"
                                     )
-                                    Text(
-                                        text = "Auto-rotates 180° when upside-down in wall outlets",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    lcdPages.forEach { (page, label) ->
+                                        val isSelected = (settings.activeLcdPage == page)
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = {
+                                                bleManager.gotoScreen(page)
+                                                Toast.makeText(context, "Switched charger LCD to $label", Toast.LENGTH_SHORT).show()
+                                            },
+                                            label = {
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color(0xFF00E5FF),
+                                                selectedLabelColor = Color(0xFF0A0E1A)
+                                            )
+                                        )
+                                    }
                                 }
                             }
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                val currentDeg = settings.orientationDegrees
-                                val isAuto = !settings.orientationLock && currentDeg == -1
-                                FilterChip(
-                                    selected = isAuto,
-                                    onClick = { bleManager.setOrientation(-1) },
-                                    label = {
-                                        Text(
-                                            text = "🔄 Auto (G-Sensor)",
-                                            fontWeight = if (isAuto) FontWeight.Bold else FontWeight.Normal,
-                                            fontSize = 11.sp
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                            // E. Physical Screen Language (PIID 13)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "Physical Screen Language",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    CuktechProtocol.LANGUAGE_OPTIONS.forEach { (code, name) ->
+                                        val isSelected = (settings.language == code)
+                                        FilterChip(
+                                            selected = isSelected,
+                                            onClick = {
+                                                bleManager.setLanguage(code)
+                                                Toast.makeText(context, "Charger language set to $name", Toast.LENGTH_SHORT).show()
+                                            },
+                                            label = {
+                                                Text(
+                                                    text = name,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                    fontSize = 12.sp
+                                                )
+                                            },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color(0xFF00E5FF),
+                                                selectedLabelColor = Color(0xFF0A0E1A)
+                                            ),
+                                            modifier = Modifier.weight(1f)
                                         )
                                     }
-                                )
-                                listOf(
-                                    0 to "0° (Normal)",
-                                    90 to "90° (Vertical)",
-                                    180 to "180° (Invert)",
-                                    270 to "270° (Vertical)"
-                                ).forEach { (deg, label) ->
-                                    val isSelected = (settings.orientationLock && currentDeg == deg)
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = { bleManager.setOrientation(deg) },
-                                        label = {
-                                            Text(
-                                                text = label,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                fontSize = 11.sp
-                                            )
-                                        }
-                                    )
                                 }
                             }
                         }
@@ -1697,65 +1661,11 @@ fun CuktechDashboardScreen(
                                         fontSize = 14.sp
                                     )
                                     Text(
-                                        text = "Re-negotiates USB-PD contracts or switches physical LCD to ADC load distribution screen",
+                                        text = "Re-negotiates USB-PD contracts and optimizes load distribution across active ports",
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                            }
-
-                            Text(
-                                text = "PHYSICAL LCD SCREEN QUICK-SWITCH",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = false,
-                                    onClick = {
-                                        bleManager.gotoScreen(1)
-                                        Toast.makeText(context, "Switched charger LCD to Total Power (Page 1)", Toast.LENGTH_SHORT).show()
-                                    },
-                                    label = { Text("⚡ Total Power (P1)", fontSize = 11.sp) }
-                                )
-                                FilterChip(
-                                    selected = false,
-                                    onClick = {
-                                        bleManager.gotoScreen(2)
-                                        Toast.makeText(context, "Switched charger LCD to ADC Assistant (Page 2)", Toast.LENGTH_SHORT).show()
-                                    },
-                                    label = { Text("🤖 ADC Assistant (P2)", fontSize = 11.sp) }
-                                )
-                                FilterChip(
-                                    selected = false,
-                                    onClick = {
-                                        bleManager.gotoScreen(3)
-                                        Toast.makeText(context, "Switched charger LCD to AI Temp Control (Page 3)", Toast.LENGTH_SHORT).show()
-                                    },
-                                    label = { Text("🌡️ AI Temp (P3)", fontSize = 11.sp) }
-                                )
-                                FilterChip(
-                                    selected = false,
-                                    onClick = {
-                                        bleManager.gotoScreen(4)
-                                        Toast.makeText(context, "Switched charger LCD to Ports Breakdown (Page 4)", Toast.LENGTH_SHORT).show()
-                                    },
-                                    label = { Text("📊 Ports Detail (P4)", fontSize = 11.sp) }
-                                )
-                                FilterChip(
-                                    selected = false,
-                                    onClick = {
-                                        bleManager.gotoScreen(5)
-                                        Toast.makeText(context, "Switched charger LCD to System Info (Page 5)", Toast.LENGTH_SHORT).show()
-                                    },
-                                    label = { Text("ℹ️ System Info (P5)", fontSize = 11.sp) }
-                                )
                             }
 
                             if (isAdcRunning) {

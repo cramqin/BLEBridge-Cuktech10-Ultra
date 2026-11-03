@@ -1604,6 +1604,23 @@ class CuktechBleManager(
             return@withLock null
         }
 
+        // If it's a SET / write-only command, receiving RCV_OK on CHAR_CMD_SEND means
+        // the hardware charger has accepted and executed the command!
+        if (isSet) {
+            pendingMiotResponses.remove(seq)
+            successfulTxCommands++
+            consecutiveFailures = 0
+            return@withLock DecodedMiotFrame(
+                reqId = seq,
+                b2 = 0x20,
+                b4 = 0x01,
+                siid = siid,
+                piid = piid,
+                status = 0,
+                payload = valueBytes
+            )
+        }
+
         val resp = withTimeoutOrNull(timeoutMs) { deferred.await() }
         pendingMiotResponses.remove(seq)
         if (resp != null) {
@@ -1790,8 +1807,8 @@ class CuktechBleManager(
                 setScreenTimeout(timeoutCode)
                 gotoScreen(1)
             } else {
-                setScreenTimeout(0)
                 setIdleScreenOff(true)
+                setScreenTimeout(5) // 1 min timeout
             }
         }
     }
@@ -1828,6 +1845,7 @@ class CuktechBleManager(
     fun gotoScreen(screenIndex: Int) {
         if (screenIndex !in 1..5) return
         scope.launch {
+            _settings.value = _settings.value.copy(activeLcdPage = screenIndex)
             sendMiotCommand(
                 siid = CuktechProtocol.SIID_CHARGER,
                 piid = CuktechProtocol.PIID_GOTO_SCREEN,
@@ -1872,31 +1890,22 @@ class CuktechBleManager(
     }
 
     fun setOrientationLock(locked: Boolean) {
-        setOrientation(if (locked) 0 else -1)
-    }
-
-    fun setOrientation(degrees: Int) {
         scope.launch {
-            // degrees: -1 = Auto (G-Sensor), 0 = 0° (Landscape), 90 = 90°, 180 = 180°, 270 = 270°
-            // In Xiaomi protocol, byte value 0 = Auto-rotate (sensor active), 1 = 0°/lock, 2 = 90°, 3 = 180°, 4 = 270°
-            val valByte = when (degrees) {
-                0 -> 1.toByte()
-                90 -> 2.toByte()
-                180 -> 3.toByte()
-                270 -> 4.toByte()
-                else -> 0.toByte() // Auto
-            }
             _settings.value = _settings.value.copy(
-                orientationLock = (degrees != -1),
-                orientationDegrees = degrees
+                orientationLock = locked,
+                orientationDegrees = if (locked) 0 else -1
             )
             sendMiotCommand(
                 siid = CuktechProtocol.SIID_CHARGER,
                 piid = CuktechProtocol.PIID_ORIENTATION_LOCK,
                 isSet = true,
-                valueBytes = byteArrayOf(valByte)
+                valueBytes = byteArrayOf(if (locked) 1.toByte() else 0.toByte())
             )
         }
+    }
+
+    fun setOrientation(degrees: Int) {
+        setOrientationLock(degrees != -1)
     }
 
     fun setFastChargeProtocols(

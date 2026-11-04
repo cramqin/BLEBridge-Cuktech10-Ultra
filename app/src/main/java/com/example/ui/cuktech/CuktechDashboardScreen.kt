@@ -239,6 +239,12 @@ fun CuktechDashboardScreen(
                         )
                     }
                     if (authState != CuktechAuthState.AUTHENTICATED) {
+                        val isConnectingCharger = authState in listOf(
+                            CuktechAuthState.CONNECTING_GATT,
+                            CuktechAuthState.DISCOVERING_SERVICES,
+                            CuktechAuthState.PHASE_A_INIT_A4,
+                            CuktechAuthState.PHASE_B_HANDSHAKE
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
                         Button(
                             onClick = {
@@ -251,12 +257,22 @@ fun CuktechDashboardScreen(
                                     showPairingDialog = true
                                 }
                             },
-                            enabled = !isDisconnectCooldown,
+                            enabled = !isDisconnectCooldown && !isConnectingCharger,
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             modifier = Modifier.height(28.dp)
                         ) {
-                            Text(if (isDisconnectCooldown) "Wait..." else "Connect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (isDisconnectCooldown) {
+                                    "Wait..."
+                                } else if (isConnectingCharger) {
+                                    "Connecting..."
+                                } else {
+                                    "Connect"
+                                },
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -375,14 +391,30 @@ fun CuktechDashboardScreen(
                             }
                         }
                         if (hasReadyCredentials && !targetMac.isNullOrBlank()) {
+                            val isConnectingCharger = authState in listOf(
+                                CuktechAuthState.CONNECTING_GATT,
+                                CuktechAuthState.DISCOVERING_SERVICES,
+                                CuktechAuthState.PHASE_A_INIT_A4,
+                                CuktechAuthState.PHASE_B_HANDSHAKE
+                            )
                             Button(
                                 onClick = { bleManager.connectToCharger(targetMac) },
-                                enabled = !isDisconnectCooldown,
+                                enabled = !isDisconnectCooldown && !isConnectingCharger,
                                 shape = RoundedCornerShape(6.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                                 modifier = Modifier.height(26.dp)
                             ) {
-                                Text(if (isDisconnectCooldown) "Wait..." else "Connect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = if (isDisconnectCooldown) {
+                                        "Wait..."
+                                    } else if (isConnectingCharger) {
+                                        "Connecting..."
+                                    } else {
+                                        "Connect"
+                                    },
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         } else {
                             Button(

@@ -860,6 +860,14 @@ fun BleBridgeDashboard(
                                     Spacer(modifier = Modifier.height(10.dp))
                                 }
 
+                                val isConnectingCharger = bleState == BleBridgeService.Companion.BleConnectionState.CONNECTING ||
+                                    cuktechAuthState in listOf(
+                                        CuktechAuthState.CONNECTING_GATT,
+                                        CuktechAuthState.DISCOVERING_SERVICES,
+                                        CuktechAuthState.PHASE_A_INIT_A4,
+                                        CuktechAuthState.PHASE_B_HANDSHAKE
+                                    )
+
                                 // Search & Pair Button (Directly connects via Bluetooth without requiring TCP Server!)
                                 Button(
                                     onClick = {
@@ -867,7 +875,7 @@ fun BleBridgeDashboard(
                                             showPairingDialog = true
                                         }
                                     },
-                                    enabled = !isDisconnectCooldown,
+                                    enabled = !isDisconnectCooldown && !isConnectingCharger,
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(
@@ -880,7 +888,13 @@ fun BleBridgeDashboard(
                                     Icon(Icons.Default.BluetoothSearching, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = if (isDisconnectCooldown) "Disconnecting..." else "Search & Pair CUKTECH 10 Ultra",
+                                        text = if (isDisconnectCooldown) {
+                                            "Disconnecting..."
+                                        } else if (isConnectingCharger) {
+                                            "Connecting to Charger..."
+                                        } else {
+                                            "Search & Pair CUKTECH 10 Ultra"
+                                        },
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp
                                     )

@@ -538,6 +538,7 @@ fun BleBridgeDashboard(
                                             val wText = if (cuktechTotalWatts > 0) " · ${"%.1f".format(cuktechTotalWatts)}W" else ""
                                             "CHARGER CONNECTED$wText" to StatusSuccess
                                         }
+                                        CuktechAuthState.SCANNING -> "SEARCHING FOR CHARGERS..." to Color(0xFF38BDF8)
                                         CuktechAuthState.CONNECTING_GATT,
                                         CuktechAuthState.DISCOVERING_SERVICES,
                                         CuktechAuthState.PHASE_A_INIT_A4,

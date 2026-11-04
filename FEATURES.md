@@ -130,11 +130,12 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
 ---
 
 ## 9. Charger Hardware Settings & Display Control
-- **Display Brightness (`PIID 14`):** `Low (20%)`, `Medium (60%)`, `High (100%)`.
-- **Screen Timeout (`PIID 15`):** `Always On`, `1 min`, `5 min`, `10 min`, `30 min`.
+- **Screen Sleep Timeout (`PIID 6`):** Configure charger LCD screen-off timeout: `Always On`, `1 min`, `5 min`, `10 min`, `30 min`.
 - **Idle Screen-Off (`PIID 19`):** Automatically puts the charger's color LCD to sleep when all ports are idle (`0W`), waking immediately when a cable is plugged in.
-- **Physical Screen Language (`PIID 13`):** Toggle the charger's onboard LCD between `Chinese (中文)` and `English`.
-- **5 Custom Dark Theme Accent Palettes:**
+- **Physical Screen Language (`PIID 13`):** Toggle the charger's onboard LCD language between `Chinese (中文)` and `English`.
+- **Screen Orientation Rotation (`PIID 20` & `PIID 14`):** Rotate the onboard display 180° (`Normal` vs `Inverted`) so the readout is right-side up regardless of wall outlet orientation.
+- **LCD Page Navigation (`PIID 14`):** Cycle or switch between the charger's onboard display views (Port Telemetry summary, per-port detail).
+- **5 Custom Dark Theme Accent Palettes (In-App):**
   - `CUKTECH Gunmetal` (Classic deep navy gunmetal with balanced cyan)
   - `AMOLED Pure Black` (True `#000000` with soft electric cyan)
   - `Cyberpunk Neon` (Midnight obsidian with neon emerald green)

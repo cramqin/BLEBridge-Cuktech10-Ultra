@@ -116,7 +116,7 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 5. **Full Port & Protocol Control:** Independent toggles for PD (up to 100W), PPS, UFCS, Huawei SCP, and USB-A 4h low-current mode.
 6. **Energy Limits & Timers:** Auto-shutoff by energy (`Wh`) or duration (`30m`–`10h`) with live second-by-second countdown badges.
 7. **Session History & CSV Export:** Trapezoidal `Wh` energy integration, Session Detail Inspector dialog, Consolidated Sessions Table dialog, and customizable CSV exports saved to `Downloads/cuktech10/history/`.
-8. **Hardware Controls & Themes:** Screen brightness, timeout, idle screen-off (`PIID 19`), physical screen language (EN/CN), and 5 dark theme accent palettes (`CUKTECH Gunmetal`, `AMOLED Pure Black`, `Cyberpunk Neon`, `Titanium Amber`, `Deep Ocean Blue`).
+8. **Hardware Controls & Themes:** Screen sleep timeout (`PIID 6`), orientation rotation, idle screen-off (`PIID 19`), physical screen language (EN/CN), and 5 dark theme accent palettes (`CUKTECH Gunmetal`, `AMOLED Pure Black`, `Cyberpunk Neon`, `Titanium Amber`, `Deep Ocean Blue`).
 9. **4 Home Screen Widgets:** Soft Glass (`4x2` & `2x2`) and Solid Dark (`4x2` & `2x2`) with 1-tap port toggles and charging sparkline.
 10. **Automation Hub:** Full Tasker/Locale action plugin, live telemetry broadcast intent (`com.cramqin.blecuktech10.TELEMETRY_UPDATE`), Home Assistant Webhook, and ADB command interface.
 

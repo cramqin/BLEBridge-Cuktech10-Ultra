@@ -67,8 +67,11 @@ Unlike typical smart home bridges that hammer Bluetooth channels or drain your p
 - **Smart Push + Adaptive Polling (Hardware-Aware):**
   - **USB-C1 & USB-C2:** The charger hardware automatically broadcasts spontaneous BLE push notifications (`b4 = 0x04`) the instant a cable is plugged in or wattage shifts. BLEBridge listens passively for C1/C2—only running a gentle `3s` backup poll when actively charging to catch unplugs, and **0 polls while idle**.
   - **USB-C3 & USB-A:** The charger firmware never broadcasts push notifications on C3/A. BLEBridge polls C3 and USB-A adaptively: every `5s` when all ports are idle (ensuring fast plug-in detection) and ramps up to `3s` whenever any port is active for smooth `Wh` energy integration.
-- **Sequential Mutex Hardware Queue:**
+- **Sequential Mutex Hardware Queue & Controller Cooldown:**
   - Prevents Telink BLE controller deadlocks by funneling all GATT writes through a sequential, non-blocking coroutine queue with automatic 1.8s command timeouts.
+  - Implements an automated 2-second disconnect cooldown with button debounce and atomic GATT handle fencing, preventing rapid spamming, HCI state desynchronization, and Android Bluetooth error 133.
+- **Safe Multi-Device Switching:**
+  - Seamlessly browse discovered peripherals without breaking active telemetry. Switching to another charger prompts for confirmation, gracefully tearing down the active GATT connection before establishing a new session.
 - **Widget Battery Optimization:**
   - The Android Home Screen Widgets declare `updatePeriodMillis="0"` (zero alarm-based wakeups). They update reactively only when live state actually changes and are automatically paused by Android when your screen is off.
 
@@ -138,6 +141,7 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 5. **Full Port & Protocol Control:** Independent toggles for PD (up to 100W), PPS, UFCS, Huawei SCP, and USB-A 4h low-current mode.
 6. **Energy Limits & Timers:** Auto-shutoff by energy (`Wh`) or duration (`30m`–`10h`) with live second-by-second countdown badges.
 7. **Session History & CSV Export:** Trapezoidal `Wh` energy integration, Session Detail Inspector dialog, Consolidated Sessions Table dialog, and customizable CSV exports saved to `Downloads/cuktech10/history/`.
+8. **Resilient Connection Lifecycle & Cooldown:** Automated 2-second cooldown on disconnect with debounced buttons and atomic GATT fencing, preventing HCI race conditions and status 133 errors.
 9. **Persistent Live Notification & Keepalive:** Ongoing Android Foreground Service notification displaying live wattage, active ports, connection status, and quick action controls without opening the app.
 10. **4 Home Screen Widgets:** Soft Glass (`4x2` & `2x2`) and Solid Dark (`4x2` & `2x2`) with 1-tap port toggles and charging sparkline.
 11. **Automation Hub:** Full Tasker/Locale action plugin, live telemetry broadcast intent (`com.cramqin.blecuktech10.TELEMETRY_UPDATE`), Home Assistant Webhook, and ADB command interface.

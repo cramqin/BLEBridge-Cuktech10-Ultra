@@ -634,8 +634,8 @@ fun BleBridgeDashboard(
                                 }
                             }
                             if (!isDisconnectCooldown &&
-                                (bleState != BleBridgeService.Companion.BleConnectionState.DISCONNECTED ||
-                                    (cuktechAuthState != CuktechAuthState.DISCONNECTED && cuktechAuthState != CuktechAuthState.SCANNING))
+                                bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED &&
+                                cuktechAuthState == CuktechAuthState.AUTHENTICATED
                             ) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(

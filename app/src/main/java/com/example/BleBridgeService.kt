@@ -6,7 +6,10 @@ import android.app.PendingIntent
 import android.app.Service
 import android.bluetooth.*
 import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
+import android.os.ParcelUuid
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -37,6 +40,7 @@ import com.example.cuktech.cloud.XiaomiCloudClient
 import com.example.cuktech.db.CuktechPersistence
 import com.example.cuktech.integrations.CloudIntegrations
 import com.example.cuktech.diagnostics.BleDiagnostics
+import com.example.cuktech.protocol.CuktechProtocol
 import com.example.cuktech.security.SecureCredentialStore
 
 class BleBridgeService : Service() {
@@ -156,24 +160,39 @@ class BleBridgeService : Service() {
     fun dismissForegroundNotificationIfIdle() {
         val isBleActive = cuktechManager?.authState?.value != null &&
                 cuktechManager?.authState?.value != com.example.cuktech.ble.CuktechAuthState.DISCONNECTED
-        if (!isBleActive) {
-            runCatching {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                } else {
-                    @Suppress("DEPRECATION")
-                    stopForeground(true)
-                }
-                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-                nm?.cancel(NOTIFICATION_ID)
-                lastNotifTitle = ""
-                lastNotifContent = ""
-                lastNotifBigText = ""
-                val isServerActive = serverJob != null && serverJob?.isActive == true
-                if (!isServerActive) {
-                    releaseWakeLock()
-                    stopSelf()
-                }
+        if (isBleActive) return
+
+        val isAutoReconnectConfigured = cuktechManager?.isAutoReconnectConfigured?.value == true
+        val isUserManual = cuktechManager?.userManuallyDisconnected == true
+        val hasTargetMac = !cuktechManager?.lastConnectedMac.isNullOrBlank() || cuktechManager?.credentialStore?.activeDevice?.value != null
+
+        // If Auto-Connect on Proximity is enabled and user did NOT manually tap disconnect,
+        // preserve the foreground service and partial wakelock so the background listener can auto-reconnect
+        if (isAutoReconnectConfigured && !isUserManual && hasTargetMac) {
+            updateNotificationTelemetry(
+                title = "⚡ CUKTECH 10 Ultra · Standby",
+                content = "Awaiting charger power-on... (Auto-Reconnect active)",
+                bigText = "Charger unplugged or out of range. Auto-connect is active and will reconnect as soon as power is restored."
+            )
+            return
+        }
+
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            nm?.cancel(NOTIFICATION_ID)
+            lastNotifTitle = ""
+            lastNotifContent = ""
+            lastNotifBigText = ""
+            val isServerActive = serverJob != null && serverJob?.isActive == true
+            if (!isServerActive) {
+                releaseWakeLock()
+                stopSelf()
             }
         }
     }
@@ -356,6 +375,49 @@ class BleBridgeService : Service() {
                 .setStyle(style)
                 .build()
             nm.notify(NOTIFICATION_ID, notif)
+        }
+    }
+
+    /**
+     * Posts a high-priority heads-up notification alert ("flash") when CUKTECH 10 Ultra
+     * connects or disconnects. Automatically dismisses after 7 seconds.
+     */
+    fun notifyAlertFlash(title: String, message: String, isConnected: Boolean) {
+        runCatching {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            val alertChannelId = "CuktechAlertChannel"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val chan = NotificationChannel(alertChannelId, "CUKTECH Connection Alerts", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "Heads-up popups when CUKTECH charger connects or disconnects"
+                    enableVibration(true)
+                    setShowBadge(true)
+                    lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+                }
+                nm.createNotificationChannel(chan)
+            }
+
+            val openIntent = (packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java)).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("EXTRA_NAV_TAB", "LIVE")
+            }
+            val openPendingIntent = PendingIntent.getActivity(
+                this, 2002, openIntent,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            val builder = NotificationCompat.Builder(this, alertChannelId)
+                .setSmallIcon(R.drawable.ic_stat_cuktech)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_EVENT)
+                .setAutoCancel(true)
+                .setTimeoutAfter(7000L)
+                .setContentIntent(openPendingIntent)
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+
+            val alertNotifId = if (isConnected) 20101 else 20102
+            nm.notify(alertNotifId, builder.build())
         }
     }
 
@@ -543,7 +605,7 @@ class BleBridgeService : Service() {
         }
     }
 
-    fun startNativeCuktechScan(durationMs: Long = 10000L) {
+    fun startNativeCuktechScan(durationMs: Long = 10000L, targetMac: String? = null) {
         if (bluetoothAdapter?.isEnabled != true) {
             log(LogLevel.LEVEL1, "Scan aborted: Bluetooth is turned OFF on your phone. Please enable Bluetooth.")
             cuktechManager?.onScanStopped()
@@ -574,10 +636,23 @@ class BleBridgeService : Service() {
         }
         scanCallbackInternal = callback
         try {
-            scanner.startScan(callback)
+            val filters = mutableListOf<ScanFilter>()
+            if (!targetMac.isNullOrBlank()) {
+                try {
+                    filters.add(ScanFilter.Builder().setDeviceAddress(targetMac.uppercase().trim()).build())
+                } catch (_: Exception) {}
+            }
+            filters.add(ScanFilter.Builder().setServiceUuid(ParcelUuid(CuktechProtocol.MI_SERVICE_UUID)).build())
+
+            val settings = ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .setReportDelay(0)
+                .build()
+
+            scanner.startScan(filters, settings, callback)
             serviceScope.launch {
                 delay(durationMs)
-                if (isScanning) {
+                if (isScanning && scanCallbackInternal === callback) {
                     stopBleScan()
                 }
             }
@@ -606,7 +681,7 @@ class BleBridgeService : Service() {
 
     // --- BLE Connection & GATT Core ---
 
-    fun connectBleNative(address: String): Boolean {
+    fun connectBleNative(address: String, autoConnect: Boolean = false): Boolean {
         if (bluetoothAdapter?.isEnabled != true) {
             log(LogLevel.LEVEL1, "Connection aborted: Bluetooth is turned OFF on your phone. Please enable Bluetooth.")
             setBleConnectionState(BleConnectionState.DISCONNECTED, null)
@@ -628,13 +703,13 @@ class BleBridgeService : Service() {
             log(LogLevel.LEVEL1, "Invalid MAC address: $address")
             return false
         }
-        log(LogLevel.LEVEL2, "Connecting to CUKTECH BLE peripheral: $address")
+        log(LogLevel.LEVEL2, "Connecting to CUKTECH BLE peripheral: $address (autoConnect=$autoConnect)")
         setBleConnectionState(BleConnectionState.CONNECTING, address)
         return try {
             bluetoothGatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                device.connectGatt(this, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+                device.connectGatt(this, autoConnect, gattCallback, BluetoothDevice.TRANSPORT_LE)
             } else {
-                device.connectGatt(this, false, gattCallback)
+                device.connectGatt(this, autoConnect, gattCallback)
             }
             bluetoothGatt != null
         } catch (e: SecurityException) {
@@ -1593,6 +1668,10 @@ class BleBridgeService : Service() {
         private val _updateAvailable = MutableStateFlow(false)
         val updateAvailable: StateFlow<Boolean> = _updateAvailable.asStateFlow()
 
+        fun notifyAlertFlash(title: String, message: String, isConnected: Boolean) {
+            instance?.notifyAlertFlash(title, message, isConnected)
+        }
+
         fun checkForUpdates() {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -1606,14 +1685,46 @@ class BleBridgeService : Service() {
                     if (response.isSuccessful) {
                         val body = response.body?.string() ?: ""
                         val json = JSONObject(body)
+
+                        // Strictly ignore pre-releases and draft releases
+                        val isPrerelease = json.optBoolean("prerelease", false)
+                        val isDraft = json.optBoolean("draft", false)
+                        if (isPrerelease || isDraft) {
+                            _updateAvailable.value = false
+                            return@launch
+                        }
+
                         val tagName = json.optString("tag_name", "").removePrefix("v").trim()
+                        if (tagName.contains("beta", ignoreCase = true) ||
+                            tagName.contains("alpha", ignoreCase = true) ||
+                            tagName.contains("rc", ignoreCase = true)
+                        ) {
+                            _updateAvailable.value = false
+                            return@launch
+                        }
+
                         val currentVersion = "1.1.0"
-                        if (tagName.isNotEmpty() && tagName != currentVersion && !tagName.startsWith("1.1")) {
+                        if (tagName.isNotEmpty() && tagName != currentVersion && isNewerVersion(tagName, currentVersion)) {
                             _updateAvailable.value = true
+                        } else {
+                            _updateAvailable.value = false
                         }
                     }
                 } catch (e: Exception) {}
             }
+        }
+
+        private fun isNewerVersion(remote: String, local: String): Boolean {
+            val rParts = remote.split(".").mapNotNull { it.toIntOrNull() }
+            val lParts = local.split(".").mapNotNull { it.toIntOrNull() }
+            val maxLen = maxOf(rParts.size, lParts.size)
+            for (i in 0 until maxLen) {
+                val r = rParts.getOrElse(i) { 0 }
+                val l = lParts.getOrElse(i) { 0 }
+                if (r > l) return true
+                if (r < l) return false
+            }
+            return false
         }
 
         fun setLogLevel(level: LogLevel, context: Context? = null) {

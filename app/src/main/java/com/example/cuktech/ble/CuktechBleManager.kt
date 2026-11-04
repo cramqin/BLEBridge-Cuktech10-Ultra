@@ -267,7 +267,7 @@ class CuktechBleManager(
         _discoveredDevices.value = emptyList()
     }
 
-    fun startSearchForCuktechChargers(durationMs: Long = 10000L) {
+    fun startSearchForCuktechChargers(durationMs: Long = 10000L, targetMac: String? = null) {
         val svc = BleBridgeService.getInstance()
         if (svc == null) {
             try {
@@ -285,7 +285,7 @@ class CuktechBleManager(
             _authState.value = CuktechAuthState.SCANNING
         }
         _statusMessage.value = "Scanning for nearby CUKTECH 10 Ultra chargers..."
-        svc.startNativeCuktechScan(durationMs)
+        svc.startNativeCuktechScan(durationMs, targetMac ?: lastConnectedMac)
     }
 
     fun stopSearchForCuktechChargers() {
@@ -551,6 +551,7 @@ class CuktechBleManager(
         } else {
             val wasConnectedOrConnecting = _authState.value != CuktechAuthState.DISCONNECTED ||
                 BleBridgeService.bleConnectionState.value != BleBridgeService.Companion.BleConnectionState.DISCONNECTED
+            val wasAuthenticated = _authState.value == CuktechAuthState.AUTHENTICATED
             lastDisconnectMs = SystemClock.elapsedRealtime()
             if (wasConnectedOrConnecting) {
                 triggerDisconnectCooldown(2000L)
@@ -569,8 +570,17 @@ class CuktechBleManager(
             val isError = (status != BluetoothGatt.GATT_SUCCESS && status != 0)
             _statusMessage.value = if (isError) "Disconnected (GATT status=$status). Retrying..." else "Disconnected (status=$status)"
 
+            // Trigger notification alert flash for disconnect if session was active
+            if (wasAuthenticated) {
+                BleBridgeService.notifyAlertFlash(
+                    "🔌 CUKTECH 10 Ultra Disconnected",
+                    "Charger unplugged or out of range",
+                    false
+                )
+            }
+
             if (autoReconnectEnabled && !lastConnectedMac.isNullOrBlank()) {
-                val delayMs = if (status == 133) 800L else if (isError) 3000L else 2500L
+                val delayMs = if (status == 133) 800L else if (isError) 2000L else 1500L
                 scheduleAutoReconnect(lastConnectedMac!!, delayMs)
             } else {
                 BleBridgeService.getInstance()?.dismissForegroundNotificationIfIdle()
@@ -578,31 +588,30 @@ class CuktechBleManager(
         }
     }
 
-    private fun scheduleAutoReconnect(mac: String, delayMs: Long = 3000L) {
+    private fun scheduleAutoReconnect(mac: String, delayMs: Long = 2000L) {
         reconnectJob?.cancel()
         reconnectJob = scope.launch {
             delay(delayMs)
-            if (_isAutoReconnectConfigured.value && !userManuallyDisconnected && _authState.value != CuktechAuthState.AUTHENTICATED) {
-                consecutiveFailures++
-                if (consecutiveFailures <= 3) {
-                    _statusMessage.value = "Attempting auto-reconnect to $mac (attempt $consecutiveFailures/3)..."
-                    BleBridgeService.getInstance()?.connectBleNative(mac)
-                } else {
-                    // Charger likely unpowered or out of range. Switch to scanning for presence
-                    _statusMessage.value = "Charger disconnected. Awaiting charger power-on..."
-                    BleBridgeService.addLogMessage(
-                        BleBridgeService.Companion.LogLevel.LEVEL2,
-                        "[Cuktech] Charger offline or out of range. Starting proximity listener scan..."
-                    )
-                    startSearchForCuktechChargers(8000L)
-                    // Periodic poll scan every 12 seconds
-                    scope.launch {
-                        delay(12000L)
-                        if (_isAutoReconnectConfigured.value && !userManuallyDisconnected && _authState.value == CuktechAuthState.DISCONNECTED) {
-                            startSearchForCuktechChargers(8000L)
-                        }
-                    }
+            while (isActive && _isAutoReconnectConfigured.value && !userManuallyDisconnected && _authState.value != CuktechAuthState.AUTHENTICATED) {
+                val btAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
+                if (btAdapter == null || !btAdapter.isEnabled) {
+                    _statusMessage.value = "Awaiting Bluetooth to be enabled..."
+                    delay(3000L)
+                    continue
                 }
+
+                _statusMessage.value = "Charger disconnected. Awaiting charger power-on..."
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL2,
+                    "[Cuktech] Auto-reconnect: Listening for $mac (charger unplugged/standby)..."
+                )
+
+                val svc = BleBridgeService.getInstance()
+                // Scan targeting the charger MAC and MiOT service UUID (delivers background callbacks)
+                svc?.startNativeCuktechScan(6000L, mac)
+
+                // Wait for the scan cycle to complete plus small pause
+                delay(7500L)
             }
         }
     }
@@ -693,12 +702,19 @@ class CuktechBleManager(
             }
             if (ok) {
                 connectionTimeoutJob?.cancel()
+                reconnectJob?.cancel()
+                reconnectJob = null
                 _authState.value = CuktechAuthState.AUTHENTICATED
                 _statusMessage.value = "CUKTECH 10 Ultra authenticated successfully! Live telemetry active."
                 consecutiveFailures = 0
                 startBackgroundLoops()
                 queryInitialChargerState()
                 BleBridgeService.refreshClientsList()
+                BleBridgeService.notifyAlertFlash(
+                    "⚡ CUKTECH 10 Ultra Connected",
+                    "Hardware bridge authenticated · Live telemetry active",
+                    true
+                )
             } else {
                 _authState.value = CuktechAuthState.AUTH_FAILED
                 BleBridgeService.refreshClientsList()

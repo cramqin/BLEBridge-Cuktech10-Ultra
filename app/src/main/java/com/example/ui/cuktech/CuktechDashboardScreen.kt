@@ -619,20 +619,33 @@ fun CuktechDashboardScreen(
                                 val c3Proto = c3Port?.protocolName?.takeIf { it.isNotBlank() && it != "Idle" && it != "--" }?.let { " · $it" } ?: ""
                                 val aProto = aPort?.protocolName?.takeIf { it.isNotBlank() && it != "Idle" && it != "--" }?.let { " · $it" } ?: ""
 
+                                val focusPort: (Int) -> Unit = { portId ->
+                                    scope.launch {
+                                        highlightedPortId = portId
+                                        pagerState.animateScrollToPage(1)
+                                        kotlinx.coroutines.delay(120)
+                                        portRequesters.getOrNull(portId - 1)?.bringIntoView()
+                                        kotlinx.coroutines.delay(2000)
+                                        if (highlightedPortId == portId) highlightedPortId = null
+                                    }
+                                }
+
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     PortPowerMiniCell(
                                         color = Color(0xFFFF7A00),
                                         portName = "C1",
                                         powerW = c1Port?.powerW ?: 0.0,
                                         subtitle = "${if ((c1Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c1Port?.voltageV) else "--V"}  ${if ((c1Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c1Port?.currentA) else "--A"}$c1Proto",
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { focusPort(1) }
                                     )
                                     PortPowerMiniCell(
                                         color = Color(0xFF3B82F6),
                                         portName = "C2",
                                         powerW = c2Port?.powerW ?: 0.0,
                                         subtitle = "${if ((c2Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c2Port?.voltageV) else "--V"}  ${if ((c2Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c2Port?.currentA) else "--A"}$c2Proto",
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { focusPort(2) }
                                     )
                                 }
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -641,14 +654,16 @@ fun CuktechDashboardScreen(
                                         portName = "C3",
                                         powerW = c3Port?.powerW ?: 0.0,
                                         subtitle = "${if ((c3Port?.voltageV ?: 0.0) > 0.1) "%.1fV".format(c3Port?.voltageV) else "--V"}  ${if ((c3Port?.currentA ?: 0.0) > 0.01) "%.2fA".format(c3Port?.currentA) else "--A"}$c3Proto",
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { focusPort(3) }
                                     )
                                     PortPowerMiniCell(
                                         color = Color(0xFFFBBF24),
                                         portName = "A",
                                         powerW = aPort?.powerW ?: 0.0,
                                         subtitle = "${if ((aPort?.voltageV ?: 0.0) > 0.1) "%.1fV".format(aPort?.voltageV) else "--V"}  ${if ((aPort?.currentA ?: 0.0) > 0.01) "%.2fA".format(aPort?.currentA) else "--A"}$aProto",
-                                        modifier = Modifier.weight(1f)
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { focusPort(4) }
                                     )
                                 }
 
@@ -702,10 +717,10 @@ fun CuktechDashboardScreen(
                                         val f2 = (p2 / sumW).toFloat()
                                         val f3 = (p3 / sumW).toFloat()
                                         val f4 = (p4 / sumW).toFloat()
-                                        if (f1 > 0f) Box(Modifier.fillMaxHeight().weight(f1).background(Color(0xFFFF7A00)))
-                                        if (f2 > 0f) Box(Modifier.fillMaxHeight().weight(f2).background(Color(0xFF3B82F6)))
-                                        if (f3 > 0f) Box(Modifier.fillMaxHeight().weight(f3).background(Color(0xFF00E5FF)))
-                                        if (f4 > 0f) Box(Modifier.fillMaxHeight().weight(f4).background(Color(0xFFFBBF24)))
+                                        if (f1 > 0f) Box(Modifier.fillMaxHeight().weight(f1).background(Color(0xFFFF7A00)).clickable { focusPort(1) })
+                                        if (f2 > 0f) Box(Modifier.fillMaxHeight().weight(f2).background(Color(0xFF3B82F6)).clickable { focusPort(2) })
+                                        if (f3 > 0f) Box(Modifier.fillMaxHeight().weight(f3).background(Color(0xFF00E5FF)).clickable { focusPort(3) })
+                                        if (f4 > 0f) Box(Modifier.fillMaxHeight().weight(f4).background(Color(0xFFFBBF24)).clickable { focusPort(4) })
                                     }
                                 }
                                 Row(
@@ -716,10 +731,10 @@ fun CuktechDashboardScreen(
                                     val c2Str = if (p2 > 0.1 && sumW > 0.1) "${(p2 / sumW * 100).toInt()}%" else "--"
                                     val c3Str = if (p3 > 0.1 && sumW > 0.1) "${(p3 / sumW * 100).toInt()}%" else "--"
                                     val aStr = if (p4 > 0.1 && sumW > 0.1) "${(p4 / sumW * 100).toInt()}%" else "--"
-                                    Text("C1 $c1Str", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFFFF7A00), fontWeight = FontWeight.Bold)
-                                    Text("C2 $c2Str", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFF3B82F6), fontWeight = FontWeight.Bold)
-                                    Text("C3 $c3Str", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
-                                    Text("A $aStr", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold)
+                                    Text("C1 $c1Str", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFFFF7A00), fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { focusPort(1) }.padding(horizontal = 4.dp, vertical = 2.dp))
+                                    Text("C2 $c2Str", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFF3B82F6), fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { focusPort(2) }.padding(horizontal = 4.dp, vertical = 2.dp))
+                                    Text("C3 $c3Str", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { focusPort(3) }.padding(horizontal = 4.dp, vertical = 2.dp))
+                                    Text("A $aStr", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xFFFBBF24), fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { focusPort(4) }.padding(horizontal = 4.dp, vertical = 2.dp))
                                 }
                             }
                         }
@@ -1095,38 +1110,123 @@ fun CuktechDashboardScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 TextButton(onClick = { showTaskerDocs = !showTaskerDocs }) {
-                                    Text(if (showTaskerDocs) "Hide Broadcast Intent API" else "View Broadcast Intent API (Send Intent)", fontSize = 11.sp)
+                                    Text(if (showTaskerDocs) "Hide Broadcast Intent API" else "View Broadcast Intent API (Send & Receive Intents)", fontSize = 11.sp)
                                 }
                             }
 
                             if (showTaskerDocs) {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val telemetryAction = "com.cramqin.blecuktech10.TELEMETRY_UPDATE"
+                                val fullDocText = """
+                                    Tasker / ADB Broadcast Intent API (Package: com.cramqin.blecuktech10)
+
+                                    1. RECEIVE TELEMETRY BROADCAST (Tasker Event ➔ Intent Received):
+                                       Action: com.cramqin.blecuktech10.TELEMETRY_UPDATE
+                                       Broadcasted automatically on every BLE telemetry frame update.
+                                       Variables / Extras:
+                                       • %mac : Charger Bluetooth MAC
+                                       • %total_watts : Combined active wattage (e.g. 26.3)
+                                       • Per-Port (1..4 where 1=C1, 2=C2, 3=C3, 4=A):
+                                         - %port_1_v, %port_2_v, %port_3_v, %port_4_v (Voltage in V)
+                                         - %port_1_a, %port_2_a, %port_3_a, %port_4_a (Current in A)
+                                         - %port_1_w, %port_2_w, %port_3_w, %port_4_w (Power in W)
+                                         - %port_1_protocol ... (e.g. "PD3.1 EPR", "UFCS", "PPS")
+                                         - %port_1_enabled ... (true / false)
+
+                                    2. SEND CONTROL INTENTS (Tasker Action ➔ Send Intent / adb am broadcast):
+                                       • Connect Charger:
+                                         Action: com.cramqin.blecuktech10.CONNECT_CHARGER
+                                         Extra (optional): mac:AA:BB:CC:DD:EE:FF
+                                       • Disconnect:
+                                         Action: com.cramqin.blecuktech10.DISCONNECT_CHARGER
+                                       • Query Status (forces immediate telemetry broadcast):
+                                         Action: com.cramqin.blecuktech10.QUERY_STATUS
+                                       • Toggle Port Power:
+                                         Action: com.cramqin.blecuktech10.SET_PORT_STATE
+                                         Extras: port:1..4 (int), enabled:true/false (bool)
+                                       • Set Scene Mode:
+                                         Action: com.cramqin.blecuktech10.SET_SCENE_MODE
+                                         Extra: mode:1..4 (int: 1=Smart, 2=Perf, 3=Quiet, 4=Dual)
+                                       • Set Screen Timeout:
+                                         Action: com.cramqin.blecuktech10.SET_SCREEN_TIMEOUT
+                                         Extra: timeout:0..4 (int: 0=Always On, 1=1min, 2=2min, 3=5min, 4=10min)
+                                       • Set Port Charge Limit (Auto Cutoff):
+                                         Action: com.cramqin.blecuktech10.SET_CHARGE_LIMIT
+                                         Extras: port:1..4 (int), wh_target:30.0 (float), mode:"once"|"always" (string), enabled:true/false (bool)
+                                       • Scan Nearby Chargers:
+                                         Action: com.cramqin.blecuktech10.SCAN_CHARGER
+                                       • Background TCP Server:
+                                         Start: com.cramqin.blecuktech10.START_SERVER (extra: port:8080)
+                                         Stop:  com.cramqin.blecuktech10.STOP_SERVER
+                                """.trimIndent()
+
                                 Surface(
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text(
-                                        text = """
-                                            Tasker / ADB Broadcast Intent API (Package: com.cramqin.blecuktech10):
-                                            • Connect Charger:
-                                              Action: com.cramqin.blecuktech10.CONNECT_CHARGER
-                                              Extra (optional): mac:AA:BB:CC:DD:EE:FF
-                                            • Disconnect:
-                                              Action: com.cramqin.blecuktech10.DISCONNECT_CHARGER
-                                            • Toggle Port Power (port=1..4, enabled=true/false):
-                                              Action: com.cramqin.blecuktech10.SET_PORT_STATE
-                                            • Set Scene Mode (mode=1..4):
-                                              Action: com.cramqin.blecuktech10.SET_SCENE_MODE
-                                            • Set Port Charge Limit (port=1..4, wh_target=30.0, mode=once/always):
-                                              Action: com.cramqin.blecuktech10.SET_CHARGE_LIMIT
-                                            • Receive Live Telemetry (Tasker Intent Received):
-                                              Action: com.cramqin.blecuktech10.TELEMETRY_UPDATE
-                                              Extras: %total_watts, %port_1_v, %port_1_a, %port_1_w, %port_1_protocol (1..4)
-                                        """.trimIndent(),
-                                        fontSize = 11.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.padding(10.dp)
-                                    )
+                                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        // Quick Copy Box for TELEMETRY_UPDATE
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                                            shape = RoundedCornerShape(6.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text("Live Telemetry Event Action", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                                    Text(telemetryAction, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)
+                                                }
+                                                FilledTonalButton(
+                                                    onClick = {
+                                                        clipboard.setPrimaryClip(ClipData.newPlainText("Tasker Telemetry Action", telemetryAction))
+                                                        Toast.makeText(context, "Copied TELEMETRY_UPDATE action", Toast.LENGTH_SHORT).show()
+                                                    },
+                                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    modifier = Modifier.height(30.dp)
+                                                ) {
+                                                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("Copy", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Full Intent Reference:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            OutlinedButton(
+                                                onClick = {
+                                                    clipboard.setPrimaryClip(ClipData.newPlainText("Tasker API Reference", fullDocText))
+                                                    Toast.makeText(context, "Full API reference copied to clipboard", Toast.LENGTH_SHORT).show()
+                                                },
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                shape = RoundedCornerShape(6.dp),
+                                                modifier = Modifier.height(26.dp)
+                                            ) {
+                                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(12.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("Copy All API Docs", fontSize = 10.sp)
+                                            }
+                                        }
+
+                                        Text(
+                                            text = fullDocText,
+                                            fontSize = 10.5.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -2586,10 +2686,21 @@ private fun PortPowerMiniCell(
     portName: String,
     powerW: Double,
     subtitle: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
 ) {
+    val clickModifier = if (onClick != null) {
+        Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+    } else {
+        Modifier.padding(vertical = 4.dp)
+    }
+
     Row(
-        modifier = modifier.padding(vertical = 4.dp),
+        modifier = modifier.then(clickModifier),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
@@ -2599,7 +2710,7 @@ private fun PortPowerMiniCell(
                 .background(color)
         )
         Spacer(modifier = Modifier.width(6.dp))
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = "$portName ",

@@ -26,24 +26,12 @@
 
 ## 📱 App Screenshots
 
-<p align="center">
-  <img src="docs/screenshots/screenshot_01_gateway_connected.png" width="19%" alt="Gateway Connected" />
-  <img src="docs/screenshots/screenshot_03_telemetry_live.png" width="19%" alt="Interactive Port Visual" />
-  <img src="docs/screenshots/screenshot_04_telemetry_graph.png" width="19%" alt="Live Power Graph" />
-  <img src="docs/screenshots/screenshot_06_power_distribution.png" width="19%" alt="Power Distribution Bar" />
-  <img src="docs/screenshots/screenshot_07_port_protocols.png" width="19%" alt="Port Protocols & Controls" />
-</p>
-<p align="center">
-  <img src="docs/screenshots/screenshot_08_charging_stats.png" width="19%" alt="Charging Session History" />
-  <img src="docs/screenshots/screenshot_09_automation_setup.png" width="19%" alt="Automation & Settings" />
-  <img src="docs/screenshots/screenshot_02_login_modal.png" width="19%" alt="Cloud Sign-In Modes" />
-  <img src="docs/screenshots/screenshot_05_themes.png" width="19%" alt="Dark Accent Themes" />
-  <img src="docs/screenshots/screenshot_10_widget_preview.png" width="19%" alt="2x2 Solid Dark Widget" />
-</p>
-<p align="center">
-  <sub><i>Top row: Gateway &amp; Paired Status &bull; Interactive Hardware Graphic &bull; Multi-Line Power Curves &bull; Power Proportion Breakdown &bull; Individual Port &amp; Protocol Controls<br />
-  Bottom row: Session History &amp; Wh Logs &bull; Tasker &amp; Webhook Setup &bull; 4 Login Modes &bull; Dark Accent Palettes &bull; 2x2 Solid Dark Home Screen Widget</i></sub>
-</p>
+| Core Telemetry & Controls | Analytics & Automation | Account & Widgets |
+| :---: | :---: | :---: |
+| [![Gateway](docs/screenshots/screenshot_01_gateway_connected.png)](docs/screenshots/screenshot_01_gateway_connected.png)<br><sub><b>Gateway & Keepalive</b></sub> | [![Multi-Line Power Curves](docs/screenshots/screenshot_04_telemetry_graph.png)](docs/screenshots/screenshot_04_telemetry_graph.png)<br><sub><b>Real-Time Rolling Power Curves</b></sub> | [![Cloud Sign-In Modes](docs/screenshots/screenshot_02_login_modal.png)](docs/screenshots/screenshot_02_login_modal.png)<br><sub><b>4 Cloud Login Modes & 2FA</b></sub> |
+| [![Interactive Port Graphic](docs/screenshots/screenshot_03_telemetry_live.png)](docs/screenshots/screenshot_03_telemetry_live.png)<br><sub><b>Hardware Port Deep-Linking</b></sub> | [![Power Proportion](docs/screenshots/screenshot_06_power_distribution.png)](docs/screenshots/screenshot_06_power_distribution.png)<br><sub><b>Power Proportion Breakdown</b></sub> | [![Dark Themes](docs/screenshots/screenshot_05_themes.png)](docs/screenshots/screenshot_05_themes.png)<br><sub><b>5 Dark Accent Palettes</b></sub> |
+| [![Port Protocols](docs/screenshots/screenshot_07_port_protocols.png)](docs/screenshots/screenshot_07_port_protocols.png)<br><sub><b>Port Protocols & Countdown Timers</b></sub> | [![Charging History](docs/screenshots/screenshot_08_charging_stats.png)](docs/screenshots/screenshot_08_charging_stats.png)<br><sub><b>Session History & Wh Logs</b></sub> | [![2x2 Widget](docs/screenshots/screenshot_10_widget_preview.png)](docs/screenshots/screenshot_10_widget_preview.png)<br><sub><b>2x2 Solid Dark Widget Tile</b></sub> |
+| | [![Automation Setup](docs/screenshots/screenshot_09_automation_setup.png)](docs/screenshots/screenshot_09_automation_setup.png)<br><sub><b>Tasker & Screen Hardware Control</b></sub> | |
 
 ---
 

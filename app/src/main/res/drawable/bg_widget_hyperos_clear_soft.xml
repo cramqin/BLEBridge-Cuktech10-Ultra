@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- HyperOS 4 / iOS 27 Clear Soft Liquid Glass: ultra-clear crystal base + bright specular rim -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="26dp" />
+            <gradient
+                android:angle="135"
+                android:startColor="#48FFFFFF"
+                android:centerColor="#1E94A3B8"
+                android:endColor="#38E2E8F0"
+                android:type="linear" />
+            <stroke
+                android:width="1.4dp"
+                android:color="#80FFFFFF" />
+        </shape>
+    </item>
+    <!-- Diagonal liquid glass refraction highlight (matches HyperOS 4 Soft Glass preview) -->
+    <item
+        android:top="1dp"
+        android:left="1dp"
+        android:right="1dp"
+        android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="25dp" />
+            <gradient
+                android:angle="315"
+                android:startColor="#36FFFFFF"
+                android:centerColor="#06FFFFFF"
+                android:endColor="#28FFFFFF"
+                android:type="linear" />
+        </shape>
+    </item>
+</layer-list>

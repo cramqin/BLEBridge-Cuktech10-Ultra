@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Dark Frosted Glass: diffused slate-mist tint with soft frosted border -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="26dp" />
+            <gradient
+                android:angle="135"
+                android:startColor="#B8253042"
+                android:centerColor="#AC18202E"
+                android:endColor="#BA101520"
+                android:type="linear" />
+            <stroke
+                android:width="1.2dp"
+                android:color="#48FFFFFF" />
+        </shape>
+    </item>
+    <!-- Inner frosted diffusion layer -->
+    <item
+        android:top="1dp"
+        android:left="1dp"
+        android:right="1dp"
+        android:bottom="1dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="25dp" />
+            <gradient
+                android:angle="315"
+                android:startColor="#24FFFFFF"
+                android:centerColor="#10CBD5E1"
+                android:endColor="#08FFFFFF"
+                android:type="linear" />
+        </shape>
+    </item>
+</layer-list>

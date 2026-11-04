@@ -35,6 +35,14 @@
 | [![Port Protocols](docs/screenshots/screenshot_07_port_protocols.png)](docs/screenshots/screenshot_07_port_protocols.png)<br><sub><b>Port Protocols & Countdown Timers</b></sub> | [![Charging History](docs/screenshots/screenshot_08_charging_stats.png)](docs/screenshots/screenshot_08_charging_stats.png)<br><sub><b>Session History & Wh Logs</b></sub> | [![2x2 Widget](docs/screenshots/screenshot_10_widget_preview.png)](docs/screenshots/screenshot_10_widget_preview.png)<br><sub><b>2x2 Solid Dark Widget Tile</b></sub> |
 | | [![Automation Setup](docs/screenshots/screenshot_09_automation_setup.png)](docs/screenshots/screenshot_09_automation_setup.png)<br><sub><b>Tasker & Screen Hardware Control</b></sub> | |
 
+<p align="center">
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.cramqin.blecuktech10%22%2C%22url%22%3A%22https%3A//github.com/cramqin/BLEBridge-Cuktech10-Ultra%22%2C%22author%22%3A%22cramqin%22%2C%22name%22%3A%22BLEBridge%20-%20CUKTECH%2010%20Ultra%22%7D">
+    <img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" width="220" alt="Add to Obtainium" />
+  </a>
+  <br>
+  <sub><i>Get automatic background updates and 1-tap install via <a href="https://github.com/ImranR98/Obtainium">Obtainium</a></i></sub>
+</p>
+
 ---
 
 ## 🙏 Acknowledgments & Heritage
@@ -142,7 +150,7 @@ Grab the latest signed `.apk` directly from the [**Releases**](../../releases) p
 
 <p align="left">
   <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.cramqin.blecuktech10%22%2C%22url%22%3A%22https%3A//github.com/cramqin/BLEBridge-Cuktech10-Ultra%22%2C%22author%22%3A%22cramqin%22%2C%22name%22%3A%22BLEBridge%20-%20CUKTECH%2010%20Ultra%22%7D">
-    <img src="https://raw.githubusercontent.com/ImranR98/apps.obtainium.imranr.dev/main/assets/graphics/badge_obtainium.png" width="220" alt="Add to Obtainium" />
+    <img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" width="220" alt="Add to Obtainium" />
   </a>
 </p>
 

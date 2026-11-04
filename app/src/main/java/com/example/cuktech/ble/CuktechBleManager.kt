@@ -257,6 +257,26 @@ class CuktechBleManager(
             .edit()
             .putBoolean("auto_reconnect_proximity", enabled)
             .apply()
+
+        if (enabled) {
+            // Overrides manual disconnect state
+            userManuallyDisconnected = false
+            if (_authState.value == CuktechAuthState.DISCONNECTED) {
+                val targetMac = lastConnectedMac
+                    ?: credentialStore.activeDevice.value?.mac
+                    ?: credentialStore.devices.value.firstOrNull { it.hasValidToken }?.mac
+                    ?: credentialStore.devices.value.firstOrNull()?.mac
+                if (!targetMac.isNullOrBlank()) {
+                    BleBridgeService.addLogMessage(
+                        BleBridgeService.Companion.LogLevel.LEVEL2,
+                        "[Cuktech] Auto-connect enabled: searching for charger $targetMac..."
+                    )
+                    connectToCharger(targetMac)
+                } else {
+                    startSearchForCuktechChargers(10000L)
+                }
+            }
+        }
     }
 
     // =========================================================================
@@ -537,6 +557,7 @@ class CuktechBleManager(
         _authState.value = CuktechAuthState.DISCONNECTED
         if (wasConnectedOrConnecting) {
             _statusMessage.value = "Disconnecting..."
+            BleBridgeService.notifyAlertFlash("🔌 CUKTECH 10 Ultra Disconnected", "Disconnected", false)
         }
         BleBridgeService.getInstance()?.stopTcpServer()
         BleBridgeService.getInstance()?.disconnectBleNative()

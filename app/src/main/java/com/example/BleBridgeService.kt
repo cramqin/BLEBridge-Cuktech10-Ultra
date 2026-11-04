@@ -378,46 +378,26 @@ class BleBridgeService : Service() {
         }
     }
 
+    private var lastToastTimeMs: Long = 0L
+    private var lastToastConnected: Boolean? = null
+
     /**
-     * Posts a high-priority heads-up notification alert ("flash") when CUKTECH 10 Ultra
-     * connects or disconnects. Automatically dismisses after 7 seconds.
+     * Shows a clean Android Toast alert when CUKTECH 10 Ultra connects or disconnects.
+     * Debounced so rapid successive callbacks do not trigger duplicate toasts.
      */
     fun notifyAlertFlash(title: String, message: String, isConnected: Boolean) {
-        runCatching {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-            val alertChannelId = "CuktechAlertChannel"
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val chan = NotificationChannel(alertChannelId, "CUKTECH Connection Alerts", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Heads-up popups when CUKTECH charger connects or disconnects"
-                    enableVibration(true)
-                    setShowBadge(true)
-                    lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
-                }
-                nm.createNotificationChannel(chan)
-            }
+        val now = System.currentTimeMillis()
+        if (lastToastConnected == isConnected && now - lastToastTimeMs < 2500L) {
+            return
+        }
+        lastToastTimeMs = now
+        lastToastConnected = isConnected
 
-            val openIntent = (packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java)).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra("EXTRA_NAV_TAB", "LIVE")
-            }
-            val openPendingIntent = PendingIntent.getActivity(
-                this, 2002, openIntent,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
-            )
-
-            val builder = NotificationCompat.Builder(this, alertChannelId)
-                .setSmallIcon(R.drawable.ic_stat_cuktech)
-                .setContentTitle(title)
-                .setContentText(message)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_EVENT)
-                .setAutoCancel(true)
-                .setTimeoutAfter(7000L)
-                .setContentIntent(openPendingIntent)
-                .setDefaults(NotificationCompat.DEFAULT_ALL)
-
-            val alertNotifId = if (isConnected) 20101 else 20102
-            nm.notify(alertNotifId, builder.build())
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            try {
+                val text = if (isConnected) "⚡ CUKTECH 10 Ultra Connected" else "🔌 CUKTECH 10 Ultra Disconnected"
+                android.widget.Toast.makeText(applicationContext, text, android.widget.Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {}
         }
     }
 

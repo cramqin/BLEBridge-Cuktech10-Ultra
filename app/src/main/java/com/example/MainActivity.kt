@@ -574,7 +574,7 @@ fun BleBridgeDashboard(
                             border = BorderStroke(1.dp, appColors.primary.copy(alpha = 0.4f))
                         ) {
                             Text(
-                                text = "v1.1.0-beta",
+                                text = "v1.1.0",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = appColors.primary,
@@ -1308,7 +1308,11 @@ fun BleBridgeDashboard(
                                                 uncheckedTrackColor = if (appColors.isDark) Color(0xFF1E2430) else MaterialTheme.colorScheme.surfaceVariant,
                                                 uncheckedBorderColor = if (appColors.isDark) Color(0xFF475569) else MaterialTheme.colorScheme.outline
                                             ),
-                                            onCheckedChange = { cuktechManager.setAutoReconnectConfigured(it) }
+                                            onCheckedChange = { isEnabled ->
+                                                ensureBleServiceStartedAndPermissions {
+                                                    cuktechManager.setAutoReconnectConfigured(isEnabled)
+                                                }
+                                            }
                                         )
                                     }
                                 }

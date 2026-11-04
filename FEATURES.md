@@ -18,6 +18,7 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
 - [11. Home Screen Widgets (Soft Glass & Solid Dark)](#11-home-screen-widgets-soft-glass--solid-dark)
 - [12. Dual-Tab Terminal: Console Log & BLE Diagnostics](#12-dual-tab-terminal-console-log--ble-diagnostics)
 - [13. Automation Hub: Tasker Plugin, Webhooks & ADB](#13-automation-hub-tasker-plugin-webhooks--adb)
+- [14. Proximity Auto-Connect, Persistent Reconnect & Toast Alerts](#14-proximity-auto-connect-persistent-reconnect--toast-alerts)
 
 ---
 
@@ -203,3 +204,19 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
   - Control the charger from Termux scripts or ADB commands over USB/Wi-Fi.
 - **Raw TCP-to-BLE Socket Gateway (`port 8080`):**
   - Bridges raw TCP socket connections straight into physical BLE GATT characteristics for low-level protocol development and scripting.
+
+---
+
+## 14. Proximity Auto-Connect, Persistent Reconnect & Toast Alerts
+- **Proximity Auto-Connect:**
+  - Automatically searches for and connects to your saved CUKTECH 10 Ultra whenever it comes into Bluetooth range—much like wireless Bluetooth keyboards, mice, or earbuds.
+  - Toggling "Auto-Connect on Proximity" ON inside the Gateway settings immediately initiates a connection/discovery scan and clears any prior manual disconnect flag.
+- **Persistent Unplug & Replug Reconnect:**
+  - When the charger is unplugged from AC power, the foreground service transitions to a low-power standby mode (`⚡ CUKTECH 10 Ultra · Standby`), keeping the Bluetooth listener active even while your phone is locked or the app is in the background.
+  - Uses native Android hardware `ScanFilter` targeting the charger's embedded MAC and MiOT service UUID (`0xFE95`) for instant packet recognition without waking the CPU for irrelevant devices.
+  - Features an automated **5-minute progressive battery backoff**: scans every ~7.5 seconds during the first 5 minutes (for fast socket-swapping), then drops to a relaxed 20-second interval to preserve battery.
+- **Startup Auto-Connect:**
+  - If the app was closed, killed by Android memory pressure, or force-stopped, reopening the app immediately re-initiates connection to the charger if Auto-Connect is configured.
+- **Native Toast Feedback:**
+  - Displays a clean, debounced Android Toast on both connection (`⚡ CUKTECH 10 Ultra Connected`) and disconnection (`🔌 CUKTECH 10 Ultra Disconnected`) across all connection modes (manual, quick connect, proximity, or tasker).
+

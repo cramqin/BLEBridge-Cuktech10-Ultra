@@ -36,6 +36,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -46,11 +48,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -126,6 +134,8 @@ fun BleBridgeDashboard(
 ) {
     val context = LocalContext.current
     val appColors = LocalAppColors.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -150,6 +160,7 @@ fun BleBridgeDashboard(
 
     BackHandler(enabled = showTelemetryScreen) {
         showTelemetryScreen = false
+        dashboardCurrentTab = 0
     }
 
     LaunchedEffect(pendingNavTab.value) {
@@ -445,7 +456,10 @@ fun BleBridgeDashboard(
                         if (showTelemetryScreen) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(
-                                    onClick = { showTelemetryScreen = false },
+                                    onClick = {
+                                        showTelemetryScreen = false
+                                        dashboardCurrentTab = 0
+                                    },
                                     modifier = Modifier
                                         .size(40.dp)
                                         .clip(RoundedCornerShape(12.dp))
@@ -649,6 +663,7 @@ fun BleBridgeDashboard(
                         },
                         onNavigateBack = {
                             showTelemetryScreen = false
+                            dashboardCurrentTab = 0
                         },
                         onTabChanged = { tab ->
                             dashboardCurrentTab = tab
@@ -659,6 +674,12 @@ fun BleBridgeDashboard(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
+                            .pointerInput(Unit) {
+                                detectTapGestures(onTap = {
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                })
+                            }
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -957,7 +978,10 @@ fun BleBridgeDashboard(
                                         border = BorderStroke(1.dp, appColors.primary.copy(alpha = 0.6f)),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clickable { showTelemetryScreen = true }
+                                            .clickable {
+                                                showTelemetryScreen = true
+                                                dashboardCurrentTab = 0
+                                            }
                                     ) {
                                         Row(
                                             modifier = Modifier.padding(14.dp),
@@ -1257,21 +1281,46 @@ fun BleBridgeDashboard(
                                 Spacer(modifier = Modifier.height(16.dp))
 
                                 // Port Config
-                                Column(modifier = Modifier.fillMaxWidth()) {
-                                    Text(
-                                        text = "TCP PORT",
-                                        color = appColors.textSecondary,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 1.sp
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "TCP PORT",
+                                            color = appColors.textSecondary,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = if (isRunning) "Port locked while active" else "Default port is 8080",
+                                            fontSize = 11.sp,
+                                            color = appColors.textSecondary
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(16.dp))
                                     OutlinedTextField(
                                         value = portInput,
-                                        onValueChange = { portInput = it },
+                                        onValueChange = { input ->
+                                            if (input.all { it.isDigit() } && input.length <= 5) {
+                                                portInput = input
+                                            }
+                                        },
                                         enabled = !isRunning,
                                         singleLine = true,
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Number,
+                                            imeAction = ImeAction.Done
+                                        ),
+                                        keyboardActions = KeyboardActions(
+                                            onDone = {
+                                                focusManager.clearFocus()
+                                                keyboardController?.hide()
+                                            }
+                                        ),
                                         shape = RoundedCornerShape(12.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedTextColor = appColors.textPrimary,
@@ -1284,16 +1333,14 @@ fun BleBridgeDashboard(
                                             unfocusedBorderColor = appColors.border,
                                             disabledBorderColor = Color.Transparent
                                         ),
-                                        modifier = Modifier.fillMaxWidth()
+                                        textStyle = TextStyle(
+                                            fontSize = 14.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            textAlign = TextAlign.Center,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        modifier = Modifier.width(120.dp)
                                     )
-                                    if (isRunning) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "Turn switch OFF to modify the TCP port.",
-                                            fontSize = 11.sp,
-                                            color = appColors.textSecondary
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -1749,6 +1796,7 @@ fun BleBridgeDashboard(
                             }
                             context.startService(stopIntent)
                             showTelemetryScreen = false
+                            dashboardCurrentTab = 0
                             val launchIntent = miHomeLaunchIntent ?: context.packageManager.getLaunchIntentForPackage(miHomePkg)
                             if (launchIntent != null) {
                                 context.startActivity(launchIntent)

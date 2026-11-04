@@ -1381,18 +1381,7 @@ fun CuktechDashboardScreen(
 
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                            // B. Auto-Connect on Proximity
-                            val isAutoReconnect by bleManager.isAutoReconnectConfigured.collectAsState()
-                            SettingSwitchRow(
-                                title = "Auto-Connect on Proximity",
-                                subtitle = "Automatically connects when charger powers on or comes in range (like a Bluetooth mouse)",
-                                checked = isAutoReconnect,
-                                onCheckedChange = { bleManager.setAutoReconnectConfigured(it) }
-                            )
-
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-
-                            // C. Idle Screen Off (PIID 19)
+                            // B. Idle Screen Off (PIID 19)
                             SettingSwitchRow(
                                 title = "Idle Screen-Off",
                                 subtitle = "Turns off charger's color LCD when all ports are idle",
@@ -1402,7 +1391,7 @@ fun CuktechDashboardScreen(
 
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
-                            // D. Physical Screen Language (PIID 13)
+                            // C. Physical Screen Language (PIID 13)
                             var localLanguage by remember(settings.language) {
                                 mutableStateOf(if (settings.language in 0..1) settings.language else 0)
                             }

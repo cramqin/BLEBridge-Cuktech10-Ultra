@@ -850,7 +850,7 @@ fun BleBridgeDashboard(
                                         } else if (state == BluetoothAdapter.STATE_ON) {
                                             if (cuktechManager.isAutoReconnectConfigured.value && !cuktechManager.userManuallyDisconnected && !cuktechManager.lastConnectedMac.isNullOrBlank()) {
                                                 scope.launch {
-                                                    delay(1200L)
+                                                    kotlinx.coroutines.delay(1200L)
                                                     if (cuktechManager.authState.value == CuktechAuthState.DISCONNECTED) {
                                                         cuktechManager.connectToCharger(cuktechManager.lastConnectedMac!!)
                                                     }
@@ -1242,6 +1242,55 @@ fun BleBridgeDashboard(
                                     color = appColors.textSecondary,
                                     lineHeight = 16.sp
                                 )
+
+                                val isAutoReconnect by cuktechManager.isAutoReconnectConfigured.collectAsState()
+                                Surface(
+                                    color = appColors.surfaceVariant,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Default.BluetoothSearching,
+                                                    contentDescription = null,
+                                                    tint = appColors.primary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "Auto-Connect on Proximity",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp,
+                                                    color = appColors.textPrimary
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "Auto-reconnects when charger powers on or comes in range (like a Bluetooth mouse)",
+                                                fontSize = 11.sp,
+                                                color = appColors.textSecondary,
+                                                lineHeight = 15.sp
+                                            )
+                                        }
+                                        Switch(
+                                            checked = isAutoReconnect,
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = Color.White,
+                                                checkedTrackColor = appColors.primary,
+                                                uncheckedThumbColor = if (appColors.isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.outline,
+                                                uncheckedTrackColor = if (appColors.isDark) Color(0xFF1E2430) else MaterialTheme.colorScheme.surfaceVariant,
+                                                uncheckedBorderColor = if (appColors.isDark) Color(0xFF475569) else MaterialTheme.colorScheme.outline
+                                            ),
+                                            onCheckedChange = { cuktechManager.setAutoReconnectConfigured(it) }
+                                        )
+                                    }
+                                }
 
                                 Surface(
                                     color = if (isBatteryIgnored) Color(0xFF10B981).copy(alpha = 0.12f) else appColors.surfaceVariant,

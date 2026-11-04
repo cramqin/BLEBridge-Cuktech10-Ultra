@@ -103,7 +103,13 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 - **Deep-Linked Interactive Ports:** Tapping any port on the visual graphic (`USB-C1`, `USB-C2`, `USB-C3`, or `USB-A`) automatically animates swiping over to the **Ports tab**, scrolls smoothly to bring that specific port card into focus, and briefly highlights it with a glowing border so you can instantly toggle its power or fast-charge protocols.
 
 ### 2. 🔐 Native Xiaomi Cloud Sync & MiOT v5 + CUKTECH v2 BLE Engine
-- **Xiaomi Cloud Login (QR Code & Password):** Sign in once to automatically fetch your charger's MAC address, device name, and **12-byte MiOT Token** from Xiaomi Cloud (`cn` region prioritized, with multi-region fallback).
+- **4 Flexible Login Modes with 2FA Support:**
+  - **Google / Web OAuth:** Seamless in-app WebView authentication for Google-linked Xiaomi accounts.
+  - **QR Code Scan:** Scan with the official Mi Home app on another phone to log in instantly with zero credentials typed.
+  - **Password Login:** Direct Xiaomi Cloud account login with full **Two-Factor Authentication (2FA)** challenge support (SMS OTP or Email verification).
+  - **Manual / JSON Token Import:** Directly paste MAC address, 12-byte MiOT Token, and BLE Key without connecting to Xiaomi Cloud.
+- **Multi-Device Credential Storage & Switcher:**
+  - Saves credentials for multiple chargers in local encrypted storage. Switch between different CUKTECH 10 Ultra chargers with a single tap or scan to auto-pair.
 - **Full 2-Phase Cryptographic Handshake:**
   - **Phase A (`0xA4`):** Exchanges capabilities on `CHAR_AUTH_CTRL` (`00000010`) and `CHAR_AUTH_DATA` (`00000005`).
   - **Phase B (`0x1500`):** Performs ephemeral `SECP256R1` ECDH key agreement, derives session keys via `HKDF-SHA256` bound to your 12-byte MiOT Token, and verifies mutual `AES-CCM` challenges.
@@ -112,16 +118,23 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 - **Live Tab:**
   - Total power hero card with Peak Session Wattage, accumulated Energy (`Wh`), RSSI signal quality, and an expandable **Power Allocation Scenarios** dialog (`AI Dynamic`, `Hybrid`, `Single Device Priority`, `Dual High-Power`).
   - Real-time multi-line **Power Curve Chart** (`Total`, `USB-C1`, `USB-C2`, `USB-C3`, `USB-A`).
-  - **4 Individual Port Cards:** Live Voltage (`V`), Current (`A`), Power (`W`), negotiated protocol badge (`PD3.0`, `PPS`, `MiPPS`, `UFCS`, `SCP`, `QC3.0`), 1-tap port ON/OFF switch, **Energy Limit (`Wh`)**, and **Closure Countdown Timer** with a live second-by-second countdown badge.
+  - **4 Individual Port Cards:**
+    - Live Voltage (`V`), Current (`A`), Power (`W`), and negotiated protocol badge (`PD3.0`, `PPS`, `MiPPS`, `UFCS`, `SCP`, `QC3.0`).
+    - 1-tap port ON/OFF switch.
+    - **Energy Limit (`Wh`) Auto-Cutoff:** Set a target `Wh` cutoff (`once` or `always`) with one-tap presets (`10Wh`, `25Wh`, `50Wh`, `80Wh`, `100Wh`).
+    - **Closure Countdown Timer:** Precision hour/minute wheel with quick presets (`Always On`, `15m`, `30m`, `1h`, `2h`, `4h`) and an active second-by-second live countdown ticker badge on the card.
 - **Ports Tab:**
   - **Per-Port Fast-Charge Protocol Switches:** Independently toggle **PD (up to 100W)**, **PPS (Programmable Power Supply)**, **UFCS (Fusion Fast Charging)**, and **Huawei SCP (22.5W)** per port (`PIID 20–23`).
   - **USB-A Low Current Mode (4h):** Keep USB-A awake for low-draw wearables, earbuds, and fitness bands (`PIID 18`).
 - **History Tab:**
-  - Tracks active and completed charging sessions per port with duration, average/peak wattage, and integrated `Wh` energy.
-  - Export session history to **CSV** (`24h`, `7d`, `30d`, `All Time`) or clear history while keeping active sessions intact.
+  - **Live & Completed Session Inspector:** Real-time charging sessions per port tracking start time, elapsed duration, average wattage, peak wattage, and total energy consumed (`Wh`).
+  - **Session Detail Inspector Dialog:** Tap any session to inspect a full summary breakdown with active session markers.
+  - **Consolidated Sessions Table Dialog:** View all charging sessions across all ports in a unified chronological spreadsheet view.
+  - **CSV Export Dialog:** Export history with custom timeframe filters (`24 Hours`, `7 Days`, `30 Days`, `All Time`) and scope (`All Telemetry Data`, `Active Sessions Only`, `Completed Sessions Only`), saved directly to `Downloads/cuktech10/history/`.
+  - **Granular History Clearing Dialog:** Clear historical sessions with options to *Keep Active Sessions* or perform a *Full Purge*.
 - **Settings Tab:**
   - **Charger Hardware Controls:** Screen Brightness (`Low 20%`, `Medium 60%`, `High 100%`), Screen Timeout (`Always On`, `1 min`, `5 min`, `10 min`, `30 min`), **Idle Screen-Off** (`PIID 19`), Physical Screen Language (`Chinese` / `English`), and **Force Soft Port Reset** (`PIID 25`) to re-negotiate USB-PD contracts.
-  - **6 Dark Theme Accent Palettes:** `CUKTECH Cyan`, `HyperCharge Blue`, `Xiaomi Orange`, `Emerald Matrix`, `Royal Amethyst`, and `Monochrome Slate`.
+  - **5 Custom Dark Theme Accent Palettes:** `CUKTECH Gunmetal` (Classic), `AMOLED Pure Black` (`#000000`), `Cyberpunk Neon`, `Titanium Amber`, and `Deep Ocean Blue`.
 
 ### 4. 🪟 Home Screen Widgets (HyperOS Soft Glass & Solid Dark)
 Includes **4 native home screen widgets** right in your Android Widget Picker:

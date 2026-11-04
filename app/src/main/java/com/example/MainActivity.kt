@@ -1155,31 +1155,46 @@ fun BleBridgeDashboard(
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                                 Text(
-                                                    text = "What is this?",
+                                                    text = "Optional TCP Socket Bridge",
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 12.sp,
                                                     color = appColors.textPrimary
                                                 )
                                                 Text(
-                                                    text = "An optional raw TCP socket server (from the original BLEBridge project) that broadcasts live CUKTECH 10 Ultra telemetry lines over your local Wi-Fi network.\n\n• Standalone Bluetooth: Not required for local charger monitoring, port switching, or Home Assistant Webhooks.\n• Safe Toggle: Turning this off will NOT disconnect your active Bluetooth connection.\n• Home Assistant: Home Assistant users should configure the HTTP Webhook in Dashboard ➔ Setup instead.",
+                                                    text = "Broadcasts live CUKTECH charger telemetry to external Python / PC scripts over your local Wi-Fi.\n\n• Standalone Bluetooth: Not required for phone BLE monitoring, port controls, or Home Assistant Webhooks.\n• Safe Toggle: Turning this off will NOT disconnect your active Bluetooth connection.",
                                                     color = appColors.textPrimary,
                                                     fontSize = 11.sp,
                                                     lineHeight = 16.sp
                                                 )
                                                 Spacer(modifier = Modifier.height(2.dp))
-                                                Text(
-                                                    text = "How to test from your PC (Same Wi-Fi network required):",
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 12.sp,
-                                                    color = appColors.primary
-                                                )
-                                                Text(
-                                                    text = "1. Connect your PC and this phone to the SAME Wi-Fi network (or phone hotspot).\n2. Turn ON the switch above and check the IP & Port (e.g., ${(wifiIp ?: "192.168.1.X")}:$portInput).\n3. In your PC terminal, run:\n   • Linux / macOS / WSL:\n     nc ${(wifiIp ?: "<phone-ip>")} $portInput\n     (or: telnet ${(wifiIp ?: "<phone-ip>")} $portInput)\n     (or: python3 -c \"import socket; s=socket.create_connection(('${(wifiIp ?: "IP")}', $portInput)); print(s.recv(1024).decode())\")\n   • Windows (PowerShell):\n     Test-NetConnection -ComputerName ${(wifiIp ?: "<phone-ip>")} -Port $portInput\n\nWhen connected, the phone logs a new client and streams JSON telemetry strings directly to your PC!",
-                                                    color = appColors.textPrimary,
-                                                    fontSize = 11.sp,
-                                                    lineHeight = 16.sp,
-                                                    fontFamily = FontFamily.Monospace
-                                                )
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        runCatching {
+                                                            val guideIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/cramqin/BLEBridge-Cuktech10-Ultra/blob/main/docs/TCP_SOCKET_BRIDGE.md")).apply {
+                                                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                            }
+                                                            context.startActivity(guideIntent)
+                                                        }
+                                                    },
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                    modifier = Modifier.height(30.dp),
+                                                    border = BorderStroke(1.dp, appColors.primary)
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.OpenInNew,
+                                                        contentDescription = null,
+                                                        tint = appColors.primary,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = "View PC Connection Guide ↗",
+                                                        fontSize = 11.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = appColors.primary
+                                                    )
+                                                }
                                             }
                                         }
                                     }

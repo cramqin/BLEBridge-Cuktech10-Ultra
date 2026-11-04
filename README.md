@@ -20,6 +20,7 @@
 
 ## 📖 Quick Links
 - **[Full Features & Hardware Documentation (FEATURES.md)](FEATURES.md)** — Complete deep-dive into every single feature, register, dialog, graph, and automation intent.
+- **[TCP Socket Bridge & Remote PC Guide (docs/TCP_SOCKET_BRIDGE.md)](docs/TCP_SOCKET_BRIDGE.md)** — Step-by-step instructions for testing raw TCP telemetry on local Wi-Fi, ADB, or Tailscale VPN.
 - **[Releases & APK Downloads](../../releases)** — Pre-built signed APKs for Android 8.0+.
 - **[Add to Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.cramqin.blecuktech10%22%2C%22url%22%3A%22https%3A//github.com/cramqin/BLEBridge-Cuktech10-Ultra%22%2C%22author%22%3A%22cramqin%22%2C%22name%22%3A%22BLEBridge%20-%20CUKTECH%2010%20Ultra%22%7D)** — 1-tap install and automatic background updates via Obtainium.
 - **[OEM Background Optimization Guide](https://dontkillmyapp.com/)** — Fix aggressive battery killers on Xiaomi HyperOS, Samsung, etc.

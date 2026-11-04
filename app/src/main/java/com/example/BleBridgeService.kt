@@ -1397,8 +1397,8 @@ class BleBridgeService : Service() {
         fun ensureCuktechManagersInitialized(context: Context): CuktechBleManager {
             val appCtx = context.applicationContext
             val prefs = appCtx.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
-            val savedLvl = prefs.getString("console_log_level", LogLevel.LEVEL2.name) ?: LogLevel.LEVEL2.name
-            _logLevel.value = runCatching { LogLevel.valueOf(savedLvl) }.getOrDefault(LogLevel.LEVEL2)
+            val savedLvl = prefs.getString("console_log_level", LogLevel.LEVEL1.name) ?: LogLevel.LEVEL1.name
+            _logLevel.value = runCatching { LogLevel.valueOf(savedLvl) }.getOrDefault(LogLevel.LEVEL1)
 
             val store = credentialStore ?: SecureCredentialStore(appCtx).also { credentialStore = it }
             val db = persistence ?: CuktechPersistence(appCtx).also { persistence = it }
@@ -1530,7 +1530,7 @@ class BleBridgeService : Service() {
         private val _bleDeviceAddress = MutableStateFlow<String?>(null)
         val bleDeviceAddress: StateFlow<String?> = _bleDeviceAddress.asStateFlow()
 
-        private val _logLevel = MutableStateFlow(LogLevel.LEVEL2)
+        private val _logLevel = MutableStateFlow(LogLevel.LEVEL1)
         val logLevel: StateFlow<LogLevel> = _logLevel.asStateFlow()
 
         private val logsList = Collections.synchronizedList(LinkedList<LogMessage>())

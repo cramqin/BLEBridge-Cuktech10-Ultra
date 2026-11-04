@@ -28,6 +28,23 @@ Huge thanks to the authors of both repositories for making this native Android p
 
 ---
 
+## ⚡ Performance, Battery & Polling Architecture
+
+Unlike typical smart home bridges that hammer Bluetooth channels or drain your phone battery, BLEBridge was engineered specifically around the AD1204U hardware's exact BLE characteristics:
+
+- **0.0% CPU & Near-Zero Battery Drain on Idle:**
+  - When no device is drawing power, the background service uses negligible CPU (`< 0.1%`) and draws virtually no extra battery over an open BLE connection.
+  - **Silent Idle Telemetry Filter:** When a poll returns unchanged `0.0V 0.0A (Idle)` values, the app **silently drops redundant state emissions**. It does not re-compose UI components, trigger launcher widget redraws, fire Home Assistant webhooks, or flood the console log.
+- **Smart Push + Adaptive Polling (Hardware-Aware):**
+  - **USB-C1 & USB-C2:** The charger hardware automatically broadcasts spontaneous BLE push notifications (`b4 = 0x04`) the instant a cable is plugged in or wattage shifts. BLEBridge listens passively for C1/C2—only running a gentle `3s` backup poll when actively charging to catch unplugs, and **0 polls while idle**.
+  - **USB-C3 & USB-A:** The charger firmware never broadcasts push notifications on C3/A. BLEBridge polls C3 and USB-A adaptively: every `5s` when all ports are idle (ensuring fast plug-in detection) and ramps up to `3s` whenever any port is active for smooth `Wh` energy integration.
+- **Sequential Mutex Hardware Queue:**
+  - Prevents Telink BLE controller deadlocks by funneling all GATT writes through a sequential, non-blocking coroutine queue with automatic 1.8s command timeouts.
+- **Widget Battery Optimization:**
+  - The Android Home Screen Widgets declare `updatePeriodMillis="0"` (zero alarm-based wakeups). They update reactively only when live state actually changes and are automatically paused by Android when your screen is off.
+
+---
+
 ## ⚠️ Prerequisites & Xiaomi Mi Home Requirements
 
 Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardware and account requirements:
@@ -44,7 +61,7 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
    - Official OTA firmware updates for the charger must be performed through the **Xiaomi Mi Home** app. BLEBridge includes a 1-tap **"Open in Xiaomi Mi Home"** button that cleanly releases the Bluetooth handle and launches Mi Home for firmware checks.
 5. **Background Keepalive & OEM Battery Optimization ([dontkillmyapp.com](https://dontkillmyapp.com/)):**
    - To keep live BLE telemetry, widgets, and background automations running reliably when your screen is off, tap **"Ignore Battery Optimization"** inside the app's **Background Keepalive & System Integration** card.
-   - Aggressive Android OEMs (Xiaomi HyperOS / MIUI, Samsung OneUI, OPPO ColorOS, Vivo OriginOS, Huawei, etc.) often kill background services even with standard Android battery whitelist enabled. Follow the device-specific steps at **[https://dontkillmyapp.com/](https://dontkillmyapp.com/)** (e.g., enable *Autostart* and set Battery Saver to *No Restrictions* on Xiaomi/HyperOS).
+   - Aggressive Android OEMs (Xiaomi HyperOS / MIUI, Samsung OneUI, OPPO ColorOS, Vivo OriginOS, Huawei, etc.) often kill background services even with standard Android battery whitelist enabled. Tap the **"OEM Background Guide (dontkillmyapp.com)"** button in the app or visit **[https://dontkillmyapp.com/](https://dontkillmyapp.com/)** to configure Autostart and set Battery Saver to *No Restrictions*.
 6. **Invisible in Standard Android System Bluetooth Settings (Normal Behavior):**
    - **You will NOT see the CUKTECH 10 Ultra in your phone's standard Android Bluetooth settings menu**, nor can you pair to it from Android's system Bluetooth scanner.
    - This is because the charger broadcasts nameless, encrypted Xiaomi MiOT `0xFE95` BLE service advertisements (`Product ID 0x660E`) rather than classic Bluetooth or standard HID/audio profiles.
@@ -62,6 +79,7 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 | **Connection & Startup Speed** | ⚡ **Instant (~1.5s native GATT)** | 🐢 Slow (Heavy plugin loading) |
 | **Persistent Background Keepalive & Live Notification** | ✅ **Yes (24/7 foreground service)** | ❌ Disconnects when screen locks |
 | **Interactive Home Screen Widgets (`4x2` & `2x2`)** | ✅ **Yes (Soft Glass & Solid Dark)** | ❌ None |
+| **Hardware Visual Panel (Interactive Port Jump)** | ✅ **Yes (Tap port graphic → jumps to port settings)** | ⚠️ Non-interactive graphic |
 | **Per-Port Live Telemetry (`V`, `A`, `W`, Fast-Charge Protocol)** | ✅ **Yes (Real-time graphs & cards)** | ✅ Yes |
 | **1-Tap Individual Port Power Toggle (`C1`, `C2`, `C3`, `USB-A`)** | ✅ **Yes (App, Widget, Tasker, ADB)** | ✅ Yes |
 | **Power Allocation Scenarios (`AI`, `Hybrid`, `Single`, `Dual`)** | ✅ **Yes (Dialog, Widget, Tasker)** | ✅ Yes |
@@ -73,23 +91,24 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 | **ADB / Termux Broadcast Intent API** | ✅ **Yes** | ❌ None |
 | **Home Assistant HTTP Webhook Push Integration** | ✅ **Yes** | ❌ None |
 | **Raw TCP-to-BLE Socket Gateway (`port 8080`)** | ✅ **Yes** | ❌ None |
-| **Built-in Bluetooth Stack & MiOT Handshake Diagnostics** | ✅ **Yes** | ❌ None |
+| **Built-in Console Log with Filtering & Live Copy** | ✅ **Yes (1,000-message rolling buffer)** | ❌ None |
+| **Manual Bluetooth Stack & MiOT Handshake Diagnostics** | ✅ **Yes (On-demand stack audit)** | ❌ None |
 
 ---
 
-## ✨ Key Features
+## ✨ Key Features & UX Highlights
 
-### 1. 🔐 Native Xiaomi Cloud Sync & MiOT v5 + CUKTECH v2 BLE Engine
+### 1. 🎨 Interactive Mi Home Style Charger Representation & Navigation
+- **Hardware Visual Panel (`CuktechChargerVisual`):** A custom-drawn, dark obsidian graphic of the physical CUKTECH 10 Ultra charger right on the Live tab.
+- **Deep-Linked Interactive Ports:** Tapping any port on the visual graphic (`USB-C1`, `USB-C2`, `USB-C3`, or `USB-A`) automatically animates swiping over to the **Ports tab**, scrolls smoothly to bring that specific port card into focus, and briefly highlights it with a glowing border so you can instantly toggle its power or fast-charge protocols.
+
+### 2. 🔐 Native Xiaomi Cloud Sync & MiOT v5 + CUKTECH v2 BLE Engine
 - **Xiaomi Cloud Login (QR Code & Password):** Sign in once to automatically fetch your charger's MAC address, device name, and **12-byte MiOT Token** from Xiaomi Cloud (`cn` region prioritized, with multi-region fallback).
 - **Full 2-Phase Cryptographic Handshake:**
   - **Phase A (`0xA4`):** Exchanges capabilities on `CHAR_AUTH_CTRL` (`00000010`) and `CHAR_AUTH_DATA` (`00000005`).
   - **Phase B (`0x1500`):** Performs ephemeral `SECP256R1` ECDH key agreement, derives session keys via `HKDF-SHA256` bound to your 12-byte MiOT Token, and verifies mutual `AES-CCM` challenges.
-- **Smart Hybrid Telemetry (Push + Adaptive Polling):**
-  - **USB-C1 & USB-C2:** Passively receive real-time hardware BLE push notifications (`b4 = 0x04`) the instant a cable is plugged in or load changes, with a `3s` active backup poll to catch unplugs and `0` polls when idle.
-  - **USB-C3 & USB-A:** Automatically polled (`5s` idle / `3s` active) since the charger firmware does not broadcast push notifications on C3/A.
-  - **Silent Idle Filter:** Unchanged `0.0W` idle polls never spam the console log or trigger redundant UI/Widget/Webhook updates.
 
-### 2. 📱 Live Telemetry Dashboard (`Live`, `Ports`, `History`, `Settings`)
+### 3. 📱 Live Telemetry Dashboard (`Live`, `Ports`, `History`, `Settings`)
 - **Live Tab:**
   - Total power hero card with Peak Session Wattage, accumulated Energy (`Wh`), RSSI signal quality, and an expandable **Power Allocation Scenarios** dialog (`AI Dynamic`, `Hybrid`, `Single Device Priority`, `Dual High-Power`).
   - Real-time multi-line **Power Curve Chart** (`Total`, `USB-C1`, `USB-C2`, `USB-C3`, `USB-A`).
@@ -104,14 +123,19 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
   - **Charger Hardware Controls:** Screen Brightness (`Low 20%`, `Medium 60%`, `High 100%`), Screen Timeout (`Always On`, `1 min`, `5 min`, `10 min`, `30 min`), **Idle Screen-Off** (`PIID 19`), Physical Screen Language (`Chinese` / `English`), and **Force Soft Port Reset** (`PIID 25`) to re-negotiate USB-PD contracts.
   - **6 Dark Theme Accent Palettes:** `CUKTECH Cyan`, `HyperCharge Blue`, `Xiaomi Orange`, `Emerald Matrix`, `Royal Amethyst`, and `Monochrome Slate`.
 
-### 3. 🪟 Home Screen Widgets (HyperOS Soft Glass & Solid Dark)
+### 4. 🪟 Home Screen Widgets (HyperOS Soft Glass & Solid Dark)
 Includes **4 native home screen widgets** right in your Android Widget Picker:
 - **`CUKTECH 10 · 4x2 Soft Glass`** & **`CUKTECH 10 · 4x2 Solid Dark`**:
   - Full control center showing connection status, total wattage, scenario pill (tap to cycle `AI Mode` → `Hybrid` → `Single` → `Dual`), and 4 interactive port capsules (tap any port capsule to toggle power ON/OFF).
 - **`CUKTECH 10 · 2x2 Soft Glass`** & **`CUKTECH 10 · 2x2 Solid Dark`**:
-  - Compact square tile with total wattage, a **live glowing cyan sparkline graph** (automatically appears when charging `> 0.2W` and hides cleanly when idle), and a 2×2 port wattage grid.
+  - Compact square tile with total wattage, a **live glowing cyan sparkline graph** (automatically appears when charging `> 0.2W` and hides cleanly when idle), and an uncompressed 2×2 port wattage grid.
 
-### 4. 🤖 Automation: Tasker Plugin, ADB Intents & Home Assistant Webhook
+### 5. 🖥️ Console Log & Bluetooth Stack Diagnostics
+- **Dual-Tab Terminal Card on Gateway Screen:**
+  - **Tab 0 (Console Log):** 1,000-message scroll-persisted rolling buffer with 3 verbosity filters (`LEVEL 1: Errors`, `LEVEL 2: Connections & Status`, `LEVEL 3: Full Raw Telemetry`), 1-tap Copy to Clipboard, and Manual Clear.
+  - **Tab 1 (BLE Diagnostics):** Fully manual, on-demand hardware diagnostics that audit phone Bluetooth capabilities, BLE advertising/scanning status, MiOT service UUID checks, active connection parameters, and battery whitelist keepalive.
+
+### 6. 🤖 Automation: Tasker Plugin, ADB Intents & Home Assistant Webhook
 - **Native Tasker / Locale / MacroDroid Plugin (`TaskerEditActivity` & `TaskerFireReceiver`):**
   - Configure automated actions directly inside Tasker's UI with zero scripting:
     1. Connect to Charger

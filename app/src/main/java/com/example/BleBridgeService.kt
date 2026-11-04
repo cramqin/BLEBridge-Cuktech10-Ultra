@@ -7,8 +7,10 @@ import android.app.Service
 import android.bluetooth.*
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -69,6 +71,19 @@ class BleBridgeService : Service() {
     private val companionBleAddress: String?
         get() = _bleDeviceAddress.value
 
+    private val bluetoothStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                if (state == BluetoothAdapter.STATE_TURNING_OFF || state == BluetoothAdapter.STATE_OFF) {
+                    log(LogLevel.LEVEL2, "Phone Bluetooth turned OFF. Disconnecting active session.")
+                    cuktechManager?.disconnectCharger()
+                    closeGattClean(triggerCooldown = true)
+                }
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -76,6 +91,10 @@ class BleBridgeService : Service() {
         ensureCuktechManagersInitialized(applicationContext)
         bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         bluetoothAdapter = bluetoothManager?.adapter
+
+        try {
+            registerReceiver(bluetoothStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+        } catch (_: Exception) {}
 
         // Initialize state
         _wifiIp.value = getLocalIpAddress()
@@ -175,6 +194,9 @@ class BleBridgeService : Service() {
 
     override fun onDestroy() {
         log(LogLevel.LEVEL2, "BLE Bridge Service destroying...")
+        try {
+            unregisterReceiver(bluetoothStateReceiver)
+        } catch (_: Exception) {}
         releaseWakeLock()
         cleanupServer()
         closeGattClean()

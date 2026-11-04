@@ -3,8 +3,10 @@ package com.example
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -712,6 +714,27 @@ fun BleBridgeDashboard(
                             }
                             lifecycleOwner.lifecycle.addObserver(observer)
                             onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                        }
+
+                        DisposableEffect(context) {
+                            val btReceiver = object : BroadcastReceiver() {
+                                override fun onReceive(c: Context?, intent: Intent?) {
+                                    if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
+                                        val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                                        if (state == BluetoothAdapter.STATE_TURNING_OFF || state == BluetoothAdapter.STATE_OFF) {
+                                            cuktechManager.disconnectCharger()
+                                        }
+                                    }
+                                }
+                            }
+                            try {
+                                context.registerReceiver(btReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+                            } catch (_: Exception) {}
+                            onDispose {
+                                try {
+                                    context.unregisterReceiver(btReceiver)
+                                } catch (_: Exception) {}
+                            }
                         }
 
                         // --- 1. CUKTECH 10 Ultra & Xiaomi Cloud Section (Primary Card) ---

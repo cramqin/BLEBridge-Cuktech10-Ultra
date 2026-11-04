@@ -590,6 +590,10 @@ class CuktechBleManager(
             }
 
             val currentCred = activeCred
+            if (!isActive || !autoReconnectEnabled || _authState.value == CuktechAuthState.DISCONNECTED || _isDisconnectCooldown.value) {
+                return@launch
+            }
+
             if (currentCred != null && !currentCred.isCuktech10Ultra) {
                 BleBridgeService.addLogMessage(
                     BleBridgeService.Companion.LogLevel.LEVEL1,
@@ -602,6 +606,9 @@ class CuktechBleManager(
             }
 
             if (currentCred == null || !currentCred.hasValidToken) {
+                if (!isActive || !autoReconnectEnabled || _authState.value == CuktechAuthState.DISCONNECTED || _isDisconnectCooldown.value) {
+                    return@launch
+                }
                 _authState.value = CuktechAuthState.AUTH_FAILED
                 _statusMessage.value = "Missing valid 12-byte MiOT Token for $gattMac. Only paired CUKTECH 10 Ultra chargers are supported."
                 BleBridgeService.addLogMessage(
@@ -613,6 +620,9 @@ class CuktechBleManager(
             }
 
             val ok = runAuthenticationHandshake(currentCred.tokenBytes())
+            if (!isActive || !autoReconnectEnabled || _authState.value == CuktechAuthState.DISCONNECTED || _isDisconnectCooldown.value) {
+                return@launch
+            }
             if (ok) {
                 connectionTimeoutJob?.cancel()
                 _authState.value = CuktechAuthState.AUTHENTICATED
@@ -1174,6 +1184,8 @@ class CuktechBleManager(
             lastDevItLo = 0
             reqCounter = 0x0300
             return true
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             _statusMessage.value = "Handshake error: ${e.message}"
             BleBridgeService.addLogMessage(

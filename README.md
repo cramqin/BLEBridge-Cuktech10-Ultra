@@ -5,7 +5,8 @@
 </p>
 
 <p align="center">
-  <a href="../../releases"><img src="https://img.shields.io/github/v/release/cramqin/BLEBridge-Cuktech10-Ultra?include_prereleases&amp;label=Release&amp;color=00E5FF" alt="Release" /></a>
+  <a href="../../releases"><img src="https://img.shields.io/github/v/release/cramqin/BLEBridge-Cuktech10-Ultra?label=Release&amp;color=00E5FF" alt="Release" /></a>
+  <a href="https://github.com/ImranR98/Obtainium"><img src="https://img.shields.io/badge/Obtainium-Compatible-8A2BE2?logo=android&amp;logoColor=white" alt="Obtainium" /></a>
   <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84?logo=android&amp;logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/Kotlin-2.2%2B-7F52FF?logo=kotlin&amp;logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/Device-CUKTECH%2010%20Ultra%20(AD1204)-00E5FF" alt="Device" />
@@ -20,6 +21,7 @@
 ## 📖 Quick Links
 - **[Full Features & Hardware Documentation (FEATURES.md)](FEATURES.md)** — Complete deep-dive into every single feature, register, dialog, graph, and automation intent.
 - **[Releases & APK Downloads](../../releases)** — Pre-built signed APKs for Android 8.0+.
+- **[Add to Obtainium](https://api.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/cramqin/BLEBridge-Cuktech10-Ultra)** — 1-tap install and automatic background updates via Obtainium.
 - **[OEM Background Optimization Guide](https://dontkillmyapp.com/)** — Fix aggressive battery killers on Xiaomi HyperOS, Samsung, etc.
 
 ---
@@ -137,6 +139,10 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 
 ### Download Pre-built Signed APK
 Grab the latest signed `.apk` directly from the [**Releases**](../../releases) page and install it on any Android 8.0+ (`API 26+`) device.
+
+[![Add to Obtainium](https://img.shields.io/badge/Add%20to-Obtainium-8A2BE2?style=for-the-badge&logo=android&logoColor=white)](https://api.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/cramqin/BLEBridge-Cuktech10-Ultra)
+
+*(Tap the button above if you have [Obtainium](https://github.com/ImranR98/Obtainium) installed for seamless 1-tap installation and automatic background updates directly from GitHub releases!)*
 
 ### Build from Source
 ```bash

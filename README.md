@@ -145,7 +145,7 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 9. **Persistent Live Notification & Keepalive:** Ongoing Android Foreground Service notification displaying live wattage, active ports, connection status, and quick action controls without opening the app.
 10. **4 Home Screen Widgets:** Soft Glass (`4x2` & `2x2`) and Solid Dark (`4x2` & `2x2`) with 1-tap port toggles and charging sparkline.
 11. **Automation Hub:** Full Tasker/Locale action plugin, live telemetry broadcast intent (`com.cramqin.blecuktech10.TELEMETRY_UPDATE`), Home Assistant Webhook, and ADB command interface.
-12. **Proximity Auto-Connect & Background Reconnect:** Automatically connects when the charger comes into Bluetooth range. Features persistent background reconnect across power cycles (with 5-minute progressive battery backoff), startup auto-reconnection, and immediate manual disconnect override on toggle.
+12. **Proximity Auto-Connect & Background Reconnect:** Automatically connects when the charger comes into Bluetooth range. Features persistent background reconnect across power cycles (with 5-minute progressive battery backoff), startup auto-reconnection, manual disconnect override on toggle, and Tasker action/intent control (`com.cramqin.blecuktech10.SET_AUTO_CONNECT`).
 13. **Connection & Disconnection Toast Feedback:** Lightweight, debounced native Android Toast alerts on every connect and disconnect event across all connection modes.
 
 ---

@@ -1180,6 +1180,9 @@ fun CuktechDashboardScreen(
                                        • Set Port Charge Limit (Auto Cutoff):
                                          Action: com.cramqin.blecuktech10.SET_CHARGE_LIMIT
                                          Extras: port:1..4 (int), wh_target:30.0 (float), mode:"once"|"always" (string), enabled:true/false (bool)
+                                       • Proximity Auto-Connect:
+                                         Action: com.cramqin.blecuktech10.SET_AUTO_CONNECT
+                                         Extra: enabled:true/false (bool)
                                        • Scan Nearby Chargers:
                                          Action: com.cramqin.blecuktech10.SCAN_CHARGER
                                        • Background TCP Server:

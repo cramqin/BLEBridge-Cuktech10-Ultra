@@ -70,6 +70,10 @@ class BleCommandReceiver : BroadcastReceiver() {
                 val enabled = intent.getBooleanExtra("enabled", true)
                 mgr.setPortChargeLimit(portId, whTarget, mode, enabled)
             }
+            ACTION_SET_AUTO_CONNECT -> {
+                val enabled = intent.getBooleanExtra("enabled", true)
+                mgr.setAutoReconnectConfigured(enabled)
+            }
             ACTION_QUERY_STATUS -> {
                 mgr.refreshAllTelemetryNow()
                 BleBridgeService.broadcastTaskerTelemetry(
@@ -111,6 +115,7 @@ class BleCommandReceiver : BroadcastReceiver() {
         const val ACTION_SET_SCENE_MODE = "com.cramqin.blecuktech10.SET_SCENE_MODE"
         const val ACTION_SET_SCREEN_TIMEOUT = "com.cramqin.blecuktech10.SET_SCREEN_TIMEOUT"
         const val ACTION_SET_CHARGE_LIMIT = "com.cramqin.blecuktech10.SET_CHARGE_LIMIT"
+        const val ACTION_SET_AUTO_CONNECT = "com.cramqin.blecuktech10.SET_AUTO_CONNECT"
         const val ACTION_QUERY_STATUS = "com.cramqin.blecuktech10.QUERY_STATUS"
     }
 }

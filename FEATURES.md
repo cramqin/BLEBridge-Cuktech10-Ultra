@@ -196,12 +196,13 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
     8. Set Port Delay Power-Off Countdown Timer (`0` to `600` minutes)
     9. Set Port Energy Cutoff Limit (`Wh`)
     10. Force Soft Port Reset (Re-negotiate all ports)
+    11. Set Proximity Auto-Connect (`ON` / `OFF`)
 - **Tasker Telemetry Broadcast Intent (`com.cramqin.blecuktech10.TELEMETRY_UPDATE`):**
   - Broadcasts live variables to Tasker: `%total_watts`, `%port_1_v`, `%port_1_a`, `%port_1_w`, `%port_1_protocol`, `%port_1_enabled` (for ports 1..4).
 - **Home Assistant HTTP Webhook Push:**
   - Pushes JSON telemetry (`total_watts`, per-port `V`/`A`/`W`/`protocol`, `rssi`) to any Home Assistant webhook endpoint.
-- **ADB / Termux Broadcast Intent API:**
-  - Control the charger from Termux scripts or ADB commands over USB/Wi-Fi.
+- **ADB / Termux / Tasker Broadcast Intent API:**
+  - Send commands via Tasker "Send Intent" or ADB: `CONNECT_CHARGER`, `DISCONNECT_CHARGER`, `SET_AUTO_CONNECT` (`--ez enabled true/false`), `SET_PORT_STATE`, `SET_SCENE_MODE`, `SET_SCREEN_TIMEOUT`, `SET_CHARGE_LIMIT`, `SCAN_CHARGER`.
 - **Raw TCP-to-BLE Socket Gateway (`port 8080`):**
   - Bridges raw TCP socket connections straight into physical BLE GATT characteristics for low-level protocol development and scripting.
 

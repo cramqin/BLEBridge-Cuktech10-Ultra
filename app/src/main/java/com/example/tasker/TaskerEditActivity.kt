@@ -136,6 +136,7 @@ fun TaskerEditScreen(
                             }
                             "SOFT_RESET" -> "CUKTECH 10: Force Soft Port Reset"
                             "SET_IDLE_SCREEN_OFF" -> "CUKTECH 10: Idle Screen-Off ${if (selectedPortState) "ON" else "OFF"}"
+                            "SET_AUTO_CONNECT" -> "CUKTECH 10: Auto-Connect ${if (selectedPortState) "ON" else "OFF"}"
                             else -> "CUKTECH 10: Action"
                         }
                         onSave(selectedAction, selectedPort, selectedPortState, selectedMode, selectedTimeout, selectedTimerMins, blurb)
@@ -159,6 +160,7 @@ fun TaskerEditScreen(
             val actions = listOf(
                 "CONNECT" to "Connect Charger BLE",
                 "DISCONNECT" to "Disconnect Charger BLE",
+                "SET_AUTO_CONNECT" to "Proximity Auto-Connect (On/Off)",
                 "SET_PORT" to "Switch Port Power (On/Off)",
                 "SET_MODE" to "Set Power Allocation Scenario",
                 "SET_TIMEOUT" to "Set Screen Timeout",
@@ -360,6 +362,27 @@ fun TaskerEditScreen(
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            if (selectedAction == "SET_AUTO_CONNECT") {
+                Text("Proximity Auto-Connect", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    "Automatically connects to CUKTECH 10 Ultra on proximity/power restoration.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilterChip(
+                        selected = selectedPortState,
+                        onClick = { selectedPortState = true },
+                        label = { Text("Enable Auto-Connect") }
+                    )
+                    FilterChip(
+                        selected = !selectedPortState,
+                        onClick = { selectedPortState = false },
+                        label = { Text("Disable Auto-Connect") }
+                    )
+                }
             }
         }
     }

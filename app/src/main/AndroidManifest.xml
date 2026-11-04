@@ -77,6 +77,7 @@
                 <action android:name="com.cramqin.blecuktech10.SET_SCENE_MODE" />
                 <action android:name="com.cramqin.blecuktech10.SET_SCREEN_TIMEOUT" />
                 <action android:name="com.cramqin.blecuktech10.SET_CHARGE_LIMIT" />
+                <action android:name="com.cramqin.blecuktech10.SET_AUTO_CONNECT" />
                 <action android:name="com.cramqin.blecuktech10.QUERY_STATUS" />
                 <action android:name="com.example.action.START_SERVER" />
                 <action android:name="com.example.action.STOP_SERVER" />

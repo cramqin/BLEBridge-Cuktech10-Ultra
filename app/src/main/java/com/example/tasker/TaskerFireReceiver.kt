@@ -60,6 +60,10 @@ class TaskerFireReceiver : BroadcastReceiver() {
             "SOFT_RESET" -> {
                 mgr.forceSoftRestart {}
             }
+            "SET_AUTO_CONNECT" -> {
+                val state = bundle.getBoolean("STATE", true)
+                mgr.setAutoReconnectConfigured(state)
+            }
         }
     }
 }

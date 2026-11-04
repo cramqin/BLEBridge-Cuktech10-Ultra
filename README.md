@@ -21,7 +21,7 @@
 ## 📖 Quick Links
 - **[Full Features & Hardware Documentation (FEATURES.md)](FEATURES.md)** — Complete deep-dive into every single feature, register, dialog, graph, and automation intent.
 - **[Releases & APK Downloads](../../releases)** — Pre-built signed APKs for Android 8.0+.
-- **[Add to Obtainium](https://api.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/cramqin/BLEBridge-Cuktech10-Ultra)** — 1-tap install and automatic background updates via Obtainium.
+- **[Add to Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.cramqin.blecuktech10%22%2C%22url%22%3A%22https%3A//github.com/cramqin/BLEBridge-Cuktech10-Ultra%22%2C%22author%22%3A%22cramqin%22%2C%22name%22%3A%22BLEBridge%20-%20CUKTECH%2010%20Ultra%22%7D)** — 1-tap install and automatic background updates via Obtainium.
 - **[OEM Background Optimization Guide](https://dontkillmyapp.com/)** — Fix aggressive battery killers on Xiaomi HyperOS, Samsung, etc.
 
 ---
@@ -140,9 +140,13 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 ### Download Pre-built Signed APK
 Grab the latest signed `.apk` directly from the [**Releases**](../../releases) page and install it on any Android 8.0+ (`API 26+`) device.
 
-[![Add to Obtainium](https://img.shields.io/badge/Add%20to-Obtainium-8A2BE2?style=for-the-badge&logo=android&logoColor=white)](https://api.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/cramqin/BLEBridge-Cuktech10-Ultra)
+<p align="left">
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.cramqin.blecuktech10%22%2C%22url%22%3A%22https%3A//github.com/cramqin/BLEBridge-Cuktech10-Ultra%22%2C%22author%22%3A%22cramqin%22%2C%22name%22%3A%22BLEBridge%20-%20CUKTECH%2010%20Ultra%22%7D">
+    <img src="https://raw.githubusercontent.com/ImranR98/apps.obtainium.imranr.dev/main/assets/graphics/badge_obtainium.png" width="220" alt="Add to Obtainium" />
+  </a>
+</p>
 
-*(Tap the button above if you have [Obtainium](https://github.com/ImranR98/Obtainium) installed for seamless 1-tap installation and automatic background updates directly from GitHub releases!)*
+*(Tap the badge above if you have [Obtainium](https://github.com/ImranR98/Obtainium) installed for seamless 1-tap installation and automatic background updates directly from GitHub releases!)*
 
 ### Build from Source
 ```bash

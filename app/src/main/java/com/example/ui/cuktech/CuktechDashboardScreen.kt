@@ -1607,7 +1607,10 @@ fun CuktechDashboardScreen(
     if (showPairingDialog) {
         CuktechDiscoveryPairingDialog(
             bleManager = bleManager,
-            onDismiss = { showPairingDialog = false },
+            onDismiss = {
+                showPairingDialog = false
+                bleManager.stopSearchForCuktechChargers()
+            },
             onSelectAndConnect = { dev ->
                 showPairingDialog = false
                 bleManager.connectToCharger(dev.mac)

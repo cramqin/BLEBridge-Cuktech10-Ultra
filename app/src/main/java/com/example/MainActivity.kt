@@ -628,7 +628,9 @@ fun BleBridgeDashboard(
                                     )
                                 }
                             }
-                            if (bleState != BleBridgeService.Companion.BleConnectionState.DISCONNECTED || cuktechAuthState != CuktechAuthState.DISCONNECTED) {
+                            if (bleState != BleBridgeService.Companion.BleConnectionState.DISCONNECTED ||
+                                (cuktechAuthState != CuktechAuthState.DISCONNECTED && cuktechAuthState != CuktechAuthState.SCANNING)
+                            ) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "Disconnect",
@@ -856,9 +858,6 @@ fun BleBridgeDashboard(
                                 Button(
                                     onClick = {
                                         ensureBleServiceStartedAndPermissions {
-                                            if (cuktechAuthState != CuktechAuthState.DISCONNECTED) {
-                                                cuktechManager.disconnectCharger()
-                                            }
                                             showPairingDialog = true
                                         }
                                     },
@@ -880,7 +879,7 @@ fun BleBridgeDashboard(
                                 }
 
                                 // Quick Connect to Last Connected Charger (Only visible when DISCONNECTED and a paired charger is known)
-                                if (cuktechAuthState == CuktechAuthState.DISCONNECTED) {
+                                if (cuktechAuthState == CuktechAuthState.DISCONNECTED || cuktechAuthState == CuktechAuthState.SCANNING) {
                                     val lastMac = cuktechManager.lastConnectedMac
                                         ?: activeCred?.mac
                                         ?: savedDevices.firstOrNull { it.hasValidToken }?.mac
@@ -1692,7 +1691,10 @@ fun BleBridgeDashboard(
         if (showPairingDialog) {
             CuktechDiscoveryPairingDialog(
                 bleManager = cuktechManager,
-                onDismiss = { showPairingDialog = false },
+                onDismiss = {
+                    showPairingDialog = false
+                    cuktechManager.stopSearchForCuktechChargers()
+                },
                 onSelectAndConnect = { dev ->
                     showPairingDialog = false
                     cuktechManager.connectToCharger(dev.mac)

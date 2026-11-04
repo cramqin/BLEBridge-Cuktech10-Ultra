@@ -607,26 +607,7 @@ class BleBridgeService : Service() {
     }
 
     fun disconnectBleNative() {
-        val gatt = bluetoothGatt
-        if (gatt != null) {
-            log(LogLevel.LEVEL2, "Initiating graceful BLE GATT disconnect...")
-            try {
-                gatt.disconnect()
-            } catch (e: SecurityException) {
-                log(LogLevel.LEVEL1, "Security Exception in gatt.disconnect: ${e.message}")
-            } catch (e: Exception) {
-                log(LogLevel.LEVEL1, "Error calling disconnect: ${e.message}")
-            }
-            // Safety fallback: if onConnectionStateChange doesn't teardown GATT within 300ms, force closeGattClean
-            serviceScope.launch {
-                delay(300L)
-                if (bluetoothGatt != null) {
-                    closeGattClean()
-                }
-            }
-        } else {
-            closeGattClean()
-        }
+        closeGattClean()
     }
 
     fun requestGattRssi(): Boolean {
@@ -724,6 +705,9 @@ class BleBridgeService : Service() {
         if (gatt != null) {
             log(LogLevel.LEVEL2, "Executing GATT handle teardown...")
             try {
+                gatt.disconnect()
+            } catch (_: Exception) {}
+            try {
                 gatt.close()
             } catch (e: Exception) {
                 log(LogLevel.LEVEL1, "Error calling close: ${e.message}")
@@ -744,6 +728,10 @@ class BleBridgeService : Service() {
     private val gattCallback = object : BluetoothGattCallback() {
 
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+            if (gatt !== bluetoothGatt) {
+                try { gatt.close() } catch (_: Exception) {}
+                return
+            }
             val addr = gatt.device.address
             cuktechManager?.onConnectionStateChange(addr, status, newState)
             if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -783,12 +771,14 @@ class BleBridgeService : Service() {
         }
 
         override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
+            if (gatt !== bluetoothGatt) return
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 cuktechManager?.onRemoteRssi(rssi)
             }
         }
 
         override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, status: Int) {
+            if (gatt !== bluetoothGatt) return
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 log(LogLevel.LEVEL2, "Negotiated packet MTU successfully: $mtu bytes")
             } else {
@@ -805,6 +795,7 @@ class BleBridgeService : Service() {
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+            if (gatt !== bluetoothGatt) return
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 log(LogLevel.LEVEL2, "BLE GATT services discovered successfully!")
                 cuktechManager?.onServicesDiscovered(gatt, status)

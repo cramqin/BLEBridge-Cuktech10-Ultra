@@ -1009,10 +1009,6 @@ fun CuktechDiscoveryPairingDialog(
 
     LaunchedEffect(isBtEnabled) {
         if (isBtEnabled) {
-            if (bleManager.authState.value != CuktechAuthState.DISCONNECTED) {
-                bleManager.disconnectCharger()
-                delay(250L)
-            }
             bleManager.startSearchForCuktechChargers(10000L)
         }
     }

@@ -1003,6 +1003,26 @@ fun CuktechDiscoveryPairingDialog(
     val isScanning by bleManager.isScanning.collectAsState()
     val statusMsg by bleManager.statusMessage.collectAsState()
     val savedCreds by bleManager.credentialStore.devices.collectAsState()
+    val bleConnectionState by com.example.BleBridgeService.bleConnectionState.collectAsState()
+
+    val isCurrentlyConnected = authState == CuktechAuthState.AUTHENTICATED ||
+        authState == CuktechAuthState.CONNECTING_GATT ||
+        authState == CuktechAuthState.DISCOVERING_SERVICES ||
+        authState == CuktechAuthState.PHASE_A_INIT_A4 ||
+        authState == CuktechAuthState.PHASE_B_HANDSHAKE ||
+        bleConnectionState != com.example.BleBridgeService.Companion.BleConnectionState.DISCONNECTED
+
+    var pendingSwitchDevice by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    val requestConnectToDevice: (String, String) -> Unit = { targetMac, targetName ->
+        if (isCurrentlyConnected) {
+            pendingSwitchDevice = targetMac to targetName
+        } else {
+            bleManager.stopSearchForCuktechChargers()
+            bleManager.connectToCharger(targetMac)
+            onDismiss()
+        }
+    }
 
     val context = LocalContext.current
     val btManager = remember { context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager }
@@ -1012,6 +1032,38 @@ fun CuktechDiscoveryPairingDialog(
         if (isBtEnabled) {
             bleManager.startSearchForCuktechChargers(10000L)
         }
+    }
+
+    pendingSwitchDevice?.let { (targetMac, targetName) ->
+        AlertDialog(
+            onDismissRequest = { pendingSwitchDevice = null },
+            title = {
+                Text("Switch Connected Device?", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            },
+            text = {
+                Text(
+                    text = "Do you want to disconnect the current device and connect to $targetName ($targetMac)?",
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingSwitchDevice = null
+                        bleManager.stopSearchForCuktechChargers()
+                        bleManager.switchToCharger(targetMac)
+                        onDismiss()
+                    }
+                ) {
+                    Text("Disconnect & Connect", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingSwitchDevice = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     Dialog(
@@ -1107,8 +1159,7 @@ fun CuktechDiscoveryPairingDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    bleManager.connectToCharger(cred.mac)
-                                    onDismiss()
+                                    requestConnectToDevice(cred.mac, cred.name)
                                 },
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
@@ -1142,8 +1193,7 @@ fun CuktechDiscoveryPairingDialog(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Button(
                                     onClick = {
-                                        bleManager.connectToCharger(cred.mac)
-                                        onDismiss()
+                                        requestConnectToDevice(cred.mac, cred.name)
                                     },
                                     shape = RoundedCornerShape(8.dp),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
@@ -1183,7 +1233,7 @@ fun CuktechDiscoveryPairingDialog(
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onSelectAndConnect(dev) },
+                                    .clickable { requestConnectToDevice(dev.mac, dev.name) },
                                 shape = RoundedCornerShape(12.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -1196,27 +1246,13 @@ fun CuktechDiscoveryPairingDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = dev.name,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            if (dev.isCuktech10Ultra) {
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Badge(containerColor = MaterialTheme.colorScheme.primary) {
-                                                    Text("0x660E", fontSize = 9.sp)
-                                                }
-                                            }
-                                            if (dev.matchedCredentials != null) {
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Badge(containerColor = Color(0xFF10B981)) {
-                                                    Text("Matched", color = Color.White, fontSize = 9.sp)
-                                                }
-                                            }
-                                        }
+                                        Text(
+                                            text = dev.name,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = "${dev.mac}  ·  ${dev.rssi} dBm",
@@ -1229,7 +1265,7 @@ fun CuktechDiscoveryPairingDialog(
                                     }
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Button(
-                                        onClick = { onSelectAndConnect(dev) },
+                                        onClick = { requestConnectToDevice(dev.mac, dev.name) },
                                         shape = RoundedCornerShape(8.dp),
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                                         modifier = Modifier.height(32.dp)

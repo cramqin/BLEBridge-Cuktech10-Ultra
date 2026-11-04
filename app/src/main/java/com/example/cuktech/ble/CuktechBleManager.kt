@@ -122,6 +122,7 @@ class CuktechBleManager(
     private var reconnectJob: Job? = null
     private var connectionTimeoutJob: Job? = null
     private var connectJob: Job? = null
+    private var switchDeviceJob: Job? = null
     private var lastDisconnectMs: Long = 0L
     private var disconnectCooldownJob: Job? = null
     private val _isDisconnectCooldown = MutableStateFlow(false)
@@ -130,9 +131,13 @@ class CuktechBleManager(
     fun triggerDisconnectCooldown(durationMs: Long = 2000L) {
         disconnectCooldownJob?.cancel()
         _isDisconnectCooldown.value = true
+        _statusMessage.value = "Disconnecting..."
         disconnectCooldownJob = scope.launch {
             delay(durationMs)
             _isDisconnectCooldown.value = false
+            if (_authState.value == CuktechAuthState.DISCONNECTED) {
+                _statusMessage.value = "Disconnected"
+            }
         }
     }
 
@@ -411,6 +416,8 @@ class CuktechBleManager(
         svc.startForegroundForBleConnection()
         autoReconnectEnabled = true
         lastConnectedMac = targetMac
+        disconnectCooldownJob?.cancel()
+        _isDisconnectCooldown.value = false
         connectJob?.cancel()
         reconnectJob?.cancel()
         connectionTimeoutJob?.cancel()
@@ -449,6 +456,16 @@ class CuktechBleManager(
         svc.connectBleNative(targetMac)
     }
 
+    fun switchToCharger(macAddress: String) {
+        switchDeviceJob?.cancel()
+        disconnectCharger()
+        _statusMessage.value = "Disconnecting current device..."
+        switchDeviceJob = scope.launch {
+            delay(2000L)
+            connectToCharger(macAddress)
+        }
+    }
+
     fun onConnectionFailed(reason: String) {
         connectJob?.cancel()
         connectionTimeoutJob?.cancel()
@@ -462,6 +479,7 @@ class CuktechBleManager(
     fun disconnectCharger() {
         autoReconnectEnabled = false
         lastDisconnectMs = SystemClock.elapsedRealtime()
+        switchDeviceJob?.cancel()
         triggerDisconnectCooldown(2000L)
         connectJob?.cancel()
         reconnectJob?.cancel()
@@ -474,7 +492,7 @@ class CuktechBleManager(
         }
         pendingMiotResponses.clear()
         _authState.value = CuktechAuthState.DISCONNECTED
-        _statusMessage.value = "Disconnected"
+        _statusMessage.value = "Disconnecting..."
         BleBridgeService.getInstance()?.disconnectBleNative()
         BleBridgeService.getInstance()?.dismissForegroundNotificationIfIdle()
     }

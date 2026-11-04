@@ -534,7 +534,9 @@ fun BleBridgeDashboard(
                                             )
                                         }
                                     }
-                                    val (headerStatusText, headerStatusColor) = when (cuktechAuthState) {
+                                    val (headerStatusText, headerStatusColor) = if (isDisconnectCooldown) {
+                                        "DISCONNECTING..." to Color(0xFFF59E0B)
+                                    } else when (cuktechAuthState) {
                                         CuktechAuthState.AUTHENTICATED -> {
                                             val wText = if (cuktechTotalWatts > 0) " · ${"%.1f".format(cuktechTotalWatts)}W" else ""
                                             "CHARGER CONNECTED$wText" to StatusSuccess
@@ -592,10 +594,12 @@ fun BleBridgeDashboard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            val bleIndicatorColor = when (bleState) {
-                                BleBridgeService.Companion.BleConnectionState.DISCONNECTED -> StatusError
-                                BleBridgeService.Companion.BleConnectionState.CONNECTING -> StatusWarning
-                                BleBridgeService.Companion.BleConnectionState.CONNECTED -> StatusSuccess
+                            val bleIndicatorColor = when {
+                                isDisconnectCooldown -> StatusWarning
+                                bleState == BleBridgeService.Companion.BleConnectionState.DISCONNECTED -> StatusError
+                                bleState == BleBridgeService.Companion.BleConnectionState.CONNECTING -> StatusWarning
+                                bleState == BleBridgeService.Companion.BleConnectionState.CONNECTED -> StatusSuccess
+                                else -> StatusError
                             }
                             Box(
                                 modifier = Modifier
@@ -605,7 +609,7 @@ fun BleBridgeDashboard(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "BLE: ${bleState.name}",
+                                text = if (isDisconnectCooldown) "BLE: DISCONNECTING" else "BLE: ${bleState.name}",
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -629,8 +633,9 @@ fun BleBridgeDashboard(
                                     )
                                 }
                             }
-                            if (bleState != BleBridgeService.Companion.BleConnectionState.DISCONNECTED ||
-                                (cuktechAuthState != CuktechAuthState.DISCONNECTED && cuktechAuthState != CuktechAuthState.SCANNING)
+                            if (!isDisconnectCooldown &&
+                                (bleState != BleBridgeService.Companion.BleConnectionState.DISCONNECTED ||
+                                    (cuktechAuthState != CuktechAuthState.DISCONNECTED && cuktechAuthState != CuktechAuthState.SCANNING))
                             ) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(

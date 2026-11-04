@@ -574,8 +574,8 @@ class BleBridgeService : Service() {
         if (isScanning) {
             stopBleScan()
         }
-        if (bluetoothGatt != null || companionBleState != Companion.BleConnectionState.DISCONNECTED) {
-            closeGattClean()
+        if (bluetoothGatt != null) {
+            closeGattClean(triggerCooldown = false)
         }
         val device = try {
             bluetoothAdapter?.getRemoteDevice(address.uppercase().trim())
@@ -699,7 +699,7 @@ class BleBridgeService : Service() {
         }
     }
 
-    fun closeGattClean() {
+    fun closeGattClean(triggerCooldown: Boolean = true) {
         val gatt = bluetoothGatt
         bluetoothGatt = null
         if (gatt != null) {
@@ -722,7 +722,9 @@ class BleBridgeService : Service() {
         }
 
         setBleConnectionState(BleConnectionState.DISCONNECTED, null)
-        cuktechManager?.triggerDisconnectCooldown(2000L)
+        if (triggerCooldown) {
+            cuktechManager?.triggerDisconnectCooldown(2000L)
+        }
         broadcastJson(createTelemetryJson("disconnected", null, null, null, null))
     }
 
@@ -738,7 +740,11 @@ class BleBridgeService : Service() {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 if (newState == BluetoothGatt.STATE_CONNECTED) {
                     log(LogLevel.LEVEL2, "BLE state connected! Initiating Auto-MTU Negotiation...")
-                    setBleConnectionState(BleConnectionState.CONNECTED, addr)
+                    if (cuktechManager == null) {
+                        setBleConnectionState(BleConnectionState.CONNECTED, addr)
+                    } else {
+                        setBleConnectionState(BleConnectionState.CONNECTING, addr)
+                    }
 
                     // Broadcast connected event to socket clients
                     val telemetry = createTelemetryJson("connected", addr, null, null, null)

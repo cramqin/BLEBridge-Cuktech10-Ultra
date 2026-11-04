@@ -150,9 +150,9 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 
 ---
 
-## 🗺️ Roadmap (Target: v1.5.0)
+## 🗺️ Roadmap (Target: v2.0.0)
 
-We are continuously enhancing the BLEBridge experience. The following features are planned for upcoming releases toward **v1.5.0**:
+We are continuously enhancing the BLEBridge experience. The following features are planned for upcoming releases toward **v2.0.0**:
 
 - [ ] **Master Killswitch:** 1-tap master toggle in the app dashboard and ongoing notification action to cut or restore power to all 4 ports simultaneously.
 - [ ] **Electricity Costing & Monthly `kWh` Tracker:** Configure your local power utility rate (e.g. `₱/kWh`, `$/kWh`) to automatically calculate and track power consumption costs per session and per month.

@@ -76,9 +76,11 @@ class BleBridgeService : Service() {
             if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
                 val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
                 if (state == BluetoothAdapter.STATE_TURNING_OFF || state == BluetoothAdapter.STATE_OFF) {
+                    val wasActive = bluetoothGatt != null || _bleConnectionState.value != BleConnectionState.DISCONNECTED ||
+                        (cuktechManager?.authState?.value != null && cuktechManager?.authState?.value != CuktechAuthState.DISCONNECTED)
                     log(LogLevel.LEVEL2, "Phone Bluetooth turned OFF. Disconnecting active session.")
                     cuktechManager?.disconnectCharger()
-                    closeGattClean(triggerCooldown = true)
+                    closeGattClean(triggerCooldown = wasActive)
                 }
             }
         }
@@ -199,7 +201,7 @@ class BleBridgeService : Service() {
         } catch (_: Exception) {}
         releaseWakeLock()
         cleanupServer()
-        closeGattClean()
+        closeGattClean(triggerCooldown = false)
         stopBleScan()
         serviceScope.cancel()
         instance = null
@@ -722,6 +724,8 @@ class BleBridgeService : Service() {
     }
 
     fun closeGattClean(triggerCooldown: Boolean = true) {
+        val wasActive = bluetoothGatt != null || _bleConnectionState.value != BleConnectionState.DISCONNECTED ||
+            (cuktechManager?.authState?.value != null && cuktechManager?.authState?.value != CuktechAuthState.DISCONNECTED)
         val gatt = bluetoothGatt
         bluetoothGatt = null
         if (gatt != null) {
@@ -744,7 +748,7 @@ class BleBridgeService : Service() {
         }
 
         setBleConnectionState(BleConnectionState.DISCONNECTED, null)
-        if (triggerCooldown) {
+        if (triggerCooldown && wasActive) {
             cuktechManager?.triggerDisconnectCooldown(2000L)
         }
         broadcastJson(createTelemetryJson("disconnected", null, null, null, null))

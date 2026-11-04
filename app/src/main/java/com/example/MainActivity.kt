@@ -722,7 +722,11 @@ fun BleBridgeDashboard(
                                     if (intent?.action == BluetoothAdapter.ACTION_STATE_CHANGED) {
                                         val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
                                         if (state == BluetoothAdapter.STATE_TURNING_OFF || state == BluetoothAdapter.STATE_OFF) {
-                                            cuktechManager.disconnectCharger()
+                                            if (cuktechAuthState != CuktechAuthState.DISCONNECTED ||
+                                                bleState != BleBridgeService.Companion.BleConnectionState.DISCONNECTED
+                                            ) {
+                                                cuktechManager.disconnectCharger()
+                                            }
                                         }
                                     }
                                 }

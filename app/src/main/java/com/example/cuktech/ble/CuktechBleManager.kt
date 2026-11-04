@@ -478,10 +478,16 @@ class CuktechBleManager(
     }
 
     fun disconnectCharger() {
+        val wasConnectedOrConnecting = _authState.value != CuktechAuthState.DISCONNECTED ||
+            BleBridgeService.getInstance()?.getBluetoothGatt() != null ||
+            BleBridgeService.bleConnectionState.value != BleBridgeService.Companion.BleConnectionState.DISCONNECTED
+
         autoReconnectEnabled = false
         lastDisconnectMs = SystemClock.elapsedRealtime()
         switchDeviceJob?.cancel()
-        triggerDisconnectCooldown(2000L)
+        if (wasConnectedOrConnecting) {
+            triggerDisconnectCooldown(2000L)
+        }
         connectJob?.cancel()
         reconnectJob?.cancel()
         connectionTimeoutJob?.cancel()
@@ -493,7 +499,9 @@ class CuktechBleManager(
         }
         pendingMiotResponses.clear()
         _authState.value = CuktechAuthState.DISCONNECTED
-        _statusMessage.value = "Disconnecting..."
+        if (wasConnectedOrConnecting) {
+            _statusMessage.value = "Disconnecting..."
+        }
         BleBridgeService.getInstance()?.disconnectBleNative()
         BleBridgeService.getInstance()?.dismissForegroundNotificationIfIdle()
     }
@@ -504,8 +512,12 @@ class CuktechBleManager(
             _authState.value = CuktechAuthState.DISCOVERING_SERVICES
             _statusMessage.value = "GATT connected, discovering services..."
         } else {
+            val wasConnectedOrConnecting = _authState.value != CuktechAuthState.DISCONNECTED ||
+                BleBridgeService.bleConnectionState.value != BleBridgeService.Companion.BleConnectionState.DISCONNECTED
             lastDisconnectMs = SystemClock.elapsedRealtime()
-            triggerDisconnectCooldown(2000L)
+            if (wasConnectedOrConnecting) {
+                triggerDisconnectCooldown(2000L)
+            }
             connectJob?.cancel()
             connectionTimeoutJob?.cancel()
             authJob?.cancel()

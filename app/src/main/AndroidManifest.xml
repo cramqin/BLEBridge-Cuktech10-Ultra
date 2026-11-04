@@ -135,6 +135,32 @@
                 android:resource="@xml/widget_cuktech_2x2_info" />
         </receiver>
 
+        <!-- Solid Dark 4x2 Control Center Widget -->
+        <receiver
+            android:name=".widget.CuktechWidget4x2SolidProvider"
+            android:label="CUKTECH 10 · 4x2 Solid Dark"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_cuktech_4x2_solid_info" />
+        </receiver>
+
+        <!-- Solid Dark 2x2 Compact Tile Widget -->
+        <receiver
+            android:name=".widget.CuktechWidget2x2SolidProvider"
+            android:label="CUKTECH 10 · 2x2 Solid Dark"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_cuktech_2x2_solid_info" />
+        </receiver>
+
     </application>
 
 </manifest>

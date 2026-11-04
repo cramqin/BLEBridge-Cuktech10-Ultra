@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">BLE Cuktech10</string>
-    <string name="widget_4x2_desc">HyperOS Soft Glass 4x2 Control Center: Live wattage, scenario switch &amp; 1-tap port toggles</string>
-    <string name="widget_2x2_desc">HyperOS Soft Glass 2x2 Compact Tile: Total wattage, scenario &amp; 4-port status</string>
+    <string name="widget_4x2_desc">HyperOS Soft Glass 4x2 Control Center: Translucent dark glass, live wattage &amp; 1-tap port toggles</string>
+    <string name="widget_2x2_desc">HyperOS Soft Glass 2x2 Compact Tile: Translucent dark glass, live graph &amp; 4-port grid</string>
+    <string name="widget_4x2_solid_desc">Solid Dark 4x2 Control Center: 100% opaque obsidian card, live wattage &amp; 1-tap port toggles</string>
+    <string name="widget_2x2_solid_desc">Solid Dark 2x2 Compact Tile: 100% opaque obsidian card, live graph &amp; 4-port grid</string>
 </resources>

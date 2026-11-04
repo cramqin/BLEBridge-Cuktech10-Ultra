@@ -338,74 +338,6 @@ fun BleBridgeDashboard(
                 HorizontalDivider(color = appColors.border, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
 
                 Text(
-                    text = "HOME SCREEN WIDGET STYLE",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
-                    color = appColors.textSecondary,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-                )
-
-                var currentWidgetStyle by remember {
-                    mutableStateOf(com.example.widget.CuktechWidgetProvider.getWidgetStyle(context))
-                }
-
-                com.example.widget.WidgetVisualStyle.entries.forEach { wStyle ->
-                    val isWSelected = currentWidgetStyle == wStyle
-                    val previewColor = when (wStyle) {
-                        com.example.widget.WidgetVisualStyle.DARK_SOFT -> Color(0xCC1A202C)
-                        com.example.widget.WidgetVisualStyle.DARK_FROSTED -> Color(0xB8253042)
-                        com.example.widget.WidgetVisualStyle.DARK_SOLID -> Color(0xFF0F141E)
-                        com.example.widget.WidgetVisualStyle.HYPEROS_SOFT -> Color(0x66E2E8F0)
-                        com.example.widget.WidgetVisualStyle.HYPEROS_FROSTED -> Color(0x99F8FAFC)
-                    }
-                    NavigationDrawerItem(
-                        icon = {
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(previewColor)
-                                    .border(
-                                        width = if (isWSelected) 2.dp else 1.dp,
-                                        color = if (isWSelected) appColors.primary else Color.White.copy(alpha = 0.4f),
-                                        shape = RoundedCornerShape(6.dp)
-                                    )
-                            )
-                        },
-                        label = {
-                            Column {
-                                Text(
-                                    text = wStyle.label,
-                                    fontWeight = if (isWSelected) FontWeight.Bold else FontWeight.Medium,
-                                    fontSize = 13.sp,
-                                    color = if (isWSelected) appColors.textPrimary else appColors.textSecondary
-                                )
-                                Text(
-                                    text = wStyle.subtitle,
-                                    fontSize = 10.sp,
-                                    lineHeight = 12.sp,
-                                    color = if (isWSelected) appColors.textPrimary.copy(alpha = 0.7f) else appColors.textSecondary.copy(alpha = 0.7f)
-                                )
-                            }
-                        },
-                        selected = isWSelected,
-                        onClick = {
-                            currentWidgetStyle = wStyle
-                            com.example.widget.CuktechWidgetProvider.setWidgetStyle(context, wStyle)
-                            Toast.makeText(context, "Widget style set to ${wStyle.label}", Toast.LENGTH_SHORT).show()
-                        },
-                        colors = NavigationDrawerItemDefaults.colors(
-                            selectedContainerColor = appColors.primaryContainer.copy(alpha = 0.5f),
-                            unselectedContainerColor = Color.Transparent
-                        ),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
-                    )
-                }
-
-                HorizontalDivider(color = appColors.border, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
-
-                Text(
                     text = "XIAOMI MI HOME",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -1212,6 +1144,31 @@ fun BleBridgeDashboard(
                                 text = if (isBatteryIgnored) "Battery Settings (Already Set)" else "Ignore Battery Optimization",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                runCatching {
+                                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://dontkillmyapp.com/")).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    context.startActivity(browserIntent)
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, appColors.border),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = appColors.primary
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(40.dp)
+                        ) {
+                            Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "OEM Background Guide (dontkillmyapp.com)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }

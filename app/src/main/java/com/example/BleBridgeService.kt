@@ -60,7 +60,7 @@ class BleBridgeService : Service() {
     private var isScanning = false
     private var scanCallbackInternal: ScanCallback? = null
 
-    private val companionBleState: Companion.BleConnectionState
+    val companionBleState: Companion.BleConnectionState
         get() = _bleConnectionState.value
 
     val isServerRunning: Boolean

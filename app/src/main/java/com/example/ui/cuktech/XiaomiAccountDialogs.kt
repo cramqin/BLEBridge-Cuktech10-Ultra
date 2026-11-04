@@ -13,7 +13,6 @@ import android.bluetooth.BluetoothManager
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import com.example.cuktech.ble.CuktechAuthState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background

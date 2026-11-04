@@ -17,6 +17,13 @@
 
 ---
 
+## 📖 Quick Links
+- **[Full Features & Hardware Documentation (FEATURES.md)](FEATURES.md)** — Complete deep-dive into every single feature, register, dialog, graph, and automation intent.
+- **[Releases & APK Downloads](../../releases)** — Pre-built signed APKs for Android 8.0+.
+- **[OEM Background Optimization Guide](https://dontkillmyapp.com/)** — Fix aggressive battery killers on Xiaomi HyperOS, Samsung, etc.
+
+---
+
 ## 🙏 Acknowledgments & Heritage
 
 This project brings full native Android control for the **CUKTECH 10 Ultra 120W GaN Charger (`njcuk.fitting.ad1204`, Product ID `0x660E`)** by combining and porting the work of two open-source repositories:
@@ -80,6 +87,8 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 | **Persistent Background Keepalive & Live Notification** | ✅ **Yes (24/7 foreground service)** | ❌ Disconnects when screen locks |
 | **Interactive Home Screen Widgets (`4x2` & `2x2`)** | ✅ **Yes (Soft Glass & Solid Dark)** | ❌ None |
 | **Hardware Visual Panel (Interactive Port Jump)** | ✅ **Yes (Tap port graphic → jumps to port settings)** | ⚠️ Non-interactive graphic |
+| **Multi-Line Real-Time Power Curves & Rolling Canvas Graph** | ✅ **Yes (Live 60s multi-line graph)** | ⚠️ Cloud hourly chart only |
+| **Force Soft Port Reset (USB-PD Contract Re-negotiation)** | ✅ **Yes (App, Tasker, ADB)** | ❌ None |
 | **Per-Port Live Telemetry (`V`, `A`, `W`, Fast-Charge Protocol)** | ✅ **Yes (Real-time graphs & cards)** | ✅ Yes |
 | **1-Tap Individual Port Power Toggle (`C1`, `C2`, `C3`, `USB-A`)** | ✅ **Yes (App, Widget, Tasker, ADB)** | ✅ Yes |
 | **Power Allocation Scenarios (`AI`, `Hybrid`, `Single`, `Dual`)** | ✅ **Yes (Dialog, Widget, Tasker)** | ✅ Yes |
@@ -96,83 +105,20 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 
 ---
 
-## ✨ Key Features & UX Highlights
+## ✨ Features Overview
 
-### 1. 🎨 Interactive Mi Home Style Charger Representation & Navigation
-- **Hardware Visual Panel (`CuktechChargerVisual`):** A custom-drawn, dark obsidian graphic of the physical CUKTECH 10 Ultra charger right on the Live tab.
-- **Deep-Linked Interactive Ports:** Tapping any port on the visual graphic (`USB-C1`, `USB-C2`, `USB-C3`, or `USB-A`) automatically animates swiping over to the **Ports tab**, scrolls smoothly to bring that specific port card into focus, and briefly highlights it with a glowing border so you can instantly toggle its power or fast-charge protocols.
+👉 **For the complete in-depth guide to every feature, register, and dialog, see [FEATURES.md](FEATURES.md).**
 
-### 2. 🔐 Native Xiaomi Cloud Sync & MiOT v5 + CUKTECH v2 BLE Engine
-- **4 Flexible Login Modes with 2FA Support:**
-  - **Google / Web OAuth:** Seamless in-app WebView authentication for Google-linked Xiaomi accounts.
-  - **QR Code Scan:** Scan with the official Mi Home app on another phone to log in instantly with zero credentials typed.
-  - **Password Login:** Direct Xiaomi Cloud account login with full **Two-Factor Authentication (2FA)** challenge support (SMS OTP or Email verification).
-  - **Manual / JSON Token Import:** Directly paste MAC address, 12-byte MiOT Token, and BLE Key without connecting to Xiaomi Cloud.
-- **Multi-Device Credential Storage & Switcher:**
-  - Saves credentials for multiple chargers in local encrypted storage. Switch between different CUKTECH 10 Ultra chargers with a single tap or scan to auto-pair.
-- **Full 2-Phase Cryptographic Handshake:**
-  - **Phase A (`0xA4`):** Exchanges capabilities on `CHAR_AUTH_CTRL` (`00000010`) and `CHAR_AUTH_DATA` (`00000005`).
-  - **Phase B (`0x1500`):** Performs ephemeral `SECP256R1` ECDH key agreement, derives session keys via `HKDF-SHA256` bound to your 12-byte MiOT Token, and verifies mutual `AES-CCM` challenges.
-
-### 3. 📱 Live Telemetry Dashboard (`Live`, `Ports`, `History`, `Settings`)
-- **Live Tab:**
-  - Total power hero card with Peak Session Wattage, accumulated Energy (`Wh`), RSSI signal quality, and an expandable **Power Allocation Scenarios** dialog (`AI Dynamic`, `Hybrid`, `Single Device Priority`, `Dual High-Power`).
-  - Real-time multi-line **Power Curve Chart** (`Total`, `USB-C1`, `USB-C2`, `USB-C3`, `USB-A`).
-  - **4 Individual Port Cards:**
-    - Live Voltage (`V`), Current (`A`), Power (`W`), and negotiated protocol badge (`PD3.0`, `PPS`, `MiPPS`, `UFCS`, `SCP`, `QC3.0`).
-    - 1-tap port ON/OFF switch.
-    - **Energy Limit (`Wh`) Auto-Cutoff:** Set a target `Wh` cutoff (`once` or `always`) with one-tap presets (`10Wh`, `25Wh`, `50Wh`, `80Wh`, `100Wh`).
-    - **Closure Countdown Timer:** Precision hour/minute wheel with quick presets (`Always On`, `15m`, `30m`, `1h`, `2h`, `4h`) and an active second-by-second live countdown ticker badge on the card.
-- **Ports Tab:**
-  - **Per-Port Fast-Charge Protocol Switches:** Independently toggle **PD (up to 100W)**, **PPS (Programmable Power Supply)**, **UFCS (Fusion Fast Charging)**, and **Huawei SCP (22.5W)** per port (`PIID 20–23`).
-  - **USB-A Low Current Mode (4h):** Keep USB-A awake for low-draw wearables, earbuds, and fitness bands (`PIID 18`).
-- **History Tab:**
-  - **Live & Completed Session Inspector:** Real-time charging sessions per port tracking start time, elapsed duration, average wattage, peak wattage, and total energy consumed (`Wh`).
-  - **Session Detail Inspector Dialog:** Tap any session to inspect a full summary breakdown with active session markers.
-  - **Consolidated Sessions Table Dialog:** View all charging sessions across all ports in a unified chronological spreadsheet view.
-  - **CSV Export Dialog:** Export history with custom timeframe filters (`24 Hours`, `7 Days`, `30 Days`, `All Time`) and scope (`All Telemetry Data`, `Active Sessions Only`, `Completed Sessions Only`), saved directly to `Downloads/cuktech10/history/`.
-  - **Granular History Clearing Dialog:** Clear historical sessions with options to *Keep Active Sessions* or perform a *Full Purge*.
-- **Settings Tab:**
-  - **Charger Hardware Controls:** Screen Brightness (`Low 20%`, `Medium 60%`, `High 100%`), Screen Timeout (`Always On`, `1 min`, `5 min`, `10 min`, `30 min`), **Idle Screen-Off** (`PIID 19`), Physical Screen Language (`Chinese` / `English`), and **Force Soft Port Reset** (`PIID 25`) to re-negotiate USB-PD contracts.
-  - **5 Custom Dark Theme Accent Palettes:** `CUKTECH Gunmetal` (Classic), `AMOLED Pure Black` (`#000000`), `Cyberpunk Neon`, `Titanium Amber`, and `Deep Ocean Blue`.
-
-### 4. 🪟 Home Screen Widgets (HyperOS Soft Glass & Solid Dark)
-Includes **4 native home screen widgets** right in your Android Widget Picker:
-- **`CUKTECH 10 · 4x2 Soft Glass`** & **`CUKTECH 10 · 4x2 Solid Dark`**:
-  - Full control center showing connection status, total wattage, scenario pill (tap to cycle `AI Mode` → `Hybrid` → `Single` → `Dual`), and 4 interactive port capsules (tap any port capsule to toggle power ON/OFF).
-- **`CUKTECH 10 · 2x2 Soft Glass`** & **`CUKTECH 10 · 2x2 Solid Dark`**:
-  - Compact square tile with total wattage, a **live glowing cyan sparkline graph** (automatically appears when charging `> 0.2W` and hides cleanly when idle), and an uncompressed 2×2 port wattage grid.
-
-### 5. 🖥️ Console Log & Bluetooth Stack Diagnostics
-- **Dual-Tab Terminal Card on Gateway Screen:**
-  - **Tab 0 (Console Log):** 1,000-message scroll-persisted rolling buffer with 3 verbosity filters (`LEVEL 1: Errors`, `LEVEL 2: Connections & Status`, `LEVEL 3: Full Raw Telemetry`), 1-tap Copy to Clipboard, and Manual Clear.
-  - **Tab 1 (BLE Diagnostics):** Fully manual, on-demand hardware diagnostics that audit phone Bluetooth capabilities, BLE advertising/scanning status, MiOT service UUID checks, active connection parameters, and battery whitelist keepalive.
-
-### 6. 🤖 Automation: Tasker Plugin, ADB Intents & Home Assistant Webhook
-- **Native Tasker / Locale / MacroDroid Plugin (`TaskerEditActivity` & `TaskerFireReceiver`):**
-  - Configure automated actions directly inside Tasker's UI with zero scripting:
-    1. Connect to Charger
-    2. Disconnect Charger
-    3. Toggle Port Power (`USB-C1`, `USB-C2`, `USB-C3`, `USB-A` ON/OFF)
-    4. Set Power Allocation Scenario (`AI Mode`, `Hybrid`, `Single`, `Dual`)
-    5. Set Charger Screen Timeout (`Always On`, `1m`, `5m`, `10m`, `30m`)
-    6. Set Idle Screen-Off (Sleep LCD when all ports are idle)
-    7. Set USB-A Low Current Mode (4-hour wearable charge)
-    8. Set Port Delay Power-Off Countdown Timer (`0` to `600` minutes)
-    9. Set Port Energy Cutoff Limit (`Wh`)
-    10. Force Soft Port Reset (Re-negotiate all ports)
-- **Home Assistant HTTP Webhook:** Push real-time JSON telemetry (`total_watts`, per-port `V`/`A`/`W`/`protocol`, `rssi`) to any Home Assistant webhook endpoint (`http://<ha-ip>:8123/api/webhook/<id>`).
-- **ADB / Termux Broadcast Intents (`com.example.BleCommandReceiver`):**
-  ```bash
-  # Start server & connect to charger
-  am broadcast -a com.cramqin.blecuktech10.CONNECT_CHARGER -n com.cramqin.blecuktech10/com.example.BleCommandReceiver
-
-  # Turn USB-C1 OFF (port=1, enabled=false)
-  am broadcast -a com.cramqin.blecuktech10.SET_PORT_STATE --ei port 1 --ez enabled false -n com.cramqin.blecuktech10/com.example.BleCommandReceiver
-
-  # Switch to Hybrid Scenario (mode=2)
-  am broadcast -a com.cramqin.blecuktech10.SET_SCENE_MODE --ei mode 2 -n com.cramqin.blecuktech10/com.example.BleCommandReceiver
-  ```
+1. **Interactive Charger Faceplate:** Custom dark obsidian representation of the physical charger on the Live tab. Tap any port on the graphic to jump directly to that port on the Ports tab with a glowing highlight.
+2. **Real-Time Rolling Power Graphs:** 60-second multi-line Canvas graph (`Total`, `C1`, `C2`, `C3`, `USB-A`) + embedded sparklines on home screen widgets.
+3. **Soft Port Reset (`PIID 25`):** Power-cycles DC-DC buck-boost switches (`0x00 -> 0x0F`) to force fresh USB-PD/PPS contract re-negotiation without pulling plugs.
+4. **4 Cloud Login Modes + 2FA:** Google/Web OAuth, Mi Home QR scan, direct password login with SMS/Email 2FA, or offline manual token entry. Multi-device charger switcher included.
+5. **Full Port & Protocol Control:** Independent toggles for PD (up to 100W), PPS, UFCS, Huawei SCP, and USB-A 4h low-current mode.
+6. **Energy Limits & Timers:** Auto-shutoff by energy (`Wh`) or duration (`30m`–`10h`) with live second-by-second countdown badges.
+7. **Session History & CSV Export:** Trapezoidal `Wh` energy integration, Session Detail Inspector dialog, Consolidated Sessions Table dialog, and customizable CSV exports saved to `Downloads/cuktech10/history/`.
+8. **Hardware Controls & Themes:** Screen brightness, timeout, idle screen-off (`PIID 19`), physical screen language (EN/CN), and 5 dark theme accent palettes (`CUKTECH Gunmetal`, `AMOLED Pure Black`, `Cyberpunk Neon`, `Titanium Amber`, `Deep Ocean Blue`).
+9. **4 Home Screen Widgets:** Soft Glass (`4x2` & `2x2`) and Solid Dark (`4x2` & `2x2`) with 1-tap port toggles and charging sparkline.
+10. **Automation Hub:** Full Tasker/Locale action plugin, live telemetry broadcast intent (`com.cramqin.blecuktech10.TELEMETRY_UPDATE`), Home Assistant Webhook, and ADB command interface.
 
 ---
 

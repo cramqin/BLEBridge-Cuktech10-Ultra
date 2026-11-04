@@ -237,21 +237,7 @@ fun CuktechDashboardScreen(
                             modifier = Modifier.size(18.dp)
                         )
                     }
-                    if (authState == CuktechAuthState.AUTHENTICATED) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        OutlinedButton(
-                            onClick = {
-                                bleManager.disconnectCharger()
-                                onNavigateBack?.invoke()
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            modifier = Modifier.height(28.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                        ) {
-                            Text("Disconnect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                    } else {
+                    if (authState != CuktechAuthState.AUTHENTICATED) {
                         Spacer(modifier = Modifier.width(4.dp))
                         Button(
                             onClick = {

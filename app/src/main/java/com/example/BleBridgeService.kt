@@ -1396,6 +1396,10 @@ class BleBridgeService : Service() {
         @Synchronized
         fun ensureCuktechManagersInitialized(context: Context): CuktechBleManager {
             val appCtx = context.applicationContext
+            val prefs = appCtx.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
+            val savedLvl = prefs.getString("console_log_level", LogLevel.LEVEL2.name) ?: LogLevel.LEVEL2.name
+            _logLevel.value = runCatching { LogLevel.valueOf(savedLvl) }.getOrDefault(LogLevel.LEVEL2)
+
             val store = credentialStore ?: SecureCredentialStore(appCtx).also { credentialStore = it }
             val db = persistence ?: CuktechPersistence(appCtx).also { persistence = it }
             val diag = bleDiagnostics ?: BleDiagnostics(appCtx).also { bleDiagnostics = it }
@@ -1559,9 +1563,14 @@ class BleBridgeService : Service() {
             }
         }
 
-        fun setLogLevel(level: LogLevel) {
+        fun setLogLevel(level: LogLevel, context: Context? = null) {
             _logLevel.value = level
             updateLogsFlow()
+            val ctx = context ?: instance?.applicationContext
+            ctx?.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
+                ?.edit()
+                ?.putString("console_log_level", level.name)
+                ?.apply()
         }
 
         fun clearLogs() {

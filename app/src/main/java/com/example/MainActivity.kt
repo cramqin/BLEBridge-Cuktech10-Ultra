@@ -944,31 +944,12 @@ fun BleBridgeDashboard(
                                                 }
                                             }
 
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                OutlinedButton(
-                                                    onClick = { cuktechManager.disconnectCharger() },
-                                                    shape = RoundedCornerShape(10.dp),
-                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusError),
-                                                    border = BorderStroke(1.dp, StatusError.copy(alpha = 0.6f)),
-                                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                                    modifier = Modifier.height(34.dp)
-                                                ) {
-                                                    Text("Disconnect", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                }
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Button(
-                                                    onClick = { showTelemetryScreen = true },
-                                                    colors = ButtonDefaults.buttonColors(
-                                                        containerColor = appColors.primary,
-                                                        contentColor = Color(0xFF0A0E1A)
-                                                    ),
-                                                    shape = RoundedCornerShape(10.dp),
-                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                                    modifier = Modifier.height(34.dp)
-                                                ) {
-                                                    Text("Telemetry →", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                                }
-                                            }
+                                            Icon(
+                                                imageVector = Icons.Default.ChevronRight,
+                                                contentDescription = "Open Telemetry",
+                                                tint = appColors.primary,
+                                                modifier = Modifier.size(26.dp)
+                                            )
                                         }
                                     }
                                 }
@@ -1279,17 +1260,17 @@ fun BleBridgeDashboard(
                                     border = if (terminalTab == 0) BorderStroke(1.dp, appColors.primary.copy(alpha = 0.5f)) else null
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "CONSOLE LOG",
+                                            text = "CONSOLE",
                                             fontWeight = FontWeight.Bold,
                                             color = if (terminalTab == 0) appColors.primary else Color(0xFF94A3B8),
                                             fontSize = 11.sp,
                                             letterSpacing = 0.5.sp
                                         )
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
                                         Box(
                                             modifier = Modifier
                                                 .size(6.dp)
@@ -1306,11 +1287,11 @@ fun BleBridgeDashboard(
                                     border = if (terminalTab == 1) BorderStroke(1.dp, appColors.primary.copy(alpha = 0.5f)) else null
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "BLE DIAGNOSTICS",
+                                            text = "DIAGNOSTICS",
                                             fontWeight = FontWeight.Bold,
                                             color = if (terminalTab == 1) appColors.primary else Color(0xFF94A3B8),
                                             fontSize = 11.sp,
@@ -1332,14 +1313,14 @@ fun BleBridgeDashboard(
                                             border = BorderStroke(1.dp, appColors.border)
                                         ) {
                                             Row(
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Text(
                                                     text = when (currentLogLevel) {
-                                                        BleBridgeService.Companion.LogLevel.LEVEL1 -> "LEVEL 1"
-                                                        BleBridgeService.Companion.LogLevel.LEVEL2 -> "LEVEL 2"
-                                                        BleBridgeService.Companion.LogLevel.LEVEL3 -> "LEVEL 3"
+                                                        BleBridgeService.Companion.LogLevel.LEVEL1 -> "LVL 1"
+                                                        BleBridgeService.Companion.LogLevel.LEVEL2 -> "LVL 2"
+                                                        BleBridgeService.Companion.LogLevel.LEVEL3 -> "LVL 3"
                                                     },
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
@@ -1363,28 +1344,28 @@ fun BleBridgeDashboard(
                                             DropdownMenuItem(
                                                 text = { Text("LEVEL 1: Errors Only", color = appColors.textPrimary, fontSize = 12.sp) },
                                                 onClick = {
-                                                    BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL1)
+                                                    BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL1, context)
                                                     dropdownExpanded = false
                                                 }
                                             )
                                             DropdownMenuItem(
                                                 text = { Text("LEVEL 2: Errors & Connect Status", color = appColors.textPrimary, fontSize = 12.sp) },
                                                 onClick = {
-                                                    BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL2)
+                                                    BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL2, context)
                                                     dropdownExpanded = false
                                                 }
                                             )
                                             DropdownMenuItem(
                                                 text = { Text("LEVEL 3: Full Telemetry", color = appColors.textPrimary, fontSize = 12.sp) },
                                                 onClick = {
-                                                    BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL3)
+                                                    BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL3, context)
                                                     dropdownExpanded = false
                                                 }
                                             )
                                         }
                                     }
 
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
 
                                     IconButton(
                                         onClick = {
@@ -1396,25 +1377,25 @@ fun BleBridgeDashboard(
                                             clipboard?.setPrimaryClip(clip)
                                             Toast.makeText(context, "Console output copied to clipboard", Toast.LENGTH_SHORT).show()
                                         },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(26.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.ContentCopy,
                                             contentDescription = "Copy logs",
                                             tint = Color(0xFF94A3B8),
-                                            modifier = Modifier.size(16.dp)
+                                            modifier = Modifier.size(15.dp)
                                         )
                                     }
-                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Spacer(modifier = Modifier.width(2.dp))
                                     IconButton(
                                         onClick = { BleBridgeService.clearLogs() },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(26.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
                                             contentDescription = "Clear logs",
                                             tint = Color(0xFF94A3B8),
-                                            modifier = Modifier.size(16.dp)
+                                            modifier = Modifier.size(15.dp)
                                         )
                                     }
                                 } else {

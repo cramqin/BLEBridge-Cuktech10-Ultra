@@ -150,6 +150,19 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 
 ---
 
+## 🗺️ Roadmap (Target: v1.5.0)
+
+We are continuously enhancing the BLEBridge experience. The following features are planned for upcoming releases toward **v1.5.0**:
+
+- [ ] **Master Killswitch:** 1-tap master toggle in the app dashboard and ongoing notification action to cut or restore power to all 4 ports simultaneously.
+- [ ] **Electricity Costing & Monthly `kWh` Tracker:** Configure your local power utility rate (e.g. `₱/kWh`, `$/kWh`) to automatically calculate and track power consumption costs per session and per month.
+- [ ] **Historical Session Graph Replay:** Interactive graph explorer to replay wattage and voltage curves from archived charging sessions.
+- [ ] **Interactive Port Action Toasts:** Contextual toast alerts with quick "Undo" actions when ports are toggled on/off.
+- [ ] **Settings Backup & Cloud Sync:** Export/import encrypted settings, port aliases, and automation configs, with optional cloud backup tied to your authenticated Xiaomi account.
+- [ ] **In-App Direct APK Updater:** Automatic background version check with direct in-app download and installation of official releases without visiting GitHub.
+
+---
+
 ## 📦 Installation & Building
 
 ### Download Pre-built Signed APK

@@ -386,7 +386,7 @@ class BleBridgeService : Service() {
         }
     }
 
-    private fun stopTcpServer() {
+    fun stopTcpServer() {
         log(LogLevel.LEVEL2, "Stopping TCP Gateway Server...")
         cleanupServer()
     }
@@ -748,10 +748,14 @@ class BleBridgeService : Service() {
         }
 
         setBleConnectionState(BleConnectionState.DISCONNECTED, null)
+        if (isServerRunning) {
+            stopTcpServer()
+        }
         if (triggerCooldown && wasActive) {
             cuktechManager?.triggerDisconnectCooldown(2000L)
         }
         broadcastJson(createTelemetryJson("disconnected", null, null, null, null))
+        dismissForegroundNotificationIfIdle()
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
@@ -1576,17 +1580,17 @@ class BleBridgeService : Service() {
                 try {
                     val client = okhttp3.OkHttpClient()
                     val request = okhttp3.Request.Builder()
-                        .url("https://raw.githubusercontent.com/woldphone/BLEBridge/main/version.json")
+                        .url("https://api.github.com/repos/cramqin/BLEBridge-Cuktech10-Ultra/releases/latest")
+                        .header("Accept", "application/vnd.github.v3+json")
                         .build()
 
                     val response = client.newCall(request).execute()
                     if (response.isSuccessful) {
                         val body = response.body?.string() ?: ""
                         val json = JSONObject(body)
-                        val remoteVersionCode = json.optInt("versionCode", 0)
-
-                        // Current version is 1 (as defined in app/build.gradle.kts)
-                        if (remoteVersionCode > 1) {
+                        val tagName = json.optString("tag_name", "").removePrefix("v").trim()
+                        val currentVersion = "1.0.5"
+                        if (tagName.isNotEmpty() && tagName != currentVersion && !tagName.startsWith("1.0.5")) {
                             _updateAvailable.value = true
                         }
                     }

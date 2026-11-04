@@ -429,18 +429,138 @@ fun BleBridgeDashboard(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
 
+                HorizontalDivider(color = appColors.border, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+
+                Text(
+                    text = "ABOUT & UPDATES",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    color = appColors.textSecondary,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Check for Updates",
+                            tint = if (updateAvailable) StatusError else appColors.primary
+                        )
+                    },
+                    label = {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "GitHub Releases & APK",
+                                    fontWeight = FontWeight.Medium,
+                                    color = appColors.textPrimary
+                                )
+                                if (updateAvailable) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(StatusError)
+                                    )
+                                }
+                            }
+                            Text(
+                                text = if (updateAvailable) "New release available on GitHub!" else "Latest version & changelog",
+                                fontSize = 11.sp,
+                                color = if (updateAvailable) StatusError else appColors.textSecondary
+                            )
+                        }
+                    },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        try {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://github.com/cramqin/BLEBridge-Cuktech10-Ultra/releases")
+                            ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Could not open browser: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = NavigationDrawerItemDefaults.colors(
+                        unselectedContainerColor = Color.Transparent
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Code,
+                            contentDescription = "GitHub Repository",
+                            tint = appColors.primary
+                        )
+                    },
+                    label = {
+                        Column {
+                            Text(
+                                text = "GitHub Repository",
+                                fontWeight = FontWeight.Medium,
+                                color = appColors.textPrimary
+                            )
+                            Text(
+                                text = "Source code, docs & issues",
+                                fontSize = 11.sp,
+                                color = appColors.textSecondary
+                            )
+                        }
+                    },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        try {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://github.com/cramqin/BLEBridge-Cuktech10-Ultra")
+                            ).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Could not open browser: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    colors = NavigationDrawerItemDefaults.colors(
+                        unselectedContainerColor = Color.Transparent
+                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                )
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 HorizontalDivider(color = appColors.border, modifier = Modifier.padding(horizontal = 20.dp))
                 Column(
                     modifier = Modifier.padding(24.dp)
                 ) {
-                    Text(
-                        text = "BLE Cuktech10 Ultra",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = appColors.textPrimary
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "BLE Cuktech10 Ultra",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = appColors.textPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = appColors.primaryContainer.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, appColors.primary.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "v1.0.5",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = appColors.primary,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = "Hardware Bridge & Dashboard",
                         fontSize = 11.sp,

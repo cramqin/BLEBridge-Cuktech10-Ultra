@@ -502,6 +502,7 @@ class CuktechBleManager(
         if (wasConnectedOrConnecting) {
             _statusMessage.value = "Disconnecting..."
         }
+        BleBridgeService.getInstance()?.stopTcpServer()
         BleBridgeService.getInstance()?.disconnectBleNative()
         BleBridgeService.getInstance()?.dismissForegroundNotificationIfIdle()
     }

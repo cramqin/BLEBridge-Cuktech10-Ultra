@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -518,10 +519,22 @@ fun BleBridgeDashboard(
                                             )
                                         }
                                     }
+                                    val (headerStatusText, headerStatusColor) = when (cuktechAuthState) {
+                                        CuktechAuthState.AUTHENTICATED -> {
+                                            val wText = if (cuktechTotalWatts > 0) " · ${"%.1f".format(cuktechTotalWatts)}W" else ""
+                                            "CHARGER CONNECTED$wText" to StatusSuccess
+                                        }
+                                        CuktechAuthState.CONNECTING_GATT,
+                                        CuktechAuthState.DISCOVERING_SERVICES,
+                                        CuktechAuthState.PHASE_A_INIT_A4,
+                                        CuktechAuthState.PHASE_B_HANDSHAKE -> "CONNECTING TO CHARGER..." to Color(0xFFF59E0B)
+                                        CuktechAuthState.AUTH_FAILED -> "AUTHENTICATION FAILED" to StatusError
+                                        CuktechAuthState.DISCONNECTED -> "CHARGER DISCONNECTED" to appColors.textSecondary
+                                    }
                                     Text(
-                                        text = if (isRunning) "SERVER ACTIVE" else "SERVER INACTIVE",
+                                        text = headerStatusText,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isRunning) StatusSuccess else appColors.textSecondary,
+                                        color = headerStatusColor,
                                         fontSize = 10.sp,
                                         letterSpacing = 1.sp
                                     )
@@ -839,6 +852,45 @@ fun BleBridgeDashboard(
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp
                                     )
+                                }
+
+                                // Quick Connect to Last Connected Charger (Only visible when DISCONNECTED and a paired charger is known)
+                                if (cuktechAuthState == CuktechAuthState.DISCONNECTED) {
+                                    val lastMac = cuktechManager.lastConnectedMac
+                                        ?: activeCred?.mac
+                                        ?: savedDevices.firstOrNull { it.hasValidToken }?.mac
+                                        ?: savedDevices.firstOrNull()?.mac
+
+                                    if (!lastMac.isNullOrBlank()) {
+                                        val lastName = activeCred?.name
+                                            ?: savedDevices.firstOrNull { it.mac.equals(lastMac, ignoreCase = true) }?.name
+                                            ?: "CUKTECH 10 Ultra"
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        OutlinedButton(
+                                            onClick = {
+                                                ensureBleServiceStartedAndPermissions {
+                                                    cuktechManager.connectToCharger(lastMac)
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(12.dp),
+                                            border = BorderStroke(1.dp, appColors.primary),
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = appColors.primary
+                                            ),
+                                            modifier = Modifier.fillMaxWidth().height(44.dp)
+                                        ) {
+                                            Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "Quick Connect: $lastName",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
                                 }
 
                                 // Connecting State Card (Allows user to cancel connection attempt)

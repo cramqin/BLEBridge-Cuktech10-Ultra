@@ -574,7 +574,7 @@ class BleBridgeService : Service() {
         if (isScanning) {
             stopBleScan()
         }
-        if (companionBleState != Companion.BleConnectionState.DISCONNECTED) {
+        if (bluetoothGatt != null || companionBleState != Companion.BleConnectionState.DISCONNECTED) {
             closeGattClean()
         }
         val device = try {
@@ -607,7 +607,26 @@ class BleBridgeService : Service() {
     }
 
     fun disconnectBleNative() {
-        closeGattClean()
+        val gatt = bluetoothGatt
+        if (gatt != null) {
+            log(LogLevel.LEVEL2, "Initiating graceful BLE GATT disconnect...")
+            try {
+                gatt.disconnect()
+            } catch (e: SecurityException) {
+                log(LogLevel.LEVEL1, "Security Exception in gatt.disconnect: ${e.message}")
+            } catch (e: Exception) {
+                log(LogLevel.LEVEL1, "Error calling disconnect: ${e.message}")
+            }
+            // Safety fallback: if onConnectionStateChange doesn't teardown GATT within 300ms, force closeGattClean
+            serviceScope.launch {
+                delay(300L)
+                if (bluetoothGatt != null) {
+                    closeGattClean()
+                }
+            }
+        } else {
+            closeGattClean()
+        }
     }
 
     fun requestGattRssi(): Boolean {
@@ -701,26 +720,14 @@ class BleBridgeService : Service() {
 
     fun closeGattClean() {
         val gatt = bluetoothGatt
+        bluetoothGatt = null
         if (gatt != null) {
-            log(LogLevel.LEVEL2, "Executing GATT leak protection & handle teardown...")
-            try {
-                refreshGattCache(gatt)
-            } catch (_: Exception) {}
-
-            try {
-                gatt.disconnect()
-            } catch (e: SecurityException) {
-                log(LogLevel.LEVEL1, "Security Exception in gatt.disconnect: ${e.message}")
-            } catch (e: Exception) {
-                log(LogLevel.LEVEL1, "Error calling disconnect: ${e.message}")
-            }
-
+            log(LogLevel.LEVEL2, "Executing GATT handle teardown...")
             try {
                 gatt.close()
             } catch (e: Exception) {
                 log(LogLevel.LEVEL1, "Error calling close: ${e.message}")
             }
-            bluetoothGatt = null
         }
 
         activeTaskDeferred?.complete(false)

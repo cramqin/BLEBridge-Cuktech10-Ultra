@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.os.ParcelUuid
+import android.os.SystemClock
 import com.example.BleBridgeService
 import com.example.cuktech.cloud.XiaomiCloudClient
 import com.example.cuktech.db.CuktechPersistence
@@ -120,6 +121,8 @@ class CuktechBleManager(
     private var keepaliveJob: Job? = null
     private var reconnectJob: Job? = null
     private var connectionTimeoutJob: Job? = null
+    private var connectJob: Job? = null
+    private var lastDisconnectMs: Long = 0L
 
     private var autoReconnectEnabled: Boolean = true
     var lastConnectedMac: String? = null
@@ -240,11 +243,12 @@ class CuktechBleManager(
             _statusMessage.value = "Starting Bluetooth scanner..."
             return
         }
+        if (_authState.value != CuktechAuthState.DISCONNECTED || svc.companionBleState != BleBridgeService.Companion.BleConnectionState.DISCONNECTED) {
+            disconnectCharger()
+        }
         clearDiscoveredDevices()
         _isScanning.value = true
-        if (_authState.value != CuktechAuthState.AUTHENTICATED && _authState.value != CuktechAuthState.CONNECTING_GATT) {
-            _authState.value = CuktechAuthState.SCANNING
-        }
+        _authState.value = CuktechAuthState.SCANNING
         _statusMessage.value = "Scanning for nearby CUKTECH 10 Ultra chargers..."
         svc.startNativeCuktechScan(durationMs)
     }
@@ -393,36 +397,62 @@ class CuktechBleManager(
         lastConnectedMac = targetMac
         reconnectJob?.cancel()
         connectionTimeoutJob?.cancel()
-        stopBackgroundLoops()
+        connectJob?.cancel()
 
         _deviceInfo.value = _deviceInfo.value.copy(
             macAddress = targetMac,
             name = targetCred?.name ?: "CUKTECH 10 Ultra"
         )
-        _authState.value = CuktechAuthState.CONNECTING_GATT
-        _statusMessage.value = "Connecting to $targetMac..."
 
-        connectionTimeoutJob = scope.launch {
-            delay(15000L)
-            if (_authState.value in listOf(
-                CuktechAuthState.CONNECTING_GATT,
-                CuktechAuthState.DISCOVERING_SERVICES,
-                CuktechAuthState.PHASE_A_INIT_A4,
-                CuktechAuthState.PHASE_B_HANDSHAKE
-            )) {
+        connectJob = scope.launch {
+            // If already connected or connecting, cleanly teardown previous session first
+            if (_authState.value != CuktechAuthState.DISCONNECTED || svc.companionBleState != BleBridgeService.Companion.BleConnectionState.DISCONNECTED) {
                 BleBridgeService.addLogMessage(
-                    BleBridgeService.Companion.LogLevel.LEVEL1,
-                    "[Cuktech] Connection to $targetMac timed out after 15s. Charger display may be asleep or out of range."
+                    BleBridgeService.Companion.LogLevel.LEVEL2,
+                    "[Cuktech] Tearing down active connection before connecting to $targetMac..."
                 )
-                _statusMessage.value = "Connection timed out. Wake charger display or verify Bluetooth."
-                disconnectCharger()
+                disconnectChargerInternal(userInitiated = false)
+                delay(250L)
             }
-        }
 
-        svc.connectBleNative(targetMac)
+            // Guard against rapid speed-spam disconnect/connect by ensuring Bluetooth controller cooldown
+            val elapsed = SystemClock.elapsedRealtime() - lastDisconnectMs
+            if (elapsed < 350L) {
+                val waitMs = 350L - elapsed
+                BleBridgeService.addLogMessage(
+                    BleBridgeService.Companion.LogLevel.LEVEL2,
+                    "[Cuktech] Controller cooldown: waiting ${waitMs}ms before initiating connection..."
+                )
+                delay(waitMs)
+            }
+
+            _authState.value = CuktechAuthState.CONNECTING_GATT
+            _statusMessage.value = "Connecting to $targetMac..."
+
+            connectionTimeoutJob?.cancel()
+            connectionTimeoutJob = scope.launch {
+                delay(15000L)
+                if (_authState.value in listOf(
+                    CuktechAuthState.CONNECTING_GATT,
+                    CuktechAuthState.DISCOVERING_SERVICES,
+                    CuktechAuthState.PHASE_A_INIT_A4,
+                    CuktechAuthState.PHASE_B_HANDSHAKE
+                )) {
+                    BleBridgeService.addLogMessage(
+                        BleBridgeService.Companion.LogLevel.LEVEL1,
+                        "[Cuktech] Connection to $targetMac timed out after 15s. Charger display may be asleep or out of range."
+                    )
+                    _statusMessage.value = "Connection timed out. Wake charger display or verify Bluetooth."
+                    disconnectCharger()
+                }
+            }
+
+            svc.connectBleNative(targetMac)
+        }
     }
 
     fun onConnectionFailed(reason: String) {
+        connectJob?.cancel()
         connectionTimeoutJob?.cancel()
         authJob?.cancel()
         stopBackgroundLoops()
@@ -432,7 +462,15 @@ class CuktechBleManager(
     }
 
     fun disconnectCharger() {
-        autoReconnectEnabled = false
+        disconnectChargerInternal(userInitiated = true)
+    }
+
+    private fun disconnectChargerInternal(userInitiated: Boolean = false) {
+        if (userInitiated) {
+            autoReconnectEnabled = false
+        }
+        lastDisconnectMs = SystemClock.elapsedRealtime()
+        connectJob?.cancel()
         reconnectJob?.cancel()
         connectionTimeoutJob?.cancel()
         authJob?.cancel()
@@ -450,6 +488,8 @@ class CuktechBleManager(
             _authState.value = CuktechAuthState.DISCOVERING_SERVICES
             _statusMessage.value = "GATT connected, discovering services..."
         } else {
+            lastDisconnectMs = SystemClock.elapsedRealtime()
+            connectJob?.cancel()
             connectionTimeoutJob?.cancel()
             authJob?.cancel()
             stopBackgroundLoops()

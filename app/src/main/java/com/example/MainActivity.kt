@@ -856,6 +856,9 @@ fun BleBridgeDashboard(
                                 Button(
                                     onClick = {
                                         ensureBleServiceStartedAndPermissions {
+                                            if (cuktechAuthState != CuktechAuthState.DISCONNECTED) {
+                                                cuktechManager.disconnectCharger()
+                                            }
                                             showPairingDialog = true
                                         }
                                     },

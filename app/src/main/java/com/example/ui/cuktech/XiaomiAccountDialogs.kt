@@ -12,6 +12,8 @@ import android.content.Context
 import android.bluetooth.BluetoothManager
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import com.example.cuktech.ble.CuktechAuthState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -1008,6 +1010,10 @@ fun CuktechDiscoveryPairingDialog(
 
     LaunchedEffect(isBtEnabled) {
         if (isBtEnabled) {
+            if (bleManager.authState.value != CuktechAuthState.DISCONNECTED) {
+                bleManager.disconnectCharger()
+                delay(250L)
+            }
             bleManager.startSearchForCuktechChargers(10000L)
         }
     }

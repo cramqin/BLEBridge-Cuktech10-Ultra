@@ -92,6 +92,7 @@ fun CuktechDashboardScreen(
     val completedSessions by bleManager.completedSessions.collectAsState()
     val chargeLimits by bleManager.chargeLimits.collectAsState()
     val countdownRemainingSeconds by bleManager.countdownRemainingSeconds.collectAsState()
+    val usbALowCurrentRemainingSeconds by bleManager.usbALowCurrentRemainingSeconds.collectAsState()
 
     val accountSession by bleManager.credentialStore.session.collectAsState()
     val savedDevices by bleManager.credentialStore.devices.collectAsState()
@@ -782,9 +783,19 @@ fun CuktechDashboardScreen(
                             )
 
                             // USB-A Low Current Mode
+                            val usbASubtitle = if (settings.usbALowCurrent && usbALowCurrentRemainingSeconds != null) {
+                                val secs = usbALowCurrentRemainingSeconds ?: 0L
+                                val h = secs / 3600
+                                val m = (secs % 3600) / 60
+                                val s = secs % 60
+                                val timeStr = if (h > 0) "${h}h ${m}m" else "${m}m ${s}s"
+                                "⏱️ Active ($timeStr remaining) · Prevents auto-cutoff for low-draw devices (smartwatches, earbuds)."
+                            } else {
+                                "Prevents auto-cutoff for low-draw devices (smartwatches, earbuds). Automatically turns off after 4 hours."
+                            }
                             SettingSwitchRow(
                                 title = "USB-A Low Current (On for 4 Hours)",
-                                subtitle = "Prevents auto-cutoff for low-draw devices (smartwatches, earbuds). Automatically turns off after 4 hours.",
+                                subtitle = usbASubtitle,
                                 checked = settings.usbALowCurrent,
                                 onCheckedChange = { bleManager.setUsbALowCurrent(it) }
                             )
@@ -1687,7 +1698,10 @@ fun CuktechDashboardScreen(
         ConsolidatedSessionsTableDialog(
             allSessions = activeSessions.values.toList() + completedSessions,
             onDismiss = { showConsolidatedTable = false },
-            onExportCsv = { showExportDialog = true }
+            onExportCsv = { showExportDialog = true },
+            onSelectSession = { session ->
+                selectedSessionDetail = session
+            }
         )
     }
 
@@ -3125,10 +3139,12 @@ private fun SessionDetailDialog(
 private fun ConsolidatedSessionsTableDialog(
     allSessions: List<com.example.cuktech.energy.ChargeSessionRecord>,
     onDismiss: () -> Unit,
-    onExportCsv: () -> Unit
+    onExportCsv: () -> Unit,
+    onSelectSession: (com.example.cuktech.energy.ChargeSessionRecord) -> Unit
 ) {
     val context = LocalContext.current
-    val timeFormat = remember { java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault()) }
+    val dateFormat = remember { java.text.SimpleDateFormat("MM-dd", java.util.Locale.getDefault()) }
+    val timeFormat = remember { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()) }
     var pageIndex by remember { mutableIntStateOf(0) }
     val pageSize = 10
     val totalPages = ((allSessions.size + pageSize - 1) / pageSize).coerceAtLeast(1)
@@ -3145,7 +3161,7 @@ private fun ConsolidatedSessionsTableDialog(
             ) {
                 Column {
                     Text("Consolidated Charging History (${allSessions.size})", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("Rolling history: up to 300 sessions retained (FIFO auto-prune)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Tap any session to inspect details · 300 retained", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },
@@ -3179,11 +3195,11 @@ private fun ConsolidatedSessionsTableDialog(
                                     .padding(vertical = 4.dp, horizontal = 4.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Port / Proto", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.5f))
+                                Text("Port / Proto", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.3f))
                                 Text("Energy", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.9f))
                                 Text("Dur", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.6f))
-                                Text("Peak", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.8f))
-                                Text("Time", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.0f))
+                                Text("Peak", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.7f))
+                                Text("From ~ To", fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.3f))
                             }
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
@@ -3193,15 +3209,27 @@ private fun ConsolidatedSessionsTableDialog(
                                     .replace(Regex("\\s*\\([0-9.]+V\\)"), "")
                                     .trim()
                                 val shortPort = s.portLabel.replace("USB-", "")
+                                val startDate = java.util.Date((s.startTimeSec * 1000).toLong())
+                                val startStr = "${dateFormat.format(startDate)} ${timeFormat.format(startDate)}"
+                                val endStr = if (s.endTimeSec != null && s.endTimeSec > 0) {
+                                    val endDate = java.util.Date((s.endTimeSec * 1000).toLong())
+                                    timeFormat.format(endDate)
+                                } else {
+                                    "Live"
+                                }
+                                val rangeStr = "$startStr ~ $endStr"
+
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .clip(RoundedCornerShape(4.dp))
                                         .background(bg)
-                                        .padding(vertical = 4.dp, horizontal = 4.dp),
+                                        .clickable { onSelectSession(s) }
+                                        .padding(vertical = 5.dp, horizontal = 4.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1.5f)) {
+                                    Column(modifier = Modifier.weight(1.3f)) {
                                         Text(shortPort, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                         Text(
                                             text = cleanProto,
@@ -3213,9 +3241,8 @@ private fun ConsolidatedSessionsTableDialog(
                                     }
                                     Text("${"%.2f".format(s.whAccumulated)}Wh", fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(0.9f))
                                     Text("${s.durationSeconds / 60}m", fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(0.6f))
-                                    Text("${"%.1f".format(s.peakWatts)}W", fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(0.8f))
-                                    val startStr = timeFormat.format(java.util.Date((s.startTimeSec * 1000).toLong()))
-                                    Text(startStr, fontSize = 9.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1.0f))
+                                    Text("${"%.1f".format(s.peakWatts)}W", fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(0.7f))
+                                    Text(rangeStr, fontSize = 8.5.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1.3f))
                                 }
                             }
                         }
@@ -3258,10 +3285,15 @@ private fun ConsolidatedSessionsTableDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val sb = StringBuilder("Port,Protocol,EnergyWh,DurationSec,PeakWatts,AvgWatts,StartTime\n")
+                    val sb = StringBuilder("Port,Protocol,EnergyWh,DurationSec,PeakWatts,AvgWatts,StartTime,EndTime\n")
                     allSessions.forEach { s ->
-                        val startStr = timeFormat.format(java.util.Date((s.startTimeSec * 1000).toLong()))
-                        sb.append("${s.portLabel},\"${s.protocolUsed}\",${"%.3f".format(s.whAccumulated)},${s.durationSeconds},${"%.1f".format(s.peakWatts)},${"%.1f".format(s.avgWatts)},$startStr\n")
+                        val startStr = "${dateFormat.format(java.util.Date((s.startTimeSec * 1000).toLong()))} ${timeFormat.format(java.util.Date((s.startTimeSec * 1000).toLong()))}"
+                        val endStr = if (s.endTimeSec != null && s.endTimeSec > 0) {
+                            "${dateFormat.format(java.util.Date((s.endTimeSec * 1000).toLong()))} ${timeFormat.format(java.util.Date((s.endTimeSec * 1000).toLong()))}"
+                        } else {
+                            "Live"
+                        }
+                        sb.append("${s.portLabel},\"${s.protocolUsed}\",${"%.3f".format(s.whAccumulated)},${s.durationSeconds},${"%.1f".format(s.peakWatts)},${"%.1f".format(s.avgWatts)},$startStr,$endStr\n")
                     }
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("Cuktech All Sessions CSV", sb.toString()))

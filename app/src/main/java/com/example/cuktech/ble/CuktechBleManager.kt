@@ -191,6 +191,11 @@ class CuktechBleManager(
     val countdownRemainingSeconds: StateFlow<Map<Int, Long>> = _countdownRemainingSeconds.asStateFlow()
     private val targetCountdownEpochSec = ConcurrentHashMap<Int, Long>()
 
+    // USB-A Low Current (4 Hours) remaining seconds countdown
+    private val _usbALowCurrentRemainingSeconds = MutableStateFlow<Long?>(null)
+    val usbALowCurrentRemainingSeconds: StateFlow<Long?> = _usbALowCurrentRemainingSeconds.asStateFlow()
+    private var targetUsbALowCurrentEpochSec: Long? = null
+
     // Callback invoked on telemetry update so Tasker / MQTT / Bemfa can broadcast
     var onTelemetryUpdated: ((Map<Int, PortTelemetry>, Double, ChargerDeviceInfo) -> Unit)? = null
 
@@ -1537,7 +1542,16 @@ class CuktechBleManager(
 
             CuktechProtocol.PIID_USB_A_LOW_CURRENT -> {
                 if (frame.payload.isNotEmpty()) {
-                    _settings.value = _settings.value.copy(usbALowCurrent = (frame.payload[0].toInt() and 0xFF) != 0)
+                    val isEnabled = (frame.payload[0].toInt() and 0xFF) != 0
+                    _settings.value = _settings.value.copy(usbALowCurrent = isEnabled)
+                    if (isEnabled) {
+                        if (targetUsbALowCurrentEpochSec == null) {
+                            targetUsbALowCurrentEpochSec = (System.currentTimeMillis() / 1000L) + (4L * 3600L)
+                        }
+                    } else {
+                        targetUsbALowCurrentEpochSec = null
+                        _usbALowCurrentRemainingSeconds.value = null
+                    }
                 }
             }
 
@@ -1984,6 +1998,18 @@ class CuktechBleManager(
         }
         _countdownRemainingSeconds.value = remMap
 
+        // Update USB-A Low Current (4 Hours) countdown
+        targetUsbALowCurrentEpochSec?.let { targetEpoch ->
+            val remUsbA = targetEpoch - nowSec
+            if (remUsbA > 0) {
+                _usbALowCurrentRemainingSeconds.value = remUsbA
+            } else {
+                targetUsbALowCurrentEpochSec = null
+                _usbALowCurrentRemainingSeconds.value = null
+                _settings.value = _settings.value.copy(usbALowCurrent = false)
+            }
+        }
+
         if (_authState.value == CuktechAuthState.AUTHENTICATED) {
             val totalW = _totalPowerWatts.value
             val ports = _ports.value
@@ -1995,14 +2021,60 @@ class CuktechBleManager(
                 "⚡ CUKTECH 10 Ultra (Idle)"
             }
 
-            val timers = remMap.entries.sortedBy { it.key }.joinToString(", ") { (pId, secs) ->
+            // Gather active timers (Port timers + USB-A Low Current)
+            val timersList = mutableListOf<String>()
+            remMap.entries.sortedBy { it.key }.forEach { (pId, secs) ->
                 val m = secs / 60
                 val s = secs % 60
-                val pLabel = ports[pId]?.portLabel ?: "P$pId"
-                String.format(java.util.Locale.US, "%s: %d:%02d", pLabel, m, s)
+                val pLabel = when (pId) {
+                    1 -> "C1"
+                    2 -> "C2"
+                    3 -> "C3"
+                    4 -> "A"
+                    else -> ports[pId]?.portLabel ?: "P$pId"
+                }
+                timersList.add(String.format(java.util.Locale.US, "%s: %d:%02d", pLabel, m, s))
+            }
+            _usbALowCurrentRemainingSeconds.value?.let { secs ->
+                val h = secs / 3600
+                val m = (secs % 3600) / 60
+                val s = secs % 60
+                val formattedUsbATimer = if (h > 0) {
+                    String.format(java.util.Locale.US, "%dh %02dm", h, m)
+                } else {
+                    String.format(java.util.Locale.US, "%d:%02d", m, s)
+                }
+                timersList.add("USB-A Trickle: $formattedUsbATimer")
             }
 
-            // 1-line compact summary for collapsed view
+            // Gather active Wh limits
+            val activeLimits = _chargeLimits.value.values.filter { it.enabled && !it.triggered }
+            val whLimitsList = mutableListOf<String>()
+            for (limit in activeLimits) {
+                val p = ports[limit.portId]
+                val cumWh = p?.cumulativeWh ?: 0.0
+                val used = limit.currentUsedWh(cumWh)
+                val pct = if (limit.whTarget > 0.0) ((used / limit.whTarget) * 100).toInt().coerceIn(0, 100) else 0
+                val pLabel = when (limit.portId) {
+                    1 -> "C1"
+                    2 -> "C2"
+                    3 -> "C3"
+                    4 -> "A"
+                    else -> "P${limit.portId}"
+                }
+                whLimitsList.add(String.format(java.util.Locale.US, "%s: %.1f/%.1fWh (%d%%)", pLabel, used, limit.whTarget, pct))
+            }
+
+            val hasTimers = timersList.isNotEmpty()
+            val hasWhLimits = whLimitsList.isNotEmpty()
+
+            // 1-line compact summary for collapsed view: uncluttered!
+            // Shows indicator icons (⏱️ for timer, 🎯 for Wh limit) then active wattage
+            val indicatorBadges = buildString {
+                if (hasTimers) append("⏱️ ")
+                if (hasWhLimits) append("🎯 ")
+            }
+
             val compactWatts = if (activePorts.isNotEmpty()) {
                 activePorts.joinToString(" · ") { port ->
                     val shortLabel = when (port.portId) {
@@ -2017,12 +2089,15 @@ class CuktechBleManager(
             } else {
                 "All ports idle"
             }
-            val content = if (timers.isNotEmpty()) "⏱️ $timers | $compactWatts" else compactWatts
+            val content = "$indicatorBadges$compactWatts"
 
             // Multi-line detailed lines for expanded bigText view
             val bigText = buildString {
-                if (timers.isNotEmpty()) {
-                    append("⏱️ Timers: ").append(timers).append("\n")
+                if (hasTimers) {
+                    append("⏱️ Timers: ").append(timersList.joinToString(" · ")).append("\n")
+                }
+                if (hasWhLimits) {
+                    append("🎯 Wh Limits: ").append(whLimitsList.joinToString(" · ")).append("\n")
                 }
                 if (activePorts.isNotEmpty()) {
                     activePorts.forEachIndexed { idx, port ->
@@ -2128,6 +2203,13 @@ class CuktechBleManager(
     fun setUsbALowCurrent(enabled: Boolean) {
         scope.launch {
             _settings.value = _settings.value.copy(usbALowCurrent = enabled)
+            if (enabled) {
+                targetUsbALowCurrentEpochSec = (System.currentTimeMillis() / 1000L) + (4L * 3600L)
+                _usbALowCurrentRemainingSeconds.value = 4L * 3600L
+            } else {
+                targetUsbALowCurrentEpochSec = null
+                _usbALowCurrentRemainingSeconds.value = null
+            }
             sendMiotCommand(
                 siid = CuktechProtocol.SIID_CHARGER,
                 piid = CuktechProtocol.PIID_USB_A_LOW_CURRENT,

@@ -9,7 +9,11 @@
   <img src="https://img.shields.io/badge/Platform-Android%208.0%2B-3DDC84?logo=android&amp;logoColor=white" alt="Android" />
   <img src="https://img.shields.io/badge/Kotlin-2.2%2B-7F52FF?logo=kotlin&amp;logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/Device-CUKTECH%2010%20Ultra%20(AD1204)-00E5FF" alt="Device" />
+  <img src="https://img.shields.io/badge/100%25-Vibe%20Coded%20%E2%9C%A8-FF6900" alt="Vibe Coded" />
 </p>
+
+> [!NOTE]
+> **✨ Vibe-Coded Disclaimer:** This entire native Android application was **vibe-coded** with AI pair-programming by combining and porting two awesome open-source repositories into a unified Kotlin + Jetpack Compose Android app. While it is tested daily on real **CUKTECH 10 Ultra (`AD1204`)** hardware, please review the code and use at your own discretion!
 
 ---
 
@@ -41,6 +45,10 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 5. **Background Keepalive & OEM Battery Optimization ([dontkillmyapp.com](https://dontkillmyapp.com/)):**
    - To keep live BLE telemetry, widgets, and background automations running reliably when your screen is off, tap **"Ignore Battery Optimization"** inside the app's **Background Keepalive & System Integration** card.
    - Aggressive Android OEMs (Xiaomi HyperOS / MIUI, Samsung OneUI, OPPO ColorOS, Vivo OriginOS, Huawei, etc.) often kill background services even with standard Android battery whitelist enabled. Follow the device-specific steps at **[https://dontkillmyapp.com/](https://dontkillmyapp.com/)** (e.g., enable *Autostart* and set Battery Saver to *No Restrictions* on Xiaomi/HyperOS).
+6. **Invisible in Standard Android System Bluetooth Settings (Normal Behavior):**
+   - **You will NOT see the CUKTECH 10 Ultra in your phone's standard Android Bluetooth settings menu**, nor can you pair to it from Android's system Bluetooth scanner.
+   - This is because the charger broadcasts nameless, encrypted Xiaomi MiOT `0xFE95` BLE service advertisements (`Product ID 0x660E`) rather than classic Bluetooth or standard HID/audio profiles.
+   - **BLEBridge's built-in scanner specifically decodes `0xFE95` advertisements** and matches the embedded MAC/Product ID against your synced Xiaomi Cloud credentials—so even though it's invisible in your phone's Bluetooth settings, **it will appear and connect right inside BLEBridge!**
 
 ---
 

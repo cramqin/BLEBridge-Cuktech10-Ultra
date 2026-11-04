@@ -47,10 +47,6 @@ open class CuktechWidgetProvider : AppWidgetProvider() {
                 }
                 ACTION_CONNECT_OR_OPEN -> {
                     if (mgr.authState.value != CuktechAuthState.AUTHENTICATED) {
-                        val svcIntent = Intent(context, BleBridgeService::class.java).apply {
-                            this.action = BleBridgeService.ACTION_START_SERVER
-                        }
-                        runCatching { context.startForegroundService(svcIntent) }
                         mgr.connectToCharger(null)
                         updateAllWidgets(context)
                     } else {

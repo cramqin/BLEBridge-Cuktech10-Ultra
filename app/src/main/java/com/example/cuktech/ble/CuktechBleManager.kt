@@ -231,7 +231,13 @@ class CuktechBleManager(
     fun startSearchForCuktechChargers(durationMs: Long = 10000L) {
         val svc = BleBridgeService.getInstance()
         if (svc == null) {
-            _statusMessage.value = "Bluetooth service is starting, please retry in a moment"
+            try {
+                val intent = android.content.Intent(context, BleBridgeService::class.java).apply {
+                    action = BleBridgeService.ACTION_SCAN_CUKTECH
+                }
+                context.startService(intent)
+            } catch (_: Exception) {}
+            _statusMessage.value = "Starting Bluetooth scanner..."
             return
         }
         clearDiscoveredDevices()
@@ -356,7 +362,18 @@ class CuktechBleManager(
 
         val svc = BleBridgeService.getInstance()
         if (svc == null) {
-            _statusMessage.value = "BLE Service is not ready"
+            try {
+                val intent = android.content.Intent(context, BleBridgeService::class.java).apply {
+                    action = BleBridgeService.ACTION_CONNECT_CUKTECH
+                    putExtra(BleBridgeService.EXTRA_MAC, targetMac)
+                }
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (_: Exception) {}
+            _statusMessage.value = "Starting BLE service and connecting to $targetMac..."
             return
         }
 
@@ -371,6 +388,7 @@ class CuktechBleManager(
             return
         }
 
+        svc.startForegroundForBleConnection()
         autoReconnectEnabled = true
         lastConnectedMac = targetMac
         reconnectJob?.cancel()
@@ -410,6 +428,7 @@ class CuktechBleManager(
         stopBackgroundLoops()
         _authState.value = CuktechAuthState.DISCONNECTED
         _statusMessage.value = reason
+        BleBridgeService.getInstance()?.dismissForegroundNotificationIfIdle()
     }
 
     fun disconnectCharger() {
@@ -422,6 +441,7 @@ class CuktechBleManager(
         _authState.value = CuktechAuthState.DISCONNECTED
         _statusMessage.value = "Disconnected"
         BleBridgeService.getInstance()?.disconnectBleNative()
+        BleBridgeService.getInstance()?.dismissForegroundNotificationIfIdle()
     }
 
     fun onConnectionStateChange(address: String, status: Int, newState: Int) {
@@ -446,6 +466,8 @@ class CuktechBleManager(
             if (autoReconnectEnabled && !lastConnectedMac.isNullOrBlank()) {
                 val delayMs = if (isError) 4500L else 3000L
                 scheduleAutoReconnect(lastConnectedMac!!, delayMs)
+            } else {
+                BleBridgeService.getInstance()?.dismissForegroundNotificationIfIdle()
             }
         }
     }
@@ -2124,17 +2146,16 @@ class CuktechBleManager(
 
             BleBridgeService.getInstance()?.updateNotificationTelemetry(title, content, bigText, totalW)
         } else {
-            val isServerRunning = BleBridgeService.isServerRunning.value
-            if (!isServerRunning && _authState.value == CuktechAuthState.DISCONNECTED) {
+            if (_authState.value == CuktechAuthState.DISCONNECTED) {
                 BleBridgeService.getInstance()?.dismissForegroundNotificationIfIdle()
                 return
             }
-            val title = "BLE Cuktech10 Gateway"
+            val title = "⚡ CUKTECH 10 Ultra"
             val content = when (_authState.value) {
                 CuktechAuthState.CONNECTING_GATT, CuktechAuthState.DISCOVERING_SERVICES,
                 CuktechAuthState.PHASE_A_INIT_A4, CuktechAuthState.PHASE_B_HANDSHAKE -> "Connecting to CUKTECH 10 Ultra..."
                 CuktechAuthState.AUTH_FAILED -> "Auth failed · Check credentials"
-                else -> if (isServerRunning) "TCP Server Active · Listening" else "Ready"
+                else -> "Ready"
             }
             BleBridgeService.getInstance()?.updateNotificationTelemetry(title = title, content = content, totalWatts = -1.0)
         }

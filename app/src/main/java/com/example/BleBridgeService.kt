@@ -92,19 +92,15 @@ class BleBridgeService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
-        if (action == ACTION_START_SERVER || action == ACTION_CONNECT_CUKTECH) {
-            createNotificationChannelAndStartForeground()
-        }
 
         if (action == ACTION_START_SERVER) {
             val port = intent.getIntExtra(EXTRA_PORT, 8080)
             startTcpServer(port)
         } else if (action == ACTION_STOP_SERVER) {
             stopTcpServer()
-            closeGattClean()
-            stopBleScan()
             dismissForegroundNotificationIfIdle()
         } else if (action == ACTION_CONNECT_CUKTECH) {
+            createNotificationChannelAndStartForeground()
             val mac = intent.getStringExtra(EXTRA_MAC)
             cuktechManager?.connectToCharger(mac)
         } else if (action == ACTION_DISCONNECT_CUKTECH) {
@@ -112,6 +108,8 @@ class BleBridgeService : Service() {
             dismissForegroundNotificationIfIdle()
         } else if (action == ACTION_SCAN_CUKTECH) {
             cuktechManager?.startSearchForCuktechChargers(10000L)
+        } else if (action == ACTION_ENSURE_SERVICE) {
+            // Ensure service instance is initialized in memory for BLE scans/connections without showing notification yet
         } else {
             dismissForegroundNotificationIfIdle()
         }
@@ -119,11 +117,14 @@ class BleBridgeService : Service() {
         return START_STICKY
     }
 
+    fun startForegroundForBleConnection() {
+        createNotificationChannelAndStartForeground()
+    }
+
     fun dismissForegroundNotificationIfIdle() {
-        val isServerActive = serverJob != null && serverJob?.isActive == true
         val isBleActive = cuktechManager?.authState?.value != null &&
                 cuktechManager?.authState?.value != com.example.cuktech.ble.CuktechAuthState.DISCONNECTED
-        if (!isServerActive && !isBleActive) {
+        if (!isBleActive) {
             runCatching {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -135,8 +136,12 @@ class BleBridgeService : Service() {
                 nm?.cancel(NOTIFICATION_ID)
                 lastNotifTitle = ""
                 lastNotifContent = ""
-                releaseWakeLock()
-                stopSelf()
+                lastNotifBigText = ""
+                val isServerActive = serverJob != null && serverJob?.isActive == true
+                if (!isServerActive) {
+                    releaseWakeLock()
+                    stopSelf()
+                }
             }
         }
     }
@@ -190,7 +195,7 @@ class BleBridgeService : Service() {
     private fun createNotificationChannelAndStartForeground() {
         acquireWakeLock()
         val channelId = "BleBridgeServiceChannel"
-        val channelName = "BLE Bridge Background Service"
+        val channelName = "CUKTECH 10 Ultra Live Telemetry"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val chan = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_LOW)
@@ -198,11 +203,11 @@ class BleBridgeService : Service() {
             manager.createNotificationChannel(chan)
         }
 
-        val stopIntent = Intent(this, BleBridgeService::class.java).apply {
-            action = ACTION_STOP_SERVER
+        val disconnectIntent = Intent(this, BleBridgeService::class.java).apply {
+            action = ACTION_DISCONNECT_CUKTECH
         }
-        val stopPendingIntent = PendingIntent.getService(
-            this, 0, stopIntent,
+        val disconnectPendingIntent = PendingIntent.getService(
+            this, 0, disconnectIntent,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -215,8 +220,8 @@ class BleBridgeService : Service() {
         )
 
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("BLE to Network Bridge")
-            .setContentText("Listening socket & BLE state engines active")
+            .setContentTitle("⚡ CUKTECH 10 Ultra")
+            .setContentText("Connecting to charger...")
             .setSmallIcon(R.drawable.ic_stat_cuktech)
             .setContentIntent(openPendingIntent)
             .setOngoing(true)
@@ -226,7 +231,7 @@ class BleBridgeService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setLocalOnly(true)
             .setSortKey("cuktech_gateway")
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Gateway", stopPendingIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Disconnect", disconnectPendingIntent)
         notificationBuilderInstance = notificationBuilder
 
         try {
@@ -283,9 +288,9 @@ class BleBridgeService : Service() {
 
             var builder = notificationBuilderInstance
             if (builder == null) {
-                val stopIntent = Intent(this, BleBridgeService::class.java).apply { action = ACTION_STOP_SERVER }
-                val stopPendingIntent = PendingIntent.getService(
-                    this, 0, stopIntent,
+                val disconnectIntent = Intent(this, BleBridgeService::class.java).apply { action = ACTION_DISCONNECT_CUKTECH }
+                val disconnectPendingIntent = PendingIntent.getService(
+                    this, 0, disconnectIntent,
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT else PendingIntent.FLAG_UPDATE_CURRENT
                 )
                 builder = NotificationCompat.Builder(this, "BleBridgeServiceChannel")
@@ -298,7 +303,7 @@ class BleBridgeService : Service() {
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setLocalOnly(true)
                     .setSortKey("cuktech_gateway")
-                    .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop Gateway", stopPendingIntent)
+                    .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Disconnect", disconnectPendingIntent)
                 notificationBuilderInstance = builder
             } else {
                 builder.setContentIntent(openPendingIntent)
@@ -1348,6 +1353,7 @@ class BleBridgeService : Service() {
     companion object {
         const val ACTION_START_SERVER = "com.example.action.START_SERVER"
         const val ACTION_STOP_SERVER = "com.example.action.STOP_SERVER"
+        const val ACTION_ENSURE_SERVICE = "com.example.action.ENSURE_SERVICE"
         const val ACTION_CONNECT_CUKTECH = "com.cramqin.blecuktech10.CONNECT_CHARGER"
         const val ACTION_DISCONNECT_CUKTECH = "com.cramqin.blecuktech10.DISCONNECT_CHARGER"
         const val ACTION_SCAN_CUKTECH = "com.cramqin.blecuktech10.SCAN_CHARGER"

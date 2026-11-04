@@ -221,6 +221,14 @@ fun BleBridgeDashboard(
         }
 
         permissionsGranted = true
+        if (BleBridgeService.getInstance() == null) {
+            try {
+                val ensureIntent = Intent(context, BleBridgeService::class.java).apply {
+                    action = BleBridgeService.ACTION_ENSURE_SERVICE
+                }
+                context.startService(ensureIntent)
+            } catch (_: Exception) {}
+        }
         onReady()
     }
 
@@ -598,7 +606,29 @@ fun BleBridgeDashboard(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // --- Server Configuration Section ---
+                        // --- Background Keepalive & Battery Optimization State ---
+                        val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
+                        var isBatteryIgnored by remember {
+                            mutableStateOf(
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                    powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+                                } else true
+                            )
+                        }
+                        val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                        DisposableEffect(lifecycleOwner) {
+                            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                                    isBatteryIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                        powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+                                    } else true
+                                }
+                            }
+                            lifecycleOwner.lifecycle.addObserver(observer)
+                            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                        }
+
+                        // --- 1. CUKTECH 10 Ultra & Xiaomi Cloud Section (Primary Card) ---
                         Card(
                             colors = CardDefaults.cardColors(containerColor = appColors.surface),
                             shape = RoundedCornerShape(24.dp),
@@ -606,573 +636,556 @@ fun BleBridgeDashboard(
                                 .fillMaxWidth()
                                 .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
                         ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Column(modifier = Modifier.padding(20.dp)) {
                                 Text(
-                                    text = "SERVER CONFIGURATION",
+                                    text = "CUKTECH 10 ULTRA & XIAOMI CLOUD",
                                     fontWeight = FontWeight.Bold,
                                     color = appColors.textSecondary,
                                     fontSize = 10.sp,
                                     letterSpacing = 1.sp
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "IP: ${wifiIp ?: "Disconnected / No Wifi"}",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = appColors.textPrimary
-                                )
-                            }
+                                Spacer(modifier = Modifier.height(14.dp))
 
-                            Switch(
-                                checked = isRunning,
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = appColors.primary,
-                                    uncheckedThumbColor = if (appColors.isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.outline,
-                                    uncheckedTrackColor = if (appColors.isDark) Color(0xFF1E2430) else MaterialTheme.colorScheme.surfaceVariant,
-                                    uncheckedBorderColor = if (appColors.isDark) Color(0xFF475569) else MaterialTheme.colorScheme.outline
-                                ),
-                                onCheckedChange = { start ->
-                                    val port = portInput.toIntOrNull() ?: 8080
-                                    val intent = Intent(context, BleBridgeService::class.java).apply {
-                                        action = if (start) BleBridgeService.ACTION_START_SERVER else BleBridgeService.ACTION_STOP_SERVER
-                                        putExtra(BleBridgeService.EXTRA_PORT, port)
-                                    }
-                                    if (start) {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                            context.startForegroundService(intent)
-                                        } else {
-                                            context.startService(intent)
-                                        }
-                                    } else {
-                                        context.stopService(intent)
-                                    }
-                                }
-                            )
-                        }
-
-                        if (!isRunning) {
-                            Surface(
-                                color = StatusWarning.copy(alpha = 0.12f),
-                                shape = RoundedCornerShape(12.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, StatusWarning.copy(alpha = 0.35f)),
-                                modifier = Modifier.fillMaxWidth().padding(top = 14.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Warning,
-                                        contentDescription = null,
-                                        tint = StatusWarning,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = "Server Configuration is OFF. Turn ON the switch above first to enable Bluetooth pairing and client connections.",
-                                        color = appColors.textPrimary,
-                                        fontSize = 11.sp,
-                                        lineHeight = 16.sp
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-                        HorizontalDivider(color = appColors.border)
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // Port Config
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "TCP PORT",
-                                    color = appColors.textSecondary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.sp
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                OutlinedTextField(
-                                    value = portInput,
-                                    onValueChange = { portInput = it },
-                                    enabled = !isRunning,
-                                    singleLine = true,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = appColors.textPrimary,
-                                        unfocusedTextColor = appColors.textPrimary,
-                                        disabledTextColor = appColors.textSecondary,
-                                        focusedContainerColor = appColors.surfaceVariant,
-                                        unfocusedContainerColor = appColors.surfaceVariant,
-                                        disabledContainerColor = appColors.surfaceVariant.copy(alpha = 0.5f),
-                                        focusedBorderColor = appColors.primary,
-                                        unfocusedBorderColor = appColors.border,
-                                        disabledBorderColor = Color.Transparent
-                                    ),
+                                // Xiaomi Cloud Account Status
+                                Surface(
+                                    color = appColors.surfaceVariant,
+                                    shape = RoundedCornerShape(14.dp),
                                     modifier = Modifier.fillMaxWidth()
-                                )
-                            }
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(14.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = if (accountSession != null) Icons.Default.CloudDone else Icons.Default.CloudOff,
+                                                    contentDescription = null,
+                                                    tint = if (accountSession != null) StatusSuccess else StatusWarning,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = if (accountSession != null) "Xiaomi Cloud: Logged In" else "Xiaomi Cloud: Not Logged In",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp,
+                                                    color = appColors.textPrimary
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(3.dp))
+                                            Text(
+                                                text = if (accountSession != null) {
+                                                    "UID: ${accountSession?.userId} · Region: ${accountSession?.region?.uppercase()} · Synced: ${savedDevices.size} dev"
+                                                } else {
+                                                    "Required for 12-byte MiOT Token exchange & Phase B authentication"
+                                                },
+                                                fontSize = 11.sp,
+                                                color = appColors.textSecondary
+                                            )
+                                            if (accountSession != null && !accountSession!!.region.equals("cn", ignoreCase = true)) {
+                                                Spacer(modifier = Modifier.height(3.dp))
+                                                Text(
+                                                    text = "⚠️ Account region is [${accountSession!!.region.uppercase()}]. CUKTECH 10 Ultra requires Mainland China (CN) in Mi Home.",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = StatusWarning
+                                                )
+                                            }
+                                        }
 
-                            // Log Level selection
-                            Column(modifier = Modifier.weight(1.3f)) {
-                                Text(
-                                    text = "VERBOSITY",
-                                    color = appColors.textSecondary,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.sp
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Box {
-                                    OutlinedButton(
-                                        onClick = { dropdownExpanded = true },
+                                        Spacer(modifier = Modifier.width(8.dp))
+
+                                        if (accountSession != null) {
+                                            OutlinedButton(
+                                                onClick = { showXiaomiLoginDialog = true },
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                modifier = Modifier.height(32.dp)
+                                            ) {
+                                                Text("Switch", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        } else {
+                                            Button(
+                                                onClick = { showXiaomiLoginDialog = true },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = appColors.primary,
+                                                    contentColor = Color.White
+                                                ),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                                modifier = Modifier.height(32.dp)
+                                            ) {
+                                                Text("Log In", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // If authentication failed, show a helpful alert banner with Sync / Login actions
+                                if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
+                                    Surface(
+                                        color = StatusErrorContainer.copy(alpha = 0.25f),
                                         shape = RoundedCornerShape(12.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            containerColor = appColors.surfaceVariant
-                                        ),
-                                        border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(appColors.border)),
-                                        modifier = Modifier.fillMaxWidth().height(56.dp)
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, StatusError),
+                                        modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
-                                            modifier = Modifier.fillMaxWidth(),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(12.dp),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = when (currentLogLevel) {
-                                                    BleBridgeService.Companion.LogLevel.LEVEL1 -> "LEVEL 1"
-                                                    BleBridgeService.Companion.LogLevel.LEVEL2 -> "LEVEL 2"
-                                                    BleBridgeService.Companion.LogLevel.LEVEL3 -> "LEVEL 3"
-                                                },
-                                                color = appColors.textPrimary,
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                            Icon(
-                                                Icons.Default.ArrowDropDown,
-                                                contentDescription = null,
-                                                tint = appColors.textSecondary
-                                            )
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "Authentication Failed",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp,
+                                                    color = StatusError
+                                                )
+                                                Text(
+                                                    text = "MiOT token required for handshake. Sync or log into Xiaomi account.",
+                                                    fontSize = 11.sp,
+                                                    color = appColors.textSecondary
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            if (accountSession != null) {
+                                                Button(
+                                                    onClick = { cuktechManager.syncCredentialsAndRetryAuth() },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = appColors.primary,
+                                                        contentColor = Color.White
+                                                    ),
+                                                    shape = RoundedCornerShape(8.dp),
+                                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                    modifier = Modifier.height(32.dp)
+                                                ) {
+                                                    Text("Sync Token", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                            }
                                         }
                                     }
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                }
 
-                                    DropdownMenu(
-                                        expanded = dropdownExpanded,
-                                        onDismissRequest = { dropdownExpanded = false },
-                                        modifier = Modifier.background(appColors.surface)
+                                // Search & Pair Button (Directly connects via Bluetooth without requiring TCP Server!)
+                                Button(
+                                    onClick = {
+                                        ensureBleServiceStartedAndPermissions {
+                                            showPairingDialog = true
+                                        }
+                                    },
+                                    enabled = true,
+                                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = appColors.primary,
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Icon(Icons.Default.BluetoothSearching, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Search & Pair CUKTECH 10 Ultra",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                }
+
+                                // Live Telemetry Card (Shown directly below Search & Pair on successful pair / connected)
+                                if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Surface(
+                                        color = appColors.surfaceVariant.copy(alpha = 0.5f),
+                                        shape = RoundedCornerShape(14.dp),
+                                        border = BorderStroke(1.dp, appColors.primary.copy(alpha = 0.6f)),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { showTelemetryScreen = true }
                                     ) {
-                                        DropdownMenuItem(
-                                            text = { Text("LEVEL 1: Errors Only", color = appColors.textPrimary, fontSize = 12.sp) },
-                                            onClick = {
-                                                BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL1)
-                                                dropdownExpanded = false
+                                        Row(
+                                            modifier = Modifier.padding(14.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(38.dp)
+                                                        .clip(RoundedCornerShape(10.dp))
+                                                        .background(appColors.primary),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Bolt,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFF0A0E1A),
+                                                        modifier = Modifier.size(24.dp)
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = cuktechDevInfo.name.ifBlank { activeCred?.name ?: "CUKTECH 10 Ultra" },
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = appColors.textPrimary,
+                                                        fontSize = 14.sp
+                                                    )
+                                                    Text(
+                                                        text = "Authenticated · ${"%.1f".format(cuktechTotalWatts)}W",
+                                                        color = StatusSuccess,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        fontSize = 12.sp
+                                                    )
+                                                }
                                             }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("LEVEL 2: Errors & Connect Status", color = appColors.textPrimary, fontSize = 12.sp) },
-                                            onClick = {
-                                                BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL2)
-                                                dropdownExpanded = false
+
+                                            Button(
+                                                onClick = { showTelemetryScreen = true },
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = appColors.primary,
+                                                    contentColor = Color(0xFF0A0E1A)
+                                                ),
+                                                shape = RoundedCornerShape(10.dp),
+                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                modifier = Modifier.height(34.dp)
+                                            ) {
+                                                Text("Telemetry →", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                             }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("LEVEL 3: Full Telemetry", color = appColors.textPrimary, fontSize = 12.sp) },
-                                            onClick = {
-                                                BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL3)
-                                                dropdownExpanded = false
-                                            }
-                                        )
+                                        }
                                     }
                                 }
                             }
                         }
 
-                    }
-                }
-
-                // --- Background Keepalive & Battery Optimization Section ---
-                val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
-                var isBatteryIgnored by remember {
-                    mutableStateOf(
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
-                        } else true
-                    )
-                }
-                val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-                DisposableEffect(lifecycleOwner) {
-                    val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-                        if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                            isBatteryIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
-                            } else true
-                        }
-                    }
-                    lifecycleOwner.lifecycle.addObserver(observer)
-                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-                }
-
-                // --- CUKTECH 10 Ultra & Xiaomi Cloud Section ---
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = appColors.surface),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            text = "CUKTECH 10 ULTRA & XIAOMI CLOUD",
-                            fontWeight = FontWeight.Bold,
-                            color = appColors.textSecondary,
-                            fontSize = 10.sp,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Xiaomi Cloud Account Status
-                        Surface(
-                            color = appColors.surfaceVariant,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        // --- 2. Background Keepalive & System Integration Section ---
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = appColors.surface),
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(20.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "BACKGROUND KEEPALIVE & SYSTEM INTEGRATION",
+                                    fontWeight = FontWeight.Bold,
+                                    color = appColors.textSecondary,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = "Keeps the background BLE connection active when screen turns off or when switching apps.",
+                                    fontSize = 12.sp,
+                                    color = appColors.textSecondary,
+                                    lineHeight = 16.sp
+                                )
+
+                                Surface(
+                                    color = if (isBatteryIgnored) Color(0xFF10B981).copy(alpha = 0.12f) else appColors.surfaceVariant,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Icon(
-                                            imageVector = if (accountSession != null) Icons.Default.CloudDone else Icons.Default.CloudOff,
+                                            imageVector = if (isBatteryIgnored) Icons.Default.CheckCircle else Icons.Default.Warning,
                                             contentDescription = null,
-                                            tint = if (accountSession != null) StatusSuccess else StatusWarning,
+                                            tint = if (isBatteryIgnored) Color(0xFF10B981) else Color(0xFFF59E0B),
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = if (accountSession != null) "Xiaomi Cloud: Logged In" else "Xiaomi Cloud: Not Logged In",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp,
-                                            color = appColors.textPrimary
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(3.dp))
-                                    Text(
-                                        text = if (accountSession != null) {
-                                            "UID: ${accountSession?.userId} · Region: ${accountSession?.region?.uppercase()} · Synced: ${savedDevices.size} dev"
-                                        } else {
-                                            "Required for 12-byte MiOT Token exchange & Phase B authentication"
-                                        },
-                                        fontSize = 11.sp,
-                                        color = appColors.textSecondary
-                                    )
-                                    if (accountSession != null && !accountSession!!.region.equals("cn", ignoreCase = true)) {
-                                        Spacer(modifier = Modifier.height(3.dp))
-                                        Text(
-                                            text = "⚠️ Account region is [${accountSession!!.region.uppercase()}]. CUKTECH 10 Ultra requires Mainland China (CN) in Mi Home.",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = StatusWarning
+                                            text = if (isBatteryIgnored) {
+                                                "Battery optimizations ignored (Keepalive active)"
+                                            } else {
+                                                "Battery optimization active (May be throttled by OS)"
+                                            },
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (isBatteryIgnored) Color(0xFF10B981) else appColors.textPrimary
                                         )
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    onClick = {
+                                        if (isBatteryIgnored) {
+                                            Toast.makeText(context, "Battery optimizations are already disabled for this app.", Toast.LENGTH_SHORT).show()
+                                        }
+                                        bleDiagnostics.requestIgnoreBatteryOptimizations()
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isBatteryIgnored) appColors.surfaceVariant else appColors.primary,
+                                        contentColor = if (isBatteryIgnored) appColors.textPrimary else Color.White
+                                    ),
+                                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                                ) {
+                                    Icon(Icons.Default.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isBatteryIgnored) "Battery Settings (Already Set)" else "Ignore Battery Optimization",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
 
-                                if (accountSession != null) {
-                                    OutlinedButton(
-                                        onClick = { showXiaomiLoginDialog = true },
-                                        shape = RoundedCornerShape(8.dp),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                        modifier = Modifier.height(32.dp)
-                                    ) {
-                                        Text("Switch", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                } else {
-                                    Button(
-                                        onClick = { showXiaomiLoginDialog = true },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = appColors.primary,
-                                            contentColor = Color.White
-                                        ),
-                                        shape = RoundedCornerShape(8.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                                        modifier = Modifier.height(32.dp)
-                                    ) {
-                                        Text("Log In", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
+                                OutlinedButton(
+                                    onClick = {
+                                        runCatching {
+                                            val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://dontkillmyapp.com/")).apply {
+                                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                            }
+                                            context.startActivity(browserIntent)
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(1.dp, appColors.border),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = appColors.primary
+                                    ),
+                                    modifier = Modifier.fillMaxWidth().height(40.dp)
+                                ) {
+                                    Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "OEM Background Guide (dontkillmyapp.com)",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // If authentication failed, show a helpful alert banner with Sync / Login actions
-                        if (cuktechAuthState == CuktechAuthState.AUTH_FAILED) {
-                            Surface(
-                                color = StatusErrorContainer.copy(alpha = 0.25f),
-                                shape = RoundedCornerShape(12.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, StatusError),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
+                        // --- 3. Optional TCP Socket Bridge Section (Placed right before Console Log) ---
+                        var showTcpTooltip by remember { mutableStateOf(false) }
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = appColors.surface),
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
+                        ) {
+                            Column(modifier = Modifier.padding(20.dp)) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
+                                    modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Authentication Failed",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp,
-                                            color = StatusError
-                                        )
-                                        Text(
-                                            text = "MiOT token required for handshake. Sync or log into Xiaomi account.",
-                                            fontSize = 11.sp,
-                                            color = appColors.textSecondary
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    if (accountSession != null) {
-                                        Button(
-                                            onClick = { cuktechManager.syncCredentialsAndRetryAuth() },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = appColors.primary,
-                                                contentColor = Color.White
-                                            ),
-                                            shape = RoundedCornerShape(8.dp),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-                                            modifier = Modifier.height(32.dp)
-                                        ) {
-                                            Text("Sync Token", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = "OPTIONAL TCP SOCKET BRIDGE",
+                                                fontWeight = FontWeight.Bold,
+                                                color = appColors.textSecondary,
+                                                fontSize = 10.sp,
+                                                letterSpacing = 1.sp
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            IconButton(
+                                                onClick = { showTcpTooltip = !showTcpTooltip },
+                                                modifier = Modifier.size(18.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Info,
+                                                    contentDescription = "TCP Bridge Info",
+                                                    tint = appColors.primary,
+                                                    modifier = Modifier.size(15.dp)
+                                                )
+                                            }
                                         }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "IP: ${wifiIp ?: "Disconnected / No Wifi"}",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = appColors.textPrimary
+                                        )
+                                        Text(
+                                            text = if (isRunning) "TCP Socket Listening on Port $serverPort" else "Off (Not required for local BLE monitoring)",
+                                            fontSize = 11.sp,
+                                            color = if (isRunning) StatusSuccess else appColors.textSecondary
+                                        )
                                     }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                        }
 
-                        // Search & Pair Button (ALWAYS visible & accessible)
-                        Button(
-                            onClick = {
-                                if (!isRunning) {
-                                    prerequisiteWarning = "Prerequisite Required:\n\nServer Configuration must be turned ON first before searching and pairing."
-                                } else {
-                                    ensureBleServiceStartedAndPermissions {
-                                        showPairingDialog = true
-                                    }
+                                    Switch(
+                                        checked = isRunning,
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = appColors.primary,
+                                            uncheckedThumbColor = if (appColors.isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.outline,
+                                            uncheckedTrackColor = if (appColors.isDark) Color(0xFF1E2430) else MaterialTheme.colorScheme.surfaceVariant,
+                                            uncheckedBorderColor = if (appColors.isDark) Color(0xFF475569) else MaterialTheme.colorScheme.outline
+                                        ),
+                                        onCheckedChange = { start ->
+                                            val port = portInput.toIntOrNull() ?: 8080
+                                            val intent = Intent(context, BleBridgeService::class.java).apply {
+                                                action = if (start) BleBridgeService.ACTION_START_SERVER else BleBridgeService.ACTION_STOP_SERVER
+                                                putExtra(BleBridgeService.EXTRA_PORT, port)
+                                            }
+                                            context.startService(intent)
+                                        }
+                                    )
                                 }
-                            },
-                            enabled = isRunning,
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = appColors.primary,
-                                contentColor = Color.White,
-                                disabledContainerColor = appColors.surfaceVariant,
-                                disabledContentColor = appColors.textSecondary
-                            )
-                        ) {
-                            Icon(Icons.Default.BluetoothSearching, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isRunning) "Search & Pair CUKTECH 10 Ultra" else "Search & Pair (Turn ON Server First)",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                        }
 
-                        // Live Telemetry Card (Shown directly below Search & Pair on successful pair / connected)
-                        if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Surface(
-                                color = appColors.surfaceVariant.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(14.dp),
-                                border = BorderStroke(1.dp, appColors.primary.copy(alpha = 0.6f)),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { showTelemetryScreen = true }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(14.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(38.dp)
-                                                .clip(RoundedCornerShape(10.dp))
-                                                .background(appColors.primary),
-                                            contentAlignment = Alignment.Center
+                                if (showTcpTooltip) {
+                                    Surface(
+                                        color = appColors.primaryContainer.copy(alpha = 0.35f),
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = BorderStroke(1.dp, appColors.primary.copy(alpha = 0.4f)),
+                                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.Top
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.Bolt,
+                                                imageVector = Icons.Default.Info,
                                                 contentDescription = null,
-                                                tint = Color(0xFF0A0E1A),
-                                                modifier = Modifier.size(24.dp)
+                                                tint = appColors.primary,
+                                                modifier = Modifier.size(18.dp).padding(top = 2.dp)
                                             )
-                                        }
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Column(modifier = Modifier.weight(1f)) {
+                                            Spacer(modifier = Modifier.width(10.dp))
                                             Text(
-                                                text = cuktechDevInfo.name.ifBlank { activeCred?.name ?: "CUKTECH 10 Ultra" },
-                                                fontWeight = FontWeight.Bold,
+                                                text = "What is this?\nThis is an optional raw TCP socket server (from the parent BLEBridge project) for external PC / Python scripts over Wi-Fi.\n\n• You do NOT need this turned on to connect to your charger or view live telemetry.\n• Turning this off will NOT disconnect your active Bluetooth connection.\n• Home Assistant users should use the HTTP Webhook in Dashboard ➔ Setup instead.",
                                                 color = appColors.textPrimary,
-                                                fontSize = 14.sp
-                                            )
-                                            Text(
-                                                text = "Authenticated · ${"%.1f".format(cuktechTotalWatts)}W",
-                                                color = StatusSuccess,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 12.sp
+                                                fontSize = 11.sp,
+                                                lineHeight = 16.sp
                                             )
                                         }
                                     }
+                                }
 
-                                    Button(
-                                        onClick = { showTelemetryScreen = true },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = appColors.primary,
-                                            contentColor = Color(0xFF0A0E1A)
-                                        ),
-                                        shape = RoundedCornerShape(10.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                        modifier = Modifier.height(34.dp)
-                                    ) {
-                                        Text("Telemetry →", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                HorizontalDivider(color = appColors.border)
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // Port Config
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "TCP PORT",
+                                            color = appColors.textSecondary,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        OutlinedTextField(
+                                            value = portInput,
+                                            onValueChange = { portInput = it },
+                                            enabled = !isRunning,
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedTextColor = appColors.textPrimary,
+                                                unfocusedTextColor = appColors.textPrimary,
+                                                disabledTextColor = appColors.textSecondary,
+                                                focusedContainerColor = appColors.surfaceVariant,
+                                                unfocusedContainerColor = appColors.surfaceVariant,
+                                                disabledContainerColor = appColors.surfaceVariant.copy(alpha = 0.5f),
+                                                focusedBorderColor = appColors.primary,
+                                                unfocusedBorderColor = appColors.border,
+                                                disabledBorderColor = Color.Transparent
+                                            ),
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
+
+                                    // Log Level selection
+                                    Column(modifier = Modifier.weight(1.3f)) {
+                                        Text(
+                                            text = "VERBOSITY",
+                                            color = appColors.textSecondary,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Box {
+                                            OutlinedButton(
+                                                onClick = { dropdownExpanded = true },
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = ButtonDefaults.outlinedButtonColors(
+                                                    containerColor = appColors.surfaceVariant
+                                                ),
+                                                border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(appColors.border)),
+                                                modifier = Modifier.fillMaxWidth().height(56.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = when (currentLogLevel) {
+                                                            BleBridgeService.Companion.LogLevel.LEVEL1 -> "LEVEL 1"
+                                                            BleBridgeService.Companion.LogLevel.LEVEL2 -> "LEVEL 2"
+                                                            BleBridgeService.Companion.LogLevel.LEVEL3 -> "LEVEL 3"
+                                                        },
+                                                        color = appColors.textPrimary,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                    Icon(
+                                                        Icons.Default.ArrowDropDown,
+                                                        contentDescription = null,
+                                                        tint = appColors.textSecondary
+                                                    )
+                                                }
+                                            }
+
+                                            DropdownMenu(
+                                                expanded = dropdownExpanded,
+                                                onDismissRequest = { dropdownExpanded = false },
+                                                modifier = Modifier.background(appColors.surface)
+                                            ) {
+                                                DropdownMenuItem(
+                                                    text = { Text("LEVEL 1: Errors Only", color = appColors.textPrimary, fontSize = 12.sp) },
+                                                    onClick = {
+                                                        BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL1)
+                                                        dropdownExpanded = false
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("LEVEL 2: Errors & Connect Status", color = appColors.textPrimary, fontSize = 12.sp) },
+                                                    onClick = {
+                                                        BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL2)
+                                                        dropdownExpanded = false
+                                                    }
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("LEVEL 3: Full Telemetry", color = appColors.textPrimary, fontSize = 12.sp) },
+                                                    onClick = {
+                                                        BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL3)
+                                                        dropdownExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                }
-
-                // --- Background Keepalive & System Integration Section ---
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = appColors.surface),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, appColors.border, RoundedCornerShape(24.dp))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = "BACKGROUND KEEPALIVE & SYSTEM INTEGRATION",
-                            fontWeight = FontWeight.Bold,
-                            color = appColors.textSecondary,
-                            fontSize = 10.sp,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "Keeps the background BLE bridge and TCP server active when screen turns off or when switching apps.",
-                            fontSize = 12.sp,
-                            color = appColors.textSecondary,
-                            lineHeight = 16.sp
-                        )
-
-                        Surface(
-                            color = if (isBatteryIgnored) Color(0xFF10B981).copy(alpha = 0.12f) else appColors.surfaceVariant,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (isBatteryIgnored) Icons.Default.CheckCircle else Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = if (isBatteryIgnored) Color(0xFF10B981) else Color(0xFFF59E0B),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (isBatteryIgnored) {
-                                        "Battery optimizations ignored (Keepalive active)"
-                                    } else {
-                                        "Battery optimization active (May be throttled by OS)"
-                                    },
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = if (isBatteryIgnored) Color(0xFF10B981) else appColors.textPrimary
-                                )
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                if (isBatteryIgnored) {
-                                    Toast.makeText(context, "Battery optimizations are already disabled for this app.", Toast.LENGTH_SHORT).show()
-                                }
-                                bleDiagnostics.requestIgnoreBatteryOptimizations()
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isBatteryIgnored) appColors.surfaceVariant else appColors.primary,
-                                contentColor = if (isBatteryIgnored) appColors.textPrimary else Color.White
-                            ),
-                            modifier = Modifier.fillMaxWidth().height(44.dp)
-                        ) {
-                            Icon(Icons.Default.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isBatteryIgnored) "Battery Settings (Already Set)" else "Ignore Battery Optimization",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                runCatching {
-                                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://dontkillmyapp.com/")).apply {
-                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
-                                    context.startActivity(browserIntent)
-                                }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, appColors.border),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = appColors.primary
-                            ),
-                            modifier = Modifier.fillMaxWidth().height(40.dp)
-                        ) {
-                            Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "OEM Background Guide (dontkillmyapp.com)",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                }
 
                 var terminalTab by rememberSaveable { mutableStateOf(0) } // 0 = Live Console, 1 = BLE Diagnostics
                 Card(

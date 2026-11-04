@@ -1358,23 +1358,38 @@ fun BleBridgeDashboard(
                                             fontFamily = FontFamily.Monospace,
                                             color = appColors.textPrimary
                                         )
+                                        val isChargerConnected = (cuktechAuthState == CuktechAuthState.AUTHENTICATED)
                                         Text(
-                                            text = if (isRunning) "TCP Socket Listening on Port $serverPort" else "Off (Not required for local BLE monitoring)",
+                                            text = if (isRunning) {
+                                                "TCP Socket Listening on Port $serverPort"
+                                            } else if (!isChargerConnected) {
+                                                "Connect to charger first to enable TCP mode"
+                                            } else {
+                                                "Off (Not required for local BLE monitoring)"
+                                            },
                                             fontSize = 11.sp,
-                                            color = if (isRunning) StatusSuccess else appColors.textSecondary
+                                            color = if (isRunning) StatusSuccess else if (!isChargerConnected) Color(0xFFF59E0B) else appColors.textSecondary
                                         )
                                     }
 
+                                    val isChargerConnected = (cuktechAuthState == CuktechAuthState.AUTHENTICATED)
                                     Switch(
-                                        checked = isRunning,
+                                        checked = isRunning && isChargerConnected,
+                                        enabled = isChargerConnected,
                                         colors = SwitchDefaults.colors(
                                             checkedThumbColor = Color.White,
                                             checkedTrackColor = appColors.primary,
                                             uncheckedThumbColor = if (appColors.isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.outline,
                                             uncheckedTrackColor = if (appColors.isDark) Color(0xFF1E2430) else MaterialTheme.colorScheme.surfaceVariant,
-                                            uncheckedBorderColor = if (appColors.isDark) Color(0xFF475569) else MaterialTheme.colorScheme.outline
+                                            uncheckedBorderColor = if (appColors.isDark) Color(0xFF475569) else MaterialTheme.colorScheme.outline,
+                                            disabledUncheckedThumbColor = (if (appColors.isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.outline).copy(alpha = 0.35f),
+                                            disabledUncheckedTrackColor = (if (appColors.isDark) Color(0xFF1E2430) else MaterialTheme.colorScheme.surfaceVariant).copy(alpha = 0.35f)
                                         ),
                                         onCheckedChange = { start ->
+                                            if (start && !isChargerConnected) {
+                                                Toast.makeText(context, "Connect to CUKTECH 10 Ultra first before enabling TCP mode.", Toast.LENGTH_SHORT).show()
+                                                return@Switch
+                                            }
                                             val port = portInput.toIntOrNull() ?: 8080
                                             val intent = Intent(context, BleBridgeService::class.java).apply {
                                                 action = if (start) BleBridgeService.ACTION_START_SERVER else BleBridgeService.ACTION_STOP_SERVER

@@ -351,6 +351,13 @@ class BleBridgeService : Service() {
     // --- TCP Socket Server Support ---
 
     private fun startTcpServer(port: Int) {
+        val isChargerConnected = cuktechManager?.authState?.value == CuktechAuthState.AUTHENTICATED
+        if (!isChargerConnected) {
+            log(LogLevel.LEVEL1, "Cannot start TCP Gateway: CUKTECH 10 Ultra is not connected.")
+            _isServerRunning.value = false
+            return
+        }
+
         if (serverJob != null && serverJob?.isActive == true) {
             log(LogLevel.LEVEL1, "Server already running on port ${_serverPort.value}")
             return

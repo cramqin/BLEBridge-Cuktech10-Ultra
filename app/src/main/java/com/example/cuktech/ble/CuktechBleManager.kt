@@ -123,6 +123,18 @@ class CuktechBleManager(
     private var connectionTimeoutJob: Job? = null
     private var connectJob: Job? = null
     private var lastDisconnectMs: Long = 0L
+    private var disconnectCooldownJob: Job? = null
+    private val _isDisconnectCooldown = MutableStateFlow(false)
+    val isDisconnectCooldown: StateFlow<Boolean> = _isDisconnectCooldown.asStateFlow()
+
+    fun triggerDisconnectCooldown(durationMs: Long = 2000L) {
+        disconnectCooldownJob?.cancel()
+        _isDisconnectCooldown.value = true
+        disconnectCooldownJob = scope.launch {
+            delay(durationMs)
+            _isDisconnectCooldown.value = false
+        }
+    }
 
     private var autoReconnectEnabled: Boolean = true
     var lastConnectedMac: String? = null
@@ -450,6 +462,7 @@ class CuktechBleManager(
     fun disconnectCharger() {
         autoReconnectEnabled = false
         lastDisconnectMs = SystemClock.elapsedRealtime()
+        triggerDisconnectCooldown(2000L)
         connectJob?.cancel()
         reconnectJob?.cancel()
         connectionTimeoutJob?.cancel()
@@ -473,6 +486,7 @@ class CuktechBleManager(
             _statusMessage.value = "GATT connected, discovering services..."
         } else {
             lastDisconnectMs = SystemClock.elapsedRealtime()
+            triggerDisconnectCooldown(2000L)
             connectJob?.cancel()
             connectionTimeoutJob?.cancel()
             authJob?.cancel()

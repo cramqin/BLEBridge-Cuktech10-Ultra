@@ -101,6 +101,7 @@ fun CuktechDashboardScreen(
 
     val diagStatus by bleDiagnostics.status.collectAsState()
     val integrationCfg by cloudIntegrations.config.collectAsState()
+    val isDisconnectCooldown by bleManager.isDisconnectCooldown.collectAsState()
 
     var showXiaomiLoginDialog by remember { mutableStateOf(false) }
     var showPairingDialog by remember { mutableStateOf(false) }
@@ -250,11 +251,12 @@ fun CuktechDashboardScreen(
                                     showPairingDialog = true
                                 }
                             },
+                            enabled = !isDisconnectCooldown,
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                             modifier = Modifier.height(28.dp)
                         ) {
-                            Text("Connect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text(if (isDisconnectCooldown) "Wait..." else "Connect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -375,11 +377,12 @@ fun CuktechDashboardScreen(
                         if (hasReadyCredentials && !targetMac.isNullOrBlank()) {
                             Button(
                                 onClick = { bleManager.connectToCharger(targetMac) },
+                                enabled = !isDisconnectCooldown,
                                 shape = RoundedCornerShape(6.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                                 modifier = Modifier.height(26.dp)
                             ) {
-                                Text("Connect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text(if (isDisconnectCooldown) "Wait..." else "Connect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         } else {
                             Button(

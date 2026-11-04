@@ -40,6 +40,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -1020,7 +1021,7 @@ fun CuktechDiscoveryPairingDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
-                .heightIn(max = 600.dp),
+                .heightIn(max = 680.dp),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
@@ -1028,7 +1029,7 @@ fun CuktechDiscoveryPairingDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1109,40 +1110,53 @@ fun CuktechDiscoveryPairingDialog(
                                     bleManager.connectToCharger(cred.mac)
                                     onDismiss()
                                 },
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(12.dp),
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(cred.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                     Text(
-                                        text = "MAC: ${cred.mac} · Token: ${if (cred.hasValidToken) "Ready" else "Missing"}",
+                                        text = cred.name,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "${cred.mac}  ·  ${if (cred.hasValidToken) "Token Ready" else "Token Missing"}",
                                         fontSize = 11.sp,
                                         fontFamily = FontFamily.Monospace,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Button(
                                     onClick = {
                                         bleManager.connectToCharger(cred.mac)
                                         onDismiss()
                                     },
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(32.dp)
                                 ) {
-                                    Text("Connect", fontSize = 12.sp)
+                                    Text("Connect", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
                 }
 
-                HorizontalDivider()
+                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
 
                 Text(
                     text = "Discovered Bluetooth Peripherals (${discovered.size})",
@@ -1170,44 +1184,57 @@ fun CuktechDiscoveryPairingDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { onSelectAndConnect(dev) },
-                                shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(12.dp),
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(dev.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Text(
+                                                text = dev.name,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                             if (dev.isCuktech10Ultra) {
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Badge(containerColor = MaterialTheme.colorScheme.primary) {
-                                                    Text("0x660E", fontSize = 10.sp)
+                                                    Text("0x660E", fontSize = 9.sp)
                                                 }
                                             }
                                             if (dev.matchedCredentials != null) {
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Badge(containerColor = Color(0xFF10B981)) {
-                                                    Text("Matched", color = Color.White, fontSize = 10.sp)
+                                                    Text("Matched", color = Color.White, fontSize = 9.sp)
                                                 }
                                             }
                                         }
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "MAC: ${dev.mac} · RSSI: ${dev.rssi} dBm",
+                                            text = "${dev.mac}  ·  ${dev.rssi} dBm",
                                             fontSize = 11.sp,
                                             fontFamily = FontFamily.Monospace,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
+                                    Spacer(modifier = Modifier.width(10.dp))
                                     Button(
                                         onClick = { onSelectAndConnect(dev) },
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                                        modifier = Modifier.height(32.dp)
                                     ) {
-                                        Text("Pair & Connect", fontSize = 12.sp)
+                                        Text("Connect", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -1226,11 +1253,14 @@ fun CuktechDiscoveryPairingDialog(
                             } else {
                                 android.widget.Toast.makeText(context, "Bluetooth is turned OFF. Please turn on Bluetooth.", android.widget.Toast.LENGTH_SHORT).show()
                             }
-                        }
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        modifier = Modifier.height(34.dp)
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Rescan")
+                        Text("Rescan", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

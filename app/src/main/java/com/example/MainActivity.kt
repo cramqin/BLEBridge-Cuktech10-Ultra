@@ -157,6 +157,7 @@ fun BleBridgeDashboard(
     val cuktechDevInfo by cuktechManager.deviceInfo.collectAsState()
     val cuktechTotalWatts by cuktechManager.totalPowerWatts.collectAsState()
     val diagStatus by bleDiagnostics.status.collectAsState()
+    val isDisconnectCooldown by cuktechManager.isDisconnectCooldown.collectAsState()
 
     BackHandler(enabled = showTelemetryScreen) {
         showTelemetryScreen = false
@@ -861,18 +862,20 @@ fun BleBridgeDashboard(
                                             showPairingDialog = true
                                         }
                                     },
-                                    enabled = true,
+                                    enabled = !isDisconnectCooldown,
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = appColors.primary,
-                                        contentColor = Color.White
+                                        contentColor = Color.White,
+                                        disabledContainerColor = appColors.primary.copy(alpha = 0.4f),
+                                        disabledContentColor = Color.White.copy(alpha = 0.6f)
                                     )
                                 ) {
                                     Icon(Icons.Default.BluetoothSearching, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Search & Pair CUKTECH 10 Ultra",
+                                        text = if (isDisconnectCooldown) "Disconnecting..." else "Search & Pair CUKTECH 10 Ultra",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp
                                     )
@@ -897,17 +900,19 @@ fun BleBridgeDashboard(
                                                     cuktechManager.connectToCharger(lastMac)
                                                 }
                                             },
+                                            enabled = !isDisconnectCooldown,
                                             shape = RoundedCornerShape(12.dp),
-                                            border = BorderStroke(1.dp, appColors.primary),
+                                            border = BorderStroke(1.dp, if (isDisconnectCooldown) appColors.primary.copy(alpha = 0.3f) else appColors.primary),
                                             colors = ButtonDefaults.outlinedButtonColors(
-                                                contentColor = appColors.primary
+                                                contentColor = appColors.primary,
+                                                disabledContentColor = appColors.primary.copy(alpha = 0.4f)
                                             ),
                                             modifier = Modifier.fillMaxWidth().height(44.dp)
                                         ) {
                                             Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = "Quick Connect: $lastName",
+                                                text = if (isDisconnectCooldown) "Disconnecting..." else "Quick Connect: $lastName",
                                                 fontWeight = FontWeight.Bold,
                                                 fontSize = 12.sp,
                                                 maxLines = 1,

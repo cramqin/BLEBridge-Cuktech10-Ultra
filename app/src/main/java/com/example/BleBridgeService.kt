@@ -722,6 +722,7 @@ class BleBridgeService : Service() {
         }
 
         setBleConnectionState(BleConnectionState.DISCONNECTED, null)
+        cuktechManager?.triggerDisconnectCooldown(2000L)
         broadcastJson(createTelemetryJson("disconnected", null, null, null, null))
     }
 

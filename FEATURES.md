@@ -14,9 +14,10 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
 - [7. Ports Control & Protocol Toggles](#7-ports-control--protocol-toggles)
 - [8. Session Tracking, Wh Integrators & CSV Export](#8-session-tracking-wh-integrators--csv-export)
 - [9. Charger Hardware Settings & Display Control](#9-charger-hardware-settings--display-control)
-- [10. Home Screen Widgets (HyperOS 4 & Solid Dark)](#10-home-screen-widgets-hyperos-4--solid-dark)
-- [11. Dual-Tab Terminal: Console Log & BLE Diagnostics](#11-dual-tab-terminal-console-log--ble-diagnostics)
-- [12. Automation Hub: Tasker Plugin, Webhooks & ADB](#12-automation-hub-tasker-plugin-webhooks--adb)
+- [10. Persistent Live Notification & Foreground Keepalive](#10-persistent-live-notification--foreground-keepalive)
+- [11. Home Screen Widgets (Soft Glass & Solid Dark)](#11-home-screen-widgets-soft-glass--solid-dark)
+- [12. Dual-Tab Terminal: Console Log & BLE Diagnostics](#12-dual-tab-terminal-console-log--ble-diagnostics)
+- [13. Automation Hub: Tasker Plugin, Webhooks & ADB](#13-automation-hub-tasker-plugin-webhooks--adb)
 
 ---
 
@@ -144,7 +145,18 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
 
 ---
 
-## 10. Home Screen Widgets (HyperOS 4 & Solid Dark)
+## 10. Persistent Live Notification & Foreground Keepalive
+- **Android Foreground Service Notification:**
+  - Keeps the BLE connection and local TCP bridge alive 24/7 even with aggressive OEM process killers and screen turned off.
+  - Displays dynamic, live-updating charging metrics directly in the Android status bar and shade:
+    - **Header Status:** Active connection state (`BLE: CONNECTED` vs `DISCONNECTED`), battery whitelist status.
+    - **Total Power & Active Ports:** Live total wattage (`23.0W`) along with concise per-port breakdowns (`C1: 4.8W | C2: 18.2W`).
+    - **1-Tap Quick Action:** Instant tap to launch directly into the full Telemetry dashboard.
+  - Automatically suppresses notification updates when idle (`0.0W`) to prevent unnecessary Android notification redraws.
+
+---
+
+## 11. Home Screen Widgets (Soft Glass & Solid Dark)
 4 native home screen widgets in the Android Widget Picker (`updatePeriodMillis="0"` for zero periodic battery drain):
 - **`CUKTECH 10 · 4x2 Soft Glass`:** Translucent frosted slate glass, connection status dot, total wattage, scenario pill (tap to cycle modes), and 4 interactive port capsules (tap to toggle port ON/OFF).
 - **`CUKTECH 10 · 2x2 Soft Glass`:** Compact square tile with total wattage, scenario badge, an uncompressed 2×2 port wattage grid, and a live cyan sparkline graph when charging.
@@ -153,7 +165,7 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
 
 ---
 
-## 11. Dual-Tab Terminal: Console Log & BLE Diagnostics
+## 12. Dual-Tab Terminal: Console Log & BLE Diagnostics
 - **Tab 0 (Console Log):**
   - 1,000-message scroll-persisted rolling buffer.
   - 3 Granular Verbosity Levels:
@@ -170,7 +182,7 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
 
 ---
 
-## 12. Automation Hub: Tasker Plugin, Webhooks & ADB
+## 13. Automation Hub: Tasker Plugin, Webhooks & ADB
 - **Tasker / Locale / MacroDroid Plugin (`TaskerEditActivity` & `TaskerFireReceiver`):**
   - Configure automated actions directly inside Tasker's GUI:
     1. Connect to Charger

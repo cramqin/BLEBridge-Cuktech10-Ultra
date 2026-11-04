@@ -30,11 +30,19 @@
   <img src="docs/screenshots/screenshot_01_gateway_connected.png" width="19%" alt="Gateway Connected" />
   <img src="docs/screenshots/screenshot_03_telemetry_live.png" width="19%" alt="Interactive Port Visual" />
   <img src="docs/screenshots/screenshot_04_telemetry_graph.png" width="19%" alt="Live Power Graph" />
-  <img src="docs/screenshots/screenshot_02_login_modal.png" width="19%" alt="Cloud Sign-In Modes" />
-  <img src="docs/screenshots/screenshot_05_themes.png" width="19%" alt="Dark Accent Themes" />
+  <img src="docs/screenshots/screenshot_06_power_distribution.png" width="19%" alt="Power Distribution Bar" />
+  <img src="docs/screenshots/screenshot_07_port_protocols.png" width="19%" alt="Port Protocols & Controls" />
 </p>
 <p align="center">
-  <sub><i>From left to right: Background Gateway &amp; Paired Charger &bull; Interactive Hardware Port Representation &bull; Rolling Real-Time Power Curves &bull; 4 Login Modes &bull; Dark Accent Palettes</i></sub>
+  <img src="docs/screenshots/screenshot_08_charging_stats.png" width="19%" alt="Charging Session History" />
+  <img src="docs/screenshots/screenshot_09_automation_setup.png" width="19%" alt="Automation & Settings" />
+  <img src="docs/screenshots/screenshot_02_login_modal.png" width="19%" alt="Cloud Sign-In Modes" />
+  <img src="docs/screenshots/screenshot_05_themes.png" width="19%" alt="Dark Accent Themes" />
+  <img src="docs/screenshots/screenshot_10_widget_preview.png" width="19%" alt="2x2 Solid Dark Widget" />
+</p>
+<p align="center">
+  <sub><i>Top row: Gateway &amp; Paired Status &bull; Interactive Hardware Graphic &bull; Multi-Line Power Curves &bull; Power Proportion Breakdown &bull; Individual Port &amp; Protocol Controls<br />
+  Bottom row: Session History &amp; Wh Logs &bull; Tasker &amp; Webhook Setup &bull; 4 Login Modes &bull; Dark Accent Palettes &bull; 2x2 Solid Dark Home Screen Widget</i></sub>
 </p>
 
 ---
@@ -131,9 +139,9 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 5. **Full Port & Protocol Control:** Independent toggles for PD (up to 100W), PPS, UFCS, Huawei SCP, and USB-A 4h low-current mode.
 6. **Energy Limits & Timers:** Auto-shutoff by energy (`Wh`) or duration (`30m`–`10h`) with live second-by-second countdown badges.
 7. **Session History & CSV Export:** Trapezoidal `Wh` energy integration, Session Detail Inspector dialog, Consolidated Sessions Table dialog, and customizable CSV exports saved to `Downloads/cuktech10/history/`.
-8. **Hardware Controls & Themes:** Screen sleep timeout (`PIID 6`), orientation rotation, idle screen-off (`PIID 19`), physical screen language (EN/CN), and 5 dark theme accent palettes (`CUKTECH Gunmetal`, `AMOLED Pure Black`, `Cyberpunk Neon`, `Titanium Amber`, `Deep Ocean Blue`).
-9. **4 Home Screen Widgets:** Soft Glass (`4x2` & `2x2`) and Solid Dark (`4x2` & `2x2`) with 1-tap port toggles and charging sparkline.
-10. **Automation Hub:** Full Tasker/Locale action plugin, live telemetry broadcast intent (`com.cramqin.blecuktech10.TELEMETRY_UPDATE`), Home Assistant Webhook, and ADB command interface.
+9. **Persistent Live Notification & Keepalive:** Ongoing Android Foreground Service notification displaying live wattage, active ports, connection status, and quick action controls without opening the app.
+10. **4 Home Screen Widgets:** Soft Glass (`4x2` & `2x2`) and Solid Dark (`4x2` & `2x2`) with 1-tap port toggles and charging sparkline.
+11. **Automation Hub:** Full Tasker/Locale action plugin, live telemetry broadcast intent (`com.cramqin.blecuktech10.TELEMETRY_UPDATE`), Home Assistant Webhook, and ADB command interface.
 
 ---
 

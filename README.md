@@ -24,6 +24,21 @@
 
 ---
 
+## 📱 App Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/screenshot_01_gateway_connected.png" width="19%" alt="Gateway Connected" />
+  <img src="docs/screenshots/screenshot_03_telemetry_live.png" width="19%" alt="Interactive Port Visual" />
+  <img src="docs/screenshots/screenshot_04_telemetry_graph.png" width="19%" alt="Live Power Graph" />
+  <img src="docs/screenshots/screenshot_02_login_modal.png" width="19%" alt="Cloud Sign-In Modes" />
+  <img src="docs/screenshots/screenshot_05_themes.png" width="19%" alt="Dark Accent Themes" />
+</p>
+<p align="center">
+  <sub><i>From left to right: Background Gateway &amp; Paired Charger &bull; Interactive Hardware Port Representation &bull; Rolling Real-Time Power Curves &bull; 4 Login Modes &bull; Dark Accent Palettes</i></sub>
+</p>
+
+---
+
 ## 🙏 Acknowledgments & Heritage
 
 This project brings full native Android control for the **CUKTECH 10 Ultra 120W GaN Charger (`njcuk.fitting.ad1204`, Product ID `0x660E`)** by combining and porting the work of two open-source repositories:
@@ -82,8 +97,8 @@ Before using **BLEBridge – CUKTECH 10 Ultra**, please note the following hardw
 | :--- | :---: | :---: |
 | **Initial Charger Binding & Cloud Registration** | ❌ *(Requires Mi Home once)* | ✅ **Yes** |
 | **Official Charger OTA Firmware Updates** | ❌ *(Hands off to Mi Home)* | ✅ **Yes** |
-| **100% Local Offline BLE Control (After Token Sync)** | ✅ **Yes (Zero cloud dependency)** | ❌ *(Requires internet & cloud)* |
-| **Connection & Startup Speed** | ⚡ **Instant (~1.5s native GATT)** | 🐢 Slow (Heavy plugin loading) |
+| **100% Local Offline BLE Control (After Token Sync)** | ✅ **Yes (Zero cloud dependency)** | ⚠️ **Bluetooth (Requires cloud for plugin load/updates)** |
+| **Connection & Startup Speed** | ⚡ **Instant (~1.5s native GATT)** | 🐢 Slow (Heavy plugin initialization) |
 | **Persistent Background Keepalive & Live Notification** | ✅ **Yes (24/7 foreground service)** | ❌ Disconnects when screen locks |
 | **Interactive Home Screen Widgets (`4x2` & `2x2`)** | ✅ **Yes (Soft Glass & Solid Dark)** | ❌ None |
 | **Hardware Visual Panel (Interactive Port Jump)** | ✅ **Yes (Tap port graphic → jumps to port settings)** | ⚠️ Non-interactive graphic |

@@ -143,6 +143,10 @@ class CuktechBleManager(
     }
 
     private var autoReconnectEnabled: Boolean = true
+    private val _isAutoReconnectConfigured = MutableStateFlow(true)
+    val isAutoReconnectConfigured: StateFlow<Boolean> = _isAutoReconnectConfigured.asStateFlow()
+    var userManuallyDisconnected: Boolean = false
+        private set
     var lastConnectedMac: String? = null
     private var consecutiveFailures: Int = 0
     private var totalTxCommands: Int = 0
@@ -221,6 +225,11 @@ class CuktechBleManager(
     var onTelemetryUpdated: ((Map<Int, PortTelemetry>, Double, ChargerDeviceInfo) -> Unit)? = null
 
     init {
+        val prefs = context.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
+        val savedAutoReconnect = prefs.getBoolean("auto_reconnect_proximity", true)
+        _isAutoReconnectConfigured.value = savedAutoReconnect
+        autoReconnectEnabled = savedAutoReconnect
+
         credentialStore.tryAutoImportLocalCredentialsFile()
         _completedSessions.value = persistence.getRecentSessions(300)
         _chargeLimits.value = persistence.loadPortChargeLimits()
@@ -239,6 +248,15 @@ class CuktechBleManager(
                 updateCountdownTickAndNotification()
             }
         }
+    }
+
+    fun setAutoReconnectConfigured(enabled: Boolean) {
+        _isAutoReconnectConfigured.value = enabled
+        autoReconnectEnabled = enabled
+        context.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("auto_reconnect_proximity", enabled)
+            .apply()
     }
 
     // =========================================================================
@@ -353,6 +371,20 @@ class CuktechBleManager(
                 .thenByDescending { it.rssi }
         )
         _discoveredDevices.value = current
+
+        // Proximity auto-connect: if not manually disconnected and auto-reconnect is enabled
+        if (_isAutoReconnectConfigured.value && !userManuallyDisconnected &&
+            _authState.value == CuktechAuthState.DISCONNECTED &&
+            !_isDisconnectCooldown.value &&
+            (matchedCred != null || (lastConnectedMac != null && lastConnectedMac.equals(mac, ignoreCase = true)))
+        ) {
+            val targetMac = matchedCred?.mac ?: mac
+            BleBridgeService.addLogMessage(
+                BleBridgeService.Companion.LogLevel.LEVEL2,
+                "[Cuktech] Proximity match detected for $displayName ($targetMac). Auto-connecting..."
+            )
+            connectToCharger(targetMac)
+        }
     }
 
     // =========================================================================
@@ -415,7 +447,8 @@ class CuktechBleManager(
         }
 
         svc.startForegroundForBleConnection()
-        autoReconnectEnabled = true
+        userManuallyDisconnected = false
+        autoReconnectEnabled = _isAutoReconnectConfigured.value
         lastConnectedMac = targetMac
         disconnectCooldownJob?.cancel()
         _isDisconnectCooldown.value = false
@@ -477,12 +510,15 @@ class CuktechBleManager(
         BleBridgeService.getInstance()?.dismissForegroundNotificationIfIdle()
     }
 
-    fun disconnectCharger() {
+    fun disconnectCharger(isManual: Boolean = true) {
         val wasConnectedOrConnecting = _authState.value != CuktechAuthState.DISCONNECTED ||
             BleBridgeService.getInstance()?.getBluetoothGatt() != null ||
             BleBridgeService.bleConnectionState.value != BleBridgeService.Companion.BleConnectionState.DISCONNECTED
 
-        autoReconnectEnabled = false
+        if (isManual) {
+            userManuallyDisconnected = true
+            autoReconnectEnabled = false
+        }
         lastDisconnectMs = SystemClock.elapsedRealtime()
         switchDeviceJob?.cancel()
         if (wasConnectedOrConnecting) {
@@ -546,9 +582,27 @@ class CuktechBleManager(
         reconnectJob?.cancel()
         reconnectJob = scope.launch {
             delay(delayMs)
-            if (autoReconnectEnabled && _authState.value != CuktechAuthState.AUTHENTICATED) {
-                _statusMessage.value = "Attempting auto-reconnect to $mac..."
-                BleBridgeService.getInstance()?.connectBleNative(mac)
+            if (_isAutoReconnectConfigured.value && !userManuallyDisconnected && _authState.value != CuktechAuthState.AUTHENTICATED) {
+                consecutiveFailures++
+                if (consecutiveFailures <= 3) {
+                    _statusMessage.value = "Attempting auto-reconnect to $mac (attempt $consecutiveFailures/3)..."
+                    BleBridgeService.getInstance()?.connectBleNative(mac)
+                } else {
+                    // Charger likely unpowered or out of range. Switch to scanning for presence
+                    _statusMessage.value = "Charger disconnected. Awaiting charger power-on..."
+                    BleBridgeService.addLogMessage(
+                        BleBridgeService.Companion.LogLevel.LEVEL2,
+                        "[Cuktech] Charger offline or out of range. Starting proximity listener scan..."
+                    )
+                    startSearchForCuktechChargers(8000L)
+                    // Periodic poll scan every 12 seconds
+                    scope.launch {
+                        delay(12000L)
+                        if (_isAutoReconnectConfigured.value && !userManuallyDisconnected && _authState.value == CuktechAuthState.DISCONNECTED) {
+                            startSearchForCuktechChargers(8000L)
+                        }
+                    }
+                }
             }
         }
     }

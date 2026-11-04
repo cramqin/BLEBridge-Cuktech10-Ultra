@@ -79,8 +79,19 @@ class BleBridgeService : Service() {
                     val wasActive = bluetoothGatt != null || _bleConnectionState.value != BleConnectionState.DISCONNECTED ||
                         (cuktechManager?.authState?.value != null && cuktechManager?.authState?.value != CuktechAuthState.DISCONNECTED)
                     log(LogLevel.LEVEL2, "Phone Bluetooth turned OFF. Disconnecting active session.")
-                    cuktechManager?.disconnectCharger()
+                    cuktechManager?.disconnectCharger(isManual = false)
                     closeGattClean(triggerCooldown = wasActive)
+                } else if (state == BluetoothAdapter.STATE_ON) {
+                    val mgr = cuktechManager
+                    if (mgr != null && mgr.isAutoReconnectConfigured.value && !mgr.userManuallyDisconnected && !mgr.lastConnectedMac.isNullOrBlank()) {
+                        log(LogLevel.LEVEL2, "Phone Bluetooth turned back ON. Triggering auto-reconnect to ${mgr.lastConnectedMac}...")
+                        serviceScope.launch {
+                            delay(1200L)
+                            if (mgr.authState.value == CuktechAuthState.DISCONNECTED) {
+                                mgr.connectToCharger(mgr.lastConnectedMac!!)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1596,8 +1607,8 @@ class BleBridgeService : Service() {
                         val body = response.body?.string() ?: ""
                         val json = JSONObject(body)
                         val tagName = json.optString("tag_name", "").removePrefix("v").trim()
-                        val currentVersion = "1.0.5"
-                        if (tagName.isNotEmpty() && tagName != currentVersion && !tagName.startsWith("1.0.5")) {
+                        val currentVersion = "1.1.0"
+                        if (tagName.isNotEmpty() && tagName != currentVersion && !tagName.startsWith("1.1")) {
                             _updateAvailable.value = true
                         }
                     }

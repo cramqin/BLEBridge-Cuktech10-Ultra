@@ -553,7 +553,7 @@ fun BleBridgeDashboard(
                             border = BorderStroke(1.dp, appColors.primary.copy(alpha = 0.4f))
                         ) {
                             Text(
-                                text = "v1.0.5",
+                                text = "v1.1.0-beta",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = appColors.primary,
@@ -845,7 +845,16 @@ fun BleBridgeDashboard(
                                             if (cuktechAuthState != CuktechAuthState.DISCONNECTED ||
                                                 bleState != BleBridgeService.Companion.BleConnectionState.DISCONNECTED
                                             ) {
-                                                cuktechManager.disconnectCharger()
+                                                cuktechManager.disconnectCharger(isManual = false)
+                                            }
+                                        } else if (state == BluetoothAdapter.STATE_ON) {
+                                            if (cuktechManager.isAutoReconnectConfigured.value && !cuktechManager.userManuallyDisconnected && !cuktechManager.lastConnectedMac.isNullOrBlank()) {
+                                                scope.launch {
+                                                    delay(1200L)
+                                                    if (cuktechManager.authState.value == CuktechAuthState.DISCONNECTED) {
+                                                        cuktechManager.connectToCharger(cuktechManager.lastConnectedMac!!)
+                                                    }
+                                                }
                                             }
                                         }
                                     }

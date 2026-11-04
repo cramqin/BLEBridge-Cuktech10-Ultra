@@ -1286,11 +1286,23 @@ class CuktechBleManager(
             val existing = curPorts[piid]
             val decoded = PortTelemetryDecoder.decodePortV2(piid, decrypted, existing)
             if (decoded != null) {
-                updatePortTelemetry(piid, decoded)
-                BleBridgeService.addLogMessage(
-                    BleBridgeService.Companion.LogLevel.LEVEL2,
-                    "[Cuktech] Port $piid Telemetry: ${decoded.voltageV}V ${decoded.currentA}A ${decoded.powerW}W (${decoded.protocolName})"
-                )
+                val hasChanged = existing == null ||
+                    existing.voltageV != decoded.voltageV ||
+                    existing.currentA != decoded.currentA ||
+                    existing.powerW != decoded.powerW ||
+                    existing.protocolName != decoded.protocolName ||
+                    existing.enabled != decoded.enabled
+                val hasActiveSession = _activeSessions.value.containsKey(piid)
+
+                if (hasChanged || decoded.powerW > 0.0 || hasActiveSession) {
+                    updatePortTelemetry(piid, decoded)
+                }
+                if (hasChanged || decoded.powerW > 0.0) {
+                    BleBridgeService.addLogMessage(
+                        BleBridgeService.Companion.LogLevel.LEVEL2,
+                        "[Cuktech] Port $piid Telemetry: ${decoded.voltageV}V ${decoded.currentA}A ${decoded.powerW}W (${decoded.protocolName})"
+                    )
+                }
             }
         }
 
@@ -1770,22 +1782,33 @@ class CuktechBleManager(
     private fun startBackgroundLoops() {
         stopBackgroundLoops()
 
-        // Loop 1: C3 & USB-A Polling (since C1/C2 push via notifications while C3/A require GET)
+        // Loop 1: Smart Port Polling (C1/C2 push hardware notifications on plug-in; C3/A require GET)
         pollingJob = scope.launch {
             var cycle = 0
             while (isActive && _authState.value == CuktechAuthState.AUTHENTICATED) {
-                delay(3000L)
+                val anyPortActive = _totalPowerWatts.value > 0.0 || _activeSessions.value.isNotEmpty()
+                delay(if (anyPortActive) 3000L else 5000L)
                 if (_authState.value != CuktechAuthState.AUTHENTICATED) break
 
+                // C3 and USB-A never push BLE notifications from hardware; poll them to detect plug-in/load
                 sendMiotCommand(CuktechProtocol.SIID_CHARGER, CuktechProtocol.PIID_PORT_C3, isSet = false, timeoutMs = 1800L)
                 sendMiotCommand(CuktechProtocol.SIID_CHARGER, CuktechProtocol.PIID_PORT_A, isSet = false, timeoutMs = 1800L)
 
-                if (cycle % 2 == 0) {
+                // C1 and C2 push hardware notifications (b4 = 0x04) automatically on plug-in;
+                // only poll them when currently active to catch any missed unplug event.
+                val c1Active = (_ports.value[1]?.powerW ?: 0.0) > 0.0 || _activeSessions.value.containsKey(1)
+                val c2Active = (_ports.value[2]?.powerW ?: 0.0) > 0.0 || _activeSessions.value.containsKey(2)
+                if (c1Active) {
                     sendMiotCommand(CuktechProtocol.SIID_CHARGER, CuktechProtocol.PIID_PORT_C1, isSet = false, timeoutMs = 1800L)
+                }
+                if (c2Active) {
                     sendMiotCommand(CuktechProtocol.SIID_CHARGER, CuktechProtocol.PIID_PORT_C2, isSet = false, timeoutMs = 1800L)
+                }
+
+                if (cycle % 2 == 0) {
                     BleBridgeService.getInstance()?.requestGattRssi()
                 }
-                if (cycle % 5 == 0) {
+                if (cycle % 6 == 0) {
                     sendMiotCommand(CuktechProtocol.SIID_CHARGER, CuktechProtocol.PIID_PORT_SW_BITMAP, isSet = false, timeoutMs = 1800L)
                 }
                 cycle++

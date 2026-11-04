@@ -1564,7 +1564,7 @@ class BleBridgeService : Service() {
         fun addLogMessage(level: LogLevel, message: String) {
             val msg = LogMessage(System.currentTimeMillis(), level, message)
             logsList.add(msg)
-            while (logsList.size > 200) {
+            while (logsList.size > 1000) {
                 logsList.removeAt(0)
             }
             updateLogsFlow()

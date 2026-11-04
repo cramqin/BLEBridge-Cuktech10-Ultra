@@ -146,6 +146,7 @@ fun BleBridgeDashboard(
 
     var portInput by remember { mutableStateOf(serverPort.toString()) }
     var dropdownExpanded by remember { mutableStateOf(false) }
+    val consoleLogListState = rememberLazyListState()
 
     LaunchedEffect(serverPort) {
         if (portInput != serverPort.toString()) {
@@ -1148,12 +1149,7 @@ fun BleBridgeDashboard(
                     }
                 }
 
-                var terminalTab by remember { mutableStateOf(0) } // 0 = Live Console, 1 = BLE Diagnostics
-                LaunchedEffect(terminalTab) {
-                    if (terminalTab == 1 && diagStatus.lastDiagnosticOutput.isBlank()) {
-                        bleDiagnostics.runBluetoothStackDiagnostics()
-                    }
-                }
+                var terminalTab by rememberSaveable { mutableStateOf(0) } // 0 = Live Console, 1 = BLE Diagnostics
                 Card(
                     colors = CardDefaults.cardColors(containerColor = if (appColors.isDark) Color(0xFF030712) else appColors.surface),
                     shape = RoundedCornerShape(24.dp),
@@ -1322,10 +1318,9 @@ fun BleBridgeDashboard(
                         ) {
                             if (terminalTab == 0) {
                                 // Tab 0: Console Logs
-                                val listState = rememberLazyListState()
                                 LaunchedEffect(logs.size) {
                                     if (logs.isNotEmpty()) {
-                                        listState.animateScrollToItem(logs.size - 1)
+                                        consoleLogListState.animateScrollToItem(logs.size - 1)
                                     }
                                 }
 
@@ -1339,7 +1334,7 @@ fun BleBridgeDashboard(
                                     )
                                 } else {
                                     LazyColumn(
-                                        state = listState,
+                                        state = consoleLogListState,
                                         modifier = Modifier.fillMaxSize()
                                     ) {
                                         items(logs) { msg ->

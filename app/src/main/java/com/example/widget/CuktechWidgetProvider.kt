@@ -11,7 +11,7 @@ import android.widget.RemoteViews
 import com.example.BleBridgeService
 import com.example.MainActivity
 import com.example.R
-import com.example.cuktech.protocol.CuktechAuthState
+import com.example.cuktech.ble.CuktechAuthState
 import com.example.cuktech.protocol.CuktechProtocol
 
 open class CuktechWidgetProvider : AppWidgetProvider() {

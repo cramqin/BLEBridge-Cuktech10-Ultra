@@ -227,21 +227,6 @@ fun BleBridgeDashboard(
         }
     }
 
-    fun triggerAutoConnectIfConfigured() {
-        val isAuto = cuktechManager.isAutoReconnectConfigured.value
-        val notManual = !cuktechManager.userManuallyDisconnected
-        val targetMac = cuktechManager.lastConnectedMac
-            ?: cuktechManager.credentialStore.activeDevice.value?.mac
-            ?: cuktechManager.credentialStore.devices.value.firstOrNull { it.hasValidToken }?.mac
-            ?: cuktechManager.credentialStore.devices.value.firstOrNull()?.mac
-
-        if (isAuto && notManual && !targetMac.isNullOrBlank() && cuktechManager.authState.value == CuktechAuthState.DISCONNECTED) {
-            ensureBleServiceStartedAndPermissions {
-                cuktechManager.connectToCharger(targetMac)
-            }
-        }
-    }
-
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
@@ -253,12 +238,8 @@ fun BleBridgeDashboard(
                 showBluetoothOffDialog = true
                 return@rememberLauncherForActivityResult
             }
-            if (pendingPermissionCallback != null) {
-                pendingPermissionCallback?.invoke()
-                pendingPermissionCallback = null
-            } else {
-                triggerAutoConnectIfConfigured()
-            }
+            pendingPermissionCallback?.invoke()
+            pendingPermissionCallback = null
         } else {
             Toast.makeText(context, "Bluetooth and Notification permissions are required.", Toast.LENGTH_LONG).show()
         }
@@ -293,6 +274,21 @@ fun BleBridgeDashboard(
         onReady()
     }
 
+    fun triggerAutoConnectIfConfigured() {
+        val isAuto = cuktechManager.isAutoReconnectConfigured.value
+        val notManual = !cuktechManager.userManuallyDisconnected
+        val targetMac = cuktechManager.lastConnectedMac
+            ?: cuktechManager.credentialStore.activeDevice.value?.mac
+            ?: cuktechManager.credentialStore.devices.value.firstOrNull { it.hasValidToken }?.mac
+            ?: cuktechManager.credentialStore.devices.value.firstOrNull()?.mac
+
+        if (isAuto && notManual && !targetMac.isNullOrBlank() && cuktechManager.authState.value == CuktechAuthState.DISCONNECTED) {
+            ensureBleServiceStartedAndPermissions {
+                cuktechManager.connectToCharger(targetMac)
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         val allOk = permissionsToRequest.all {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
@@ -301,9 +297,14 @@ fun BleBridgeDashboard(
             permissionLauncher.launch(permissionsToRequest.toTypedArray())
         } else {
             permissionsGranted = true
-            triggerAutoConnectIfConfigured()
         }
         BleBridgeService.checkForUpdates()
+    }
+
+    LaunchedEffect(permissionsGranted) {
+        if (permissionsGranted) {
+            triggerAutoConnectIfConfigured()
+        }
     }
 
     ModalNavigationDrawer(

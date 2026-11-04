@@ -592,6 +592,7 @@ class CuktechBleManager(
         reconnectJob?.cancel()
         reconnectJob = scope.launch {
             delay(delayMs)
+            val startTimeMs = SystemClock.elapsedRealtime()
             while (isActive && _isAutoReconnectConfigured.value && !userManuallyDisconnected && _authState.value != CuktechAuthState.AUTHENTICATED) {
                 val btAdapter = (context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
                 if (btAdapter == null || !btAdapter.isEnabled) {
@@ -599,6 +600,12 @@ class CuktechBleManager(
                     delay(3000L)
                     continue
                 }
+
+                val elapsed = SystemClock.elapsedRealtime() - startTimeMs
+                // First 5 minutes: fast discovery (6s scan every 7.5s)
+                // After 5 minutes: low-power standby (4s scan every 20s) to save battery
+                val scanDuration = if (elapsed < 5 * 60 * 1000L) 6000L else 4000L
+                val intervalDelay = if (elapsed < 5 * 60 * 1000L) 7500L else 20000L
 
                 _statusMessage.value = "Charger disconnected. Awaiting charger power-on..."
                 BleBridgeService.addLogMessage(
@@ -608,10 +615,9 @@ class CuktechBleManager(
 
                 val svc = BleBridgeService.getInstance()
                 // Scan targeting the charger MAC and MiOT service UUID (delivers background callbacks)
-                svc?.startNativeCuktechScan(6000L, mac)
+                svc?.startNativeCuktechScan(scanDuration, mac)
 
-                // Wait for the scan cycle to complete plus small pause
-                delay(7500L)
+                delay(intervalDelay)
             }
         }
     }

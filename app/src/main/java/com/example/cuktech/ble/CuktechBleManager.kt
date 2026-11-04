@@ -22,6 +22,7 @@ import com.example.cuktech.protocol.PortTelemetryDecoder
 import com.example.cuktech.protocol.SessionKeys
 import com.example.cuktech.security.CuktechDeviceCredentials
 import com.example.cuktech.security.SecureCredentialStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

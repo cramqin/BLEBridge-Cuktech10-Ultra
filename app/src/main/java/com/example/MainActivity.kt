@@ -62,8 +62,11 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class MainActivity : ComponentActivity() {
+    private val pendingNavTab = mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleIntent(intent)
         enableEdgeToEdge()
         BleBridgeService.ensureCuktechManagersInitialized(applicationContext)
 
@@ -91,10 +94,24 @@ class MainActivity : ComponentActivity() {
                 ) {
                     BleBridgeDashboard(
                         currentPalette = selectedPalette,
-                        onPaletteChanged = { updatePalette(it) }
+                        onPaletteChanged = { updatePalette(it) },
+                        pendingNavTab = pendingNavTab
                     )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val nav = intent?.getStringExtra("EXTRA_NAV_TAB")
+        if (!nav.isNullOrBlank()) {
+            pendingNavTab.value = nav
         }
     }
 }
@@ -103,7 +120,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun BleBridgeDashboard(
     currentPalette: DarkThemePalette = DarkThemePalette.CUKTECH_CYAN,
-    onPaletteChanged: (DarkThemePalette) -> Unit = {}
+    onPaletteChanged: (DarkThemePalette) -> Unit = {},
+    pendingNavTab: MutableState<String?> = remember { mutableStateOf(null) }
 ) {
     val context = LocalContext.current
     val appColors = LocalAppColors.current
@@ -131,6 +149,15 @@ fun BleBridgeDashboard(
 
     BackHandler(enabled = showTelemetryScreen) {
         showTelemetryScreen = false
+    }
+
+    LaunchedEffect(pendingNavTab.value) {
+        val tab = pendingNavTab.value
+        if (tab == "LIVE") {
+            showTelemetryScreen = true
+            dashboardCurrentTab = 0
+            pendingNavTab.value = null
+        }
     }
 
     // Collect states dynamically from BleBridgeService's companion object
@@ -557,18 +584,33 @@ fun BleBridgeDashboard(
                             )
                         }
 
-                        bleAddress?.let { addr ->
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(appColors.primaryContainer)
-                                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                            ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            bleAddress?.let { addr ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(appColors.primaryContainer)
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = addr,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 11.sp,
+                                        color = appColors.primary
+                                    )
+                                }
+                            }
+                            if (bleState != BleBridgeService.Companion.BleConnectionState.DISCONNECTED || cuktechAuthState != CuktechAuthState.DISCONNECTED) {
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = addr,
-                                    fontFamily = FontFamily.Monospace,
+                                    text = "Disconnect",
                                     fontSize = 11.sp,
-                                    color = appColors.primary
+                                    fontWeight = FontWeight.Bold,
+                                    color = StatusError,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .clickable { cuktechManager.disconnectCharger() }
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
                         }
@@ -588,6 +630,7 @@ fun BleBridgeDashboard(
                         cloudClient = BleBridgeService.xiaomiCloudClient,
                         bleDiagnostics = bleDiagnostics,
                         cloudIntegrations = cloudIntegrations,
+                        initialTab = dashboardCurrentTab,
                         onRequestBlePermissions = { onReady ->
                             ensureBleServiceStartedAndPermissions(onReady)
                         },
@@ -798,6 +841,61 @@ fun BleBridgeDashboard(
                                     )
                                 }
 
+                                // Connecting State Card (Allows user to cancel connection attempt)
+                                if (cuktechAuthState in listOf(
+                                    CuktechAuthState.CONNECTING_GATT,
+                                    CuktechAuthState.DISCOVERING_SERVICES,
+                                    CuktechAuthState.PHASE_A_INIT_A4,
+                                    CuktechAuthState.PHASE_B_HANDSHAKE
+                                )) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Surface(
+                                        color = appColors.surfaceVariant.copy(alpha = 0.5f),
+                                        shape = RoundedCornerShape(14.dp),
+                                        border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.6f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(14.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(20.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = Color(0xFFF59E0B)
+                                                )
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "Connecting CUKTECH 10...",
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = appColors.textPrimary,
+                                                        fontSize = 13.sp
+                                                    )
+                                                    Text(
+                                                        text = cuktechAuthState.label,
+                                                        color = Color(0xFFF59E0B),
+                                                        fontSize = 11.sp,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                }
+                                            }
+                                            OutlinedButton(
+                                                onClick = { cuktechManager.disconnectCharger() },
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusError),
+                                                border = BorderStroke(1.dp, StatusError.copy(alpha = 0.6f)),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                modifier = Modifier.height(34.dp)
+                                            ) {
+                                                Text("Cancel", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+
                                 // Live Telemetry Card (Shown directly below Search & Pair on successful pair / connected)
                                 if (cuktechAuthState == CuktechAuthState.AUTHENTICATED) {
                                     Spacer(modifier = Modifier.height(12.dp))
@@ -846,17 +944,30 @@ fun BleBridgeDashboard(
                                                 }
                                             }
 
-                                            Button(
-                                                onClick = { showTelemetryScreen = true },
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = appColors.primary,
-                                                    contentColor = Color(0xFF0A0E1A)
-                                                ),
-                                                shape = RoundedCornerShape(10.dp),
-                                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                                modifier = Modifier.height(34.dp)
-                                            ) {
-                                                Text("Telemetry →", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                OutlinedButton(
+                                                    onClick = { cuktechManager.disconnectCharger() },
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = StatusError),
+                                                    border = BorderStroke(1.dp, StatusError.copy(alpha = 0.6f)),
+                                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                                    modifier = Modifier.height(34.dp)
+                                                ) {
+                                                    Text("Disconnect", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Button(
+                                                    onClick = { showTelemetryScreen = true },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = appColors.primary,
+                                                        contentColor = Color(0xFF0A0E1A)
+                                                    ),
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                                    modifier = Modifier.height(34.dp)
+                                                ) {
+                                                    Text("Telemetry →", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                }
                                             }
                                         }
                                     }
@@ -1051,7 +1162,7 @@ fun BleBridgeDashboard(
                                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
                                     ) {
                                         Row(
-                                            modifier = Modifier.padding(12.dp),
+                                            modifier = Modifier.padding(14.dp),
                                             verticalAlignment = Alignment.Top
                                         ) {
                                             Icon(
@@ -1061,12 +1172,34 @@ fun BleBridgeDashboard(
                                                 modifier = Modifier.size(18.dp).padding(top = 2.dp)
                                             )
                                             Spacer(modifier = Modifier.width(10.dp))
-                                            Text(
-                                                text = "What is this?\nThis is an optional raw TCP socket server (from the parent BLEBridge project) for external PC / Python scripts over Wi-Fi.\n\n• You do NOT need this turned on to connect to your charger or view live telemetry.\n• Turning this off will NOT disconnect your active Bluetooth connection.\n• Home Assistant users should use the HTTP Webhook in Dashboard ➔ Setup instead.",
-                                                color = appColors.textPrimary,
-                                                fontSize = 11.sp,
-                                                lineHeight = 16.sp
-                                            )
+                                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text(
+                                                    text = "What is this?",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp,
+                                                    color = appColors.textPrimary
+                                                )
+                                                Text(
+                                                    text = "An optional raw TCP socket server (from the original BLEBridge project) that broadcasts live CUKTECH 10 Ultra telemetry lines over your local Wi-Fi network.\n\n• Standalone Bluetooth: Not required for local charger monitoring, port switching, or Home Assistant Webhooks.\n• Safe Toggle: Turning this off will NOT disconnect your active Bluetooth connection.\n• Home Assistant: Home Assistant users should configure the HTTP Webhook in Dashboard ➔ Setup instead.",
+                                                    color = appColors.textPrimary,
+                                                    fontSize = 11.sp,
+                                                    lineHeight = 16.sp
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = "How to test from your PC (Same Wi-Fi network required):",
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp,
+                                                    color = appColors.primary
+                                                )
+                                                Text(
+                                                    text = "1. Connect your PC and this phone to the SAME Wi-Fi network (or phone hotspot).\n2. Turn ON the switch above and check the IP & Port (e.g., ${(wifiIp ?: "192.168.1.X")}:$portInput).\n3. In your PC terminal, run:\n   • Linux / macOS / WSL:\n     nc ${(wifiIp ?: "<phone-ip>")} $portInput\n     (or: telnet ${(wifiIp ?: "<phone-ip>")} $portInput)\n     (or: python3 -c \"import socket; s=socket.create_connection(('${(wifiIp ?: "IP")}', $portInput)); print(s.recv(1024).decode())\")\n   • Windows (PowerShell):\n     Test-NetConnection -ComputerName ${(wifiIp ?: "<phone-ip>")} -Port $portInput\n\nWhen connected, the phone logs a new client and streams JSON telemetry strings directly to your PC!",
+                                                    color = appColors.textPrimary,
+                                                    fontSize = 11.sp,
+                                                    lineHeight = 16.sp,
+                                                    fontFamily = FontFamily.Monospace
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1075,113 +1208,43 @@ fun BleBridgeDashboard(
                                 HorizontalDivider(color = appColors.border)
                                 Spacer(modifier = Modifier.height(16.dp))
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    // Port Config
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "TCP PORT",
-                                            color = appColors.textSecondary,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 1.sp
-                                        )
+                                // Port Config
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Text(
+                                        text = "TCP PORT",
+                                        color = appColors.textSecondary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    OutlinedTextField(
+                                        value = portInput,
+                                        onValueChange = { portInput = it },
+                                        enabled = !isRunning,
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = appColors.textPrimary,
+                                            unfocusedTextColor = appColors.textPrimary,
+                                            disabledTextColor = appColors.textSecondary,
+                                            focusedContainerColor = appColors.surfaceVariant,
+                                            unfocusedContainerColor = appColors.surfaceVariant,
+                                            disabledContainerColor = appColors.surfaceVariant.copy(alpha = 0.5f),
+                                            focusedBorderColor = appColors.primary,
+                                            unfocusedBorderColor = appColors.border,
+                                            disabledBorderColor = Color.Transparent
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    if (isRunning) {
                                         Spacer(modifier = Modifier.height(4.dp))
-                                        OutlinedTextField(
-                                            value = portInput,
-                                            onValueChange = { portInput = it },
-                                            enabled = !isRunning,
-                                            singleLine = true,
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedTextColor = appColors.textPrimary,
-                                                unfocusedTextColor = appColors.textPrimary,
-                                                disabledTextColor = appColors.textSecondary,
-                                                focusedContainerColor = appColors.surfaceVariant,
-                                                unfocusedContainerColor = appColors.surfaceVariant,
-                                                disabledContainerColor = appColors.surfaceVariant.copy(alpha = 0.5f),
-                                                focusedBorderColor = appColors.primary,
-                                                unfocusedBorderColor = appColors.border,
-                                                disabledBorderColor = Color.Transparent
-                                            ),
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-
-                                    // Log Level selection
-                                    Column(modifier = Modifier.weight(1.3f)) {
                                         Text(
-                                            text = "VERBOSITY",
-                                            color = appColors.textSecondary,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 1.sp
+                                            text = "Turn switch OFF to modify the TCP port.",
+                                            fontSize = 11.sp,
+                                            color = appColors.textSecondary
                                         )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Box {
-                                            OutlinedButton(
-                                                onClick = { dropdownExpanded = true },
-                                                shape = RoundedCornerShape(12.dp),
-                                                colors = ButtonDefaults.outlinedButtonColors(
-                                                    containerColor = appColors.surfaceVariant
-                                                ),
-                                                border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(appColors.border)),
-                                                modifier = Modifier.fillMaxWidth().height(56.dp)
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text(
-                                                        text = when (currentLogLevel) {
-                                                            BleBridgeService.Companion.LogLevel.LEVEL1 -> "LEVEL 1"
-                                                            BleBridgeService.Companion.LogLevel.LEVEL2 -> "LEVEL 2"
-                                                            BleBridgeService.Companion.LogLevel.LEVEL3 -> "LEVEL 3"
-                                                        },
-                                                        color = appColors.textPrimary,
-                                                        fontSize = 13.sp,
-                                                        fontWeight = FontWeight.Medium
-                                                    )
-                                                    Icon(
-                                                        Icons.Default.ArrowDropDown,
-                                                        contentDescription = null,
-                                                        tint = appColors.textSecondary
-                                                    )
-                                                }
-                                            }
-
-                                            DropdownMenu(
-                                                expanded = dropdownExpanded,
-                                                onDismissRequest = { dropdownExpanded = false },
-                                                modifier = Modifier.background(appColors.surface)
-                                            ) {
-                                                DropdownMenuItem(
-                                                    text = { Text("LEVEL 1: Errors Only", color = appColors.textPrimary, fontSize = 12.sp) },
-                                                    onClick = {
-                                                        BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL1)
-                                                        dropdownExpanded = false
-                                                    }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("LEVEL 2: Errors & Connect Status", color = appColors.textPrimary, fontSize = 12.sp) },
-                                                    onClick = {
-                                                        BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL2)
-                                                        dropdownExpanded = false
-                                                    }
-                                                )
-                                                DropdownMenuItem(
-                                                    text = { Text("LEVEL 3: Full Telemetry", color = appColors.textPrimary, fontSize = 12.sp) },
-                                                    onClick = {
-                                                        BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL3)
-                                                        dropdownExpanded = false
-                                                    }
-                                                )
-                                            }
-                                        }
                                     }
                                 }
                             }
@@ -1260,6 +1323,69 @@ fun BleBridgeDashboard(
                             // Right: Action Icon Buttons
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 if (terminalTab == 0) {
+                                    // Verbosity Level Selector
+                                    Box {
+                                        Surface(
+                                            modifier = Modifier.clickable { dropdownExpanded = true },
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = appColors.surfaceVariant,
+                                            border = BorderStroke(1.dp, appColors.border)
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = when (currentLogLevel) {
+                                                        BleBridgeService.Companion.LogLevel.LEVEL1 -> "LEVEL 1"
+                                                        BleBridgeService.Companion.LogLevel.LEVEL2 -> "LEVEL 2"
+                                                        BleBridgeService.Companion.LogLevel.LEVEL3 -> "LEVEL 3"
+                                                    },
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = appColors.textPrimary
+                                                )
+                                                Spacer(modifier = Modifier.width(2.dp))
+                                                Icon(
+                                                    Icons.Default.ArrowDropDown,
+                                                    contentDescription = null,
+                                                    tint = appColors.textSecondary,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
+                                        }
+
+                                        DropdownMenu(
+                                            expanded = dropdownExpanded,
+                                            onDismissRequest = { dropdownExpanded = false },
+                                            modifier = Modifier.background(appColors.surface)
+                                        ) {
+                                            DropdownMenuItem(
+                                                text = { Text("LEVEL 1: Errors Only", color = appColors.textPrimary, fontSize = 12.sp) },
+                                                onClick = {
+                                                    BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL1)
+                                                    dropdownExpanded = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("LEVEL 2: Errors & Connect Status", color = appColors.textPrimary, fontSize = 12.sp) },
+                                                onClick = {
+                                                    BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL2)
+                                                    dropdownExpanded = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("LEVEL 3: Full Telemetry", color = appColors.textPrimary, fontSize = 12.sp) },
+                                                onClick = {
+                                                    BleBridgeService.setLogLevel(BleBridgeService.Companion.LogLevel.LEVEL3)
+                                                    dropdownExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(6.dp))
+
                                     IconButton(
                                         onClick = {
                                             val fullLogText = logs.joinToString("\n") { logMsg ->

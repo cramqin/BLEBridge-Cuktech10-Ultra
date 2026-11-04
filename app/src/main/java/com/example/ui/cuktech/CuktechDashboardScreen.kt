@@ -74,6 +74,7 @@ fun CuktechDashboardScreen(
     cloudClient: XiaomiCloudClient,
     bleDiagnostics: BleDiagnostics,
     cloudIntegrations: CloudIntegrations,
+    initialTab: Int = 0,
     onRequestBlePermissions: (() -> Unit) -> Unit,
     onNavigateBack: (() -> Unit)? = null,
     onTabChanged: ((Int) -> Unit)? = null
@@ -120,7 +121,12 @@ fun CuktechDashboardScreen(
     var showConsolidatedTable by remember { mutableStateOf(false) }
     var showScenariosDialog by remember { mutableStateOf(false) }
 
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
+    val pagerState = rememberPagerState(initialPage = initialTab.coerceIn(0, 3), pageCount = { 4 })
+    LaunchedEffect(initialTab) {
+        if (pagerState.currentPage != initialTab.coerceIn(0, 3)) {
+            pagerState.scrollToPage(initialTab.coerceIn(0, 3))
+        }
+    }
     LaunchedEffect(pagerState.currentPage) {
         onTabChanged?.invoke(pagerState.currentPage)
     }

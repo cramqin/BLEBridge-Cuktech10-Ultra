@@ -221,6 +221,23 @@ class CuktechBleManager(
     val usbALowCurrentRemainingSeconds: StateFlow<Long?> = _usbALowCurrentRemainingSeconds.asStateFlow()
     private var targetUsbALowCurrentEpochSec: Long? = null
 
+    // Telemetry & Sleep Policy StateFlows
+    private val _telemetryMasterEnabled = MutableStateFlow(true)
+    val telemetryMasterEnabled: StateFlow<Boolean> = _telemetryMasterEnabled.asStateFlow()
+
+    private val _logOnlyWhenPhoneCharging = MutableStateFlow(false)
+    val logOnlyWhenPhoneCharging: StateFlow<Boolean> = _logOnlyWhenPhoneCharging.asStateFlow()
+
+    private val _pausePollingWhenScreenLocked = MutableStateFlow(false)
+    val pausePollingWhenScreenLocked: StateFlow<Boolean> = _pausePollingWhenScreenLocked.asStateFlow()
+
+    private val _portLoggingMap = MutableStateFlow(mapOf(1 to true, 2 to true, 3 to true, 4 to true))
+    val portLoggingMap: StateFlow<Map<Int, Boolean>> = _portLoggingMap.asStateFlow()
+
+    // Host system states updated by BleBridgeService
+    val isPhoneCharging = MutableStateFlow(false)
+    val isScreenOn = MutableStateFlow(true)
+
     // Callback invoked on telemetry update so Tasker / MQTT / Bemfa can broadcast
     var onTelemetryUpdated: ((Map<Int, PortTelemetry>, Double, ChargerDeviceInfo) -> Unit)? = null
 
@@ -260,23 +277,6 @@ class CuktechBleManager(
             }
         }
     }
-
-    // --- Telemetry & Sleep Policy StateFlows ---
-    private val _telemetryMasterEnabled = MutableStateFlow(true)
-    val telemetryMasterEnabled: StateFlow<Boolean> = _telemetryMasterEnabled.asStateFlow()
-
-    private val _logOnlyWhenPhoneCharging = MutableStateFlow(false)
-    val logOnlyWhenPhoneCharging: StateFlow<Boolean> = _logOnlyWhenPhoneCharging.asStateFlow()
-
-    private val _pausePollingWhenScreenLocked = MutableStateFlow(false)
-    val pausePollingWhenScreenLocked: StateFlow<Boolean> = _pausePollingWhenScreenLocked.asStateFlow()
-
-    private val _portLoggingMap = MutableStateFlow(mapOf(1 to true, 2 to true, 3 to true, 4 to true))
-    val portLoggingMap: StateFlow<Map<Int, Boolean>> = _portLoggingMap.asStateFlow()
-
-    // Host system states updated by BleBridgeService
-    val isPhoneCharging = MutableStateFlow(false)
-    val isScreenOn = MutableStateFlow(true)
 
     fun isPortLoggingEnabled(portId: Int): Boolean {
         return _portLoggingMap.value[portId] ?: true

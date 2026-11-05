@@ -1168,11 +1168,27 @@ fun CuktechDashboardScreen(
                                 .padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text(
-                                text = "Tasker & Automation Integration",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Tasker & Automation Integration",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "Tasker Action Plugin & broadcast intents",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                TextButton(onClick = { showTaskerDocs = !showTaskerDocs }) {
+                                    Text(if (showTaskerDocs) "Hide" else "Configure", fontSize = 12.sp)
+                                }
+                            }
 
                             Surface(
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
@@ -1198,26 +1214,6 @@ fun CuktechDashboardScreen(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                }
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                FilledTonalButton(
-                                    onClick = { showTaskerDocs = !showTaskerDocs },
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = if (showTaskerDocs) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(if (showTaskerDocs) "Hide Intent API" else "View Broadcast Intent API", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
 

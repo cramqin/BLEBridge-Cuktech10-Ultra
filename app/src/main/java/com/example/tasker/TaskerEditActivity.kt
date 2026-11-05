@@ -137,6 +137,10 @@ fun TaskerEditScreen(
                             "SOFT_RESET" -> "CUKTECH 10: Force Soft Port Reset"
                             "SET_IDLE_SCREEN_OFF" -> "CUKTECH 10: Idle Screen-Off ${if (selectedPortState) "ON" else "OFF"}"
                             "SET_AUTO_CONNECT" -> "CUKTECH 10: Auto-Connect ${if (selectedPortState) "ON" else "OFF"}"
+                            "SET_PORT_LOGGING" -> "CUKTECH 10: $portLabel History Logging ${if (selectedPortState) "ON" else "OFF"}"
+                            "SET_TELEMETRY" -> "CUKTECH 10: Master Telemetry ${if (selectedPortState) "ON" else "PAUSED"}"
+                            "SET_LOG_WHEN_CHARGING" -> "CUKTECH 10: Log Only When Phone Charging ${if (selectedPortState) "ON" else "OFF"}"
+                            "SET_PAUSE_WHEN_LOCKED" -> "CUKTECH 10: Pause Polling When Screen Locked ${if (selectedPortState) "ON" else "OFF"}"
                             else -> "CUKTECH 10: Action"
                         }
                         onSave(selectedAction, selectedPort, selectedPortState, selectedMode, selectedTimeout, selectedTimerMins, blurb)
@@ -167,7 +171,11 @@ fun TaskerEditScreen(
                 "SET_IDLE_SCREEN_OFF" to "Idle Screen-Off (Sleep LCD when idle)",
                 "SET_LOW_CURRENT" to "USB-A Low Current Mode (4h)",
                 "SET_PORT_TIMER" to "Set Port Delay Poweroff Timer",
-                "SOFT_RESET" to "Force Soft Port Reset (Renegotiate PD)"
+                "SOFT_RESET" to "Force Soft Port Reset (Renegotiate PD)",
+                "SET_PORT_LOGGING" to "Port History Logging (On/Off)",
+                "SET_TELEMETRY" to "Master Telemetry (On/Paused)",
+                "SET_LOG_WHEN_CHARGING" to "Log Only When Phone Charging (On/Off)",
+                "SET_PAUSE_WHEN_LOCKED" to "Pause Polling When Screen Locked (On/Off)"
             )
 
             actions.forEach { (key, label) ->
@@ -381,6 +389,96 @@ fun TaskerEditScreen(
                         selected = !selectedPortState,
                         onClick = { selectedPortState = false },
                         label = { Text("Disable Auto-Connect") }
+                    )
+                }
+            }
+
+            if (selectedAction == "SET_PORT_LOGGING") {
+                Text("Select Port", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    portNames.forEach { (pId, name) ->
+                        FilterChip(
+                            selected = (selectedPort == pId),
+                            onClick = { selectedPort = pId },
+                            label = { Text(name) }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text("Port History & Wh Logging", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilterChip(
+                        selected = selectedPortState,
+                        onClick = { selectedPortState = true },
+                        label = { Text("Logging ON") }
+                    )
+                    FilterChip(
+                        selected = !selectedPortState,
+                        onClick = { selectedPortState = false },
+                        label = { Text("Logging OFF") }
+                    )
+                }
+            }
+
+            if (selectedAction == "SET_TELEMETRY") {
+                Text("Master Telemetry Switch", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    "Enables or pauses active BLE telemetry polling across all ports.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilterChip(
+                        selected = selectedPortState,
+                        onClick = { selectedPortState = true },
+                        label = { Text("Telemetry ON") }
+                    )
+                    FilterChip(
+                        selected = !selectedPortState,
+                        onClick = { selectedPortState = false },
+                        label = { Text("Pause Telemetry") }
+                    )
+                }
+            }
+
+            if (selectedAction == "SET_LOG_WHEN_CHARGING") {
+                Text("Log Only When Phone Charging", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    "Restricts history recording to when the host Android phone is plugged into a charger.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilterChip(
+                        selected = selectedPortState,
+                        onClick = { selectedPortState = true },
+                        label = { Text("Enable Condition") }
+                    )
+                    FilterChip(
+                        selected = !selectedPortState,
+                        onClick = { selectedPortState = false },
+                        label = { Text("Disable Condition") }
+                    )
+                }
+            }
+
+            if (selectedAction == "SET_PAUSE_WHEN_LOCKED") {
+                Text("Pause Polling When Screen Locked", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    "Suspends BLE polling and database writes when screen is locked (maximizes Doze deep sleep).",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilterChip(
+                        selected = selectedPortState,
+                        onClick = { selectedPortState = true },
+                        label = { Text("Pause When Locked") }
+                    )
+                    FilterChip(
+                        selected = !selectedPortState,
+                        onClick = { selectedPortState = false },
+                        label = { Text("Continuous Logging") }
                     )
                 }
             }

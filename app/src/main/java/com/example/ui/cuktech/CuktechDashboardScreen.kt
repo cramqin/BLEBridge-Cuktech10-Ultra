@@ -94,6 +94,10 @@ fun CuktechDashboardScreen(
     val chargeLimits by bleManager.chargeLimits.collectAsState()
     val countdownRemainingSeconds by bleManager.countdownRemainingSeconds.collectAsState()
     val usbALowCurrentRemainingSeconds by bleManager.usbALowCurrentRemainingSeconds.collectAsState()
+    val portLoggingMap by bleManager.portLoggingMap.collectAsState()
+    val telemetryMasterEnabled by bleManager.telemetryMasterEnabled.collectAsState()
+    val logOnlyWhenPhoneCharging by bleManager.logOnlyWhenPhoneCharging.collectAsState()
+    val pausePollingWhenScreenLocked by bleManager.pausePollingWhenScreenLocked.collectAsState()
 
     val accountSession by bleManager.credentialStore.session.collectAsState()
     val savedDevices by bleManager.credentialStore.devices.collectAsState()
@@ -791,6 +795,7 @@ fun CuktechDashboardScreen(
                         for (portId in 1..4) {
                             val port = portsMap[portId] ?: PortTelemetry(portId, "Port $portId")
                             val limit = chargeLimits[portId]
+                            val isLoggingEn = portLoggingMap[portId] ?: true
                             PortTelemetryCard(
                                 port = port,
                                 settings = settings,
@@ -798,11 +803,13 @@ fun CuktechDashboardScreen(
                                 countdownRemainingSec = countdownRemainingSeconds[portId],
                                 isHighlighted = (highlightedPortId == portId),
                                 bringIntoViewRequester = portRequesters.getOrNull(portId - 1),
+                                isLoggingEnabled = isLoggingEn,
                                 onToggleEnabled = { enabled -> bleManager.setPortEnabled(portId, enabled) },
                                 onSelectCountdown = { code -> bleManager.setPortCountdown(portId, code) },
                                 onSetProtocol = { proto, en -> bleManager.setPortProtocol(portId, proto, en) },
                                 onOpenChargeLimit = { chargeLimitDialogPort = portId },
-                                onOpenClosureTimeDialog = { closureTimeDialogPort = portId }
+                                onOpenClosureTimeDialog = { closureTimeDialogPort = portId },
+                                onToggleLogging = { en -> bleManager.setPortLoggingEnabled(portId, en) }
                             )
                         }
                     }
@@ -1085,6 +1092,69 @@ fun CuktechDashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
 
+                    // 0. Telemetry Engine & Sleep Policies Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.BatterySaver,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Telemetry Engine & Sleep Policies",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                    Text(
+                                        text = "Granular background polling, sleep controls, and battery optimization",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            // A. Master Telemetry Switch
+                            SettingSwitchRow(
+                                title = "Master Telemetry Engine",
+                                subtitle = if (telemetryMasterEnabled) "Active · Charger telemetry polling and live watts enabled" else "Paused · Radio polling stopped, minimal idle power",
+                                checked = telemetryMasterEnabled,
+                                onCheckedChange = { bleManager.setTelemetryMasterEnabled(it) }
+                            )
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                            // B. Log Only When Phone Charging
+                            SettingSwitchRow(
+                                title = "Only Log When Host Phone is Charging",
+                                subtitle = if (logOnlyWhenPhoneCharging) "Active · History & Wh are logged only while this phone is connected to AC power" else "Disabled · Logs sessions regardless of phone charging state",
+                                checked = logOnlyWhenPhoneCharging,
+                                onCheckedChange = { bleManager.setLogOnlyWhenPhoneCharging(it) }
+                            )
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                            // C. Pause Polling When Screen Locked
+                            SettingSwitchRow(
+                                title = "Pause Polling When Screen Locked",
+                                subtitle = if (pausePollingWhenScreenLocked) "Active · Suspends background polling while screen is off (maximizes Doze deep sleep)" else "Disabled · Continuous logging even with screen locked",
+                                checked = pausePollingWhenScreenLocked,
+                                onCheckedChange = { bleManager.setPausePollingWhenScreenLocked(it) }
+                            )
+                        }
+                    }
 
                     // 3. Tasker & Automation Integration Card
                     Card(
@@ -1182,6 +1252,18 @@ fun CuktechDashboardScreen(
                                          Extras: port:1..4 (int), wh_target:30.0 (float), mode:"once"|"always" (string), enabled:true/false (bool)
                                        • Proximity Auto-Connect:
                                          Action: com.cramqin.blecuktech10.SET_AUTO_CONNECT
+                                         Extra: enabled:true/false (bool)
+                                       • Toggle Port History Logging:
+                                         Action: com.cramqin.blecuktech10.SET_PORT_LOGGING
+                                         Extras: port:1..4 (int), enabled:true/false (bool)
+                                       • Master Telemetry Engine:
+                                         Action: com.cramqin.blecuktech10.SET_TELEMETRY_ENABLED
+                                         Extra: enabled:true/false (bool)
+                                       • Log Only When Phone Charging:
+                                         Action: com.cramqin.blecuktech10.SET_LOG_ONLY_WHEN_CHARGING
+                                         Extra: enabled:true/false (bool)
+                                       • Pause Polling When Screen Locked:
+                                         Action: com.cramqin.blecuktech10.SET_PAUSE_POLLING_WHEN_LOCKED
                                          Extra: enabled:true/false (bool)
                                        • Scan Nearby Chargers:
                                          Action: com.cramqin.blecuktech10.SCAN_CHARGER
@@ -2313,11 +2395,13 @@ private fun PortTelemetryCard(
     countdownRemainingSec: Long? = null,
     isHighlighted: Boolean = false,
     bringIntoViewRequester: BringIntoViewRequester? = null,
+    isLoggingEnabled: Boolean = true,
     onToggleEnabled: (Boolean) -> Unit,
     onSelectCountdown: (Int) -> Unit,
     onSetProtocol: (String, Boolean) -> Unit,
     onOpenChargeLimit: () -> Unit,
-    onOpenClosureTimeDialog: () -> Unit
+    onOpenClosureTimeDialog: () -> Unit,
+    onToggleLogging: (Boolean) -> Unit
 ) {
     val accentColor = when (port.portId) {
         1 -> Color(0xFF38BDF8)
@@ -2606,6 +2690,31 @@ private fun PortTelemetryCard(
                             .clip(RoundedCornerShape(3.dp))
                     )
                 }
+            }
+
+            // History & Wh Logging Option Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(
+                        text = "History & Wh Logging",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = if (isLoggingEnabled) "Records sessions & Wh to history (Live watts unaffected)" else "Live watts shown only (No history or session saved)",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = isLoggingEnabled,
+                    colors = cuktechSwitchColors(),
+                    onCheckedChange = onToggleLogging
+                )
             }
 
             // Wh Charge Limit button

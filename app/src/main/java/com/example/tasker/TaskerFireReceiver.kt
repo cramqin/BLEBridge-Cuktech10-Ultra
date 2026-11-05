@@ -64,6 +64,23 @@ class TaskerFireReceiver : BroadcastReceiver() {
                 val state = bundle.getBoolean("STATE", true)
                 mgr.setAutoReconnectConfigured(state)
             }
+            "SET_PORT_LOGGING" -> {
+                val port = bundle.getInt("PORT", 1)
+                val state = bundle.getBoolean("STATE", true)
+                mgr.setPortLoggingEnabled(port, state)
+            }
+            "SET_TELEMETRY" -> {
+                val state = bundle.getBoolean("STATE", true)
+                mgr.setTelemetryMasterEnabled(state)
+            }
+            "SET_LOG_WHEN_CHARGING" -> {
+                val state = bundle.getBoolean("STATE", false)
+                mgr.setLogOnlyWhenPhoneCharging(state)
+            }
+            "SET_PAUSE_WHEN_LOCKED" -> {
+                val state = bundle.getBoolean("STATE", false)
+                mgr.setPausePollingWhenScreenLocked(state)
+            }
         }
     }
 }

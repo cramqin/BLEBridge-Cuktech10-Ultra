@@ -230,6 +230,17 @@ class CuktechBleManager(
         _isAutoReconnectConfigured.value = savedAutoReconnect
         autoReconnectEnabled = savedAutoReconnect
 
+        // Policy states
+        _telemetryMasterEnabled.value = prefs.getBoolean("telemetry_master_enabled", true)
+        _logOnlyWhenPhoneCharging.value = prefs.getBoolean("log_only_when_phone_charging", false)
+        _pausePollingWhenScreenLocked.value = prefs.getBoolean("pause_polling_when_screen_locked", false)
+        _portLoggingMap.value = mapOf(
+            1 to prefs.getBoolean("port_logging_1", true),
+            2 to prefs.getBoolean("port_logging_2", true),
+            3 to prefs.getBoolean("port_logging_3", true),
+            4 to prefs.getBoolean("port_logging_4", true)
+        )
+
         credentialStore.tryAutoImportLocalCredentialsFile()
         _completedSessions.value = persistence.getRecentSessions(300)
         _chargeLimits.value = persistence.loadPortChargeLimits()
@@ -248,6 +259,68 @@ class CuktechBleManager(
                 updateCountdownTickAndNotification()
             }
         }
+    }
+
+    // --- Telemetry & Sleep Policy StateFlows ---
+    private val _telemetryMasterEnabled = MutableStateFlow(true)
+    val telemetryMasterEnabled: StateFlow<Boolean> = _telemetryMasterEnabled.asStateFlow()
+
+    private val _logOnlyWhenPhoneCharging = MutableStateFlow(false)
+    val logOnlyWhenPhoneCharging: StateFlow<Boolean> = _logOnlyWhenPhoneCharging.asStateFlow()
+
+    private val _pausePollingWhenScreenLocked = MutableStateFlow(false)
+    val pausePollingWhenScreenLocked: StateFlow<Boolean> = _pausePollingWhenScreenLocked.asStateFlow()
+
+    private val _portLoggingMap = MutableStateFlow(mapOf(1 to true, 2 to true, 3 to true, 4 to true))
+    val portLoggingMap: StateFlow<Map<Int, Boolean>> = _portLoggingMap.asStateFlow()
+
+    // Host system states updated by BleBridgeService
+    val isPhoneCharging = MutableStateFlow(false)
+    val isScreenOn = MutableStateFlow(true)
+
+    fun isPortLoggingEnabled(portId: Int): Boolean {
+        return _portLoggingMap.value[portId] ?: true
+    }
+
+    fun setPortLoggingEnabled(portId: Int, enabled: Boolean) {
+        val updated = _portLoggingMap.value.toMutableMap()
+        updated[portId] = enabled
+        _portLoggingMap.value = updated
+        context.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("port_logging_$portId", enabled)
+            .apply()
+    }
+
+    fun setTelemetryMasterEnabled(enabled: Boolean) {
+        _telemetryMasterEnabled.value = enabled
+        context.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("telemetry_master_enabled", enabled)
+            .apply()
+    }
+
+    fun setLogOnlyWhenPhoneCharging(enabled: Boolean) {
+        _logOnlyWhenPhoneCharging.value = enabled
+        context.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("log_only_when_phone_charging", enabled)
+            .apply()
+    }
+
+    fun setPausePollingWhenScreenLocked(enabled: Boolean) {
+        _pausePollingWhenScreenLocked.value = enabled
+        context.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("pause_polling_when_screen_locked", enabled)
+            .apply()
+    }
+
+    fun shouldPollNow(): Boolean {
+        if (!_telemetryMasterEnabled.value) return false
+        if (_logOnlyWhenPhoneCharging.value && !isPhoneCharging.value) return false
+        if (_pausePollingWhenScreenLocked.value && !isScreenOn.value) return false
+        return true
     }
 
     fun setAutoReconnectConfigured(enabled: Boolean) {
@@ -1575,25 +1648,32 @@ class CuktechBleManager(
     private fun updatePortTelemetry(portId: Int, decoded: PortTelemetry) {
         val curPorts = _ports.value.toMutableMap()
         val nowSec = System.currentTimeMillis() / 1000.0
-        val integrator = energyIntegrators[portId]!!
-        val deltaWh = integrator.update(decoded.powerW, nowSec)
-        val cumulativeWh = integrator.totalWh
+        val isLoggingActiveForPort = isPortLoggingEnabled(portId) && (_telemetryMasterEnabled.value) &&
+            (!_logOnlyWhenPhoneCharging.value || isPhoneCharging.value)
 
-        val detector = sessionDetectors[portId]!!
-        val finishedSession = detector.onSample(decoded.powerW, deltaWh, decoded.protocolName, nowSec)
-        if (finishedSession != null) {
-            persistence.insertCompletedSession(finishedSession)
-            _completedSessions.value = persistence.getRecentSessions(300)
-        }
+        var cumulativeWh = curPorts[portId]?.cumulativeWh ?: 0.0
 
-        val updatedActive = _activeSessions.value.toMutableMap()
-        val curActive = detector.activeSession
-        if (curActive != null) {
-            updatedActive[portId] = curActive
-        } else {
-            updatedActive.remove(portId)
+        if (isLoggingActiveForPort) {
+            val integrator = energyIntegrators[portId]!!
+            val deltaWh = integrator.update(decoded.powerW, nowSec)
+            cumulativeWh = integrator.totalWh
+
+            val detector = sessionDetectors[portId]!!
+            val finishedSession = detector.onSample(decoded.powerW, deltaWh, decoded.protocolName, nowSec)
+            if (finishedSession != null) {
+                persistence.insertCompletedSession(finishedSession)
+                _completedSessions.value = persistence.getRecentSessions(300)
+            }
+
+            val updatedActive = _activeSessions.value.toMutableMap()
+            val curActive = detector.activeSession
+            if (curActive != null) {
+                updatedActive[portId] = curActive
+            } else {
+                updatedActive.remove(portId)
+            }
+            _activeSessions.value = updatedActive
         }
-        _activeSessions.value = updatedActive
 
         val updatedPort = decoded.copy(cumulativeWh = cumulativeWh)
         curPorts[portId] = updatedPort
@@ -1828,7 +1908,10 @@ class CuktechBleManager(
 
         if (now - lastHistoryWriteMs >= 5000L) {
             lastHistoryWriteMs = now
-            persistence.recordPortSnapshot(portsMap.values, now)
+            val activeLoggingPorts = portsMap.values.filter { isPortLoggingEnabled(it.portId) }
+            if (activeLoggingPorts.isNotEmpty() && _telemetryMasterEnabled.value && (!_logOnlyWhenPhoneCharging.value || isPhoneCharging.value)) {
+                persistence.recordPortSnapshot(activeLoggingPorts, now)
+            }
         }
     }
 
@@ -2004,6 +2087,11 @@ class CuktechBleManager(
                 val anyPortActive = _totalPowerWatts.value > 0.0 || _activeSessions.value.isNotEmpty()
                 delay(if (anyPortActive) 3000L else 5000L)
                 if (_authState.value != CuktechAuthState.AUTHENTICATED) break
+
+                // If user policy disables polling (e.g. phone not charging or screen locked), sleep without waking CPU/radio
+                if (!shouldPollNow()) {
+                    continue
+                }
 
                 // C3 and USB-A never push BLE notifications from hardware; poll them to detect plug-in/load
                 sendMiotCommand(CuktechProtocol.SIID_CHARGER, CuktechProtocol.PIID_PORT_C3, isSet = false, timeoutMs = 1800L)

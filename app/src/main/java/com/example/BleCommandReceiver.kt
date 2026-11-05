@@ -74,6 +74,23 @@ class BleCommandReceiver : BroadcastReceiver() {
                 val enabled = intent.getBooleanExtra("enabled", true)
                 mgr.setAutoReconnectConfigured(enabled)
             }
+            ACTION_SET_PORT_LOGGING -> {
+                val portId = intent.getIntExtra("port", 1)
+                val enabled = intent.getBooleanExtra("enabled", true)
+                mgr.setPortLoggingEnabled(portId, enabled)
+            }
+            ACTION_SET_TELEMETRY_ENABLED -> {
+                val enabled = intent.getBooleanExtra("enabled", true)
+                mgr.setTelemetryMasterEnabled(enabled)
+            }
+            ACTION_SET_LOG_ONLY_WHEN_CHARGING -> {
+                val enabled = intent.getBooleanExtra("enabled", false)
+                mgr.setLogOnlyWhenPhoneCharging(enabled)
+            }
+            ACTION_SET_PAUSE_POLLING_WHEN_LOCKED -> {
+                val enabled = intent.getBooleanExtra("enabled", false)
+                mgr.setPausePollingWhenScreenLocked(enabled)
+            }
             ACTION_QUERY_STATUS -> {
                 mgr.refreshAllTelemetryNow()
                 BleBridgeService.broadcastTaskerTelemetry(
@@ -116,6 +133,10 @@ class BleCommandReceiver : BroadcastReceiver() {
         const val ACTION_SET_SCREEN_TIMEOUT = "com.cramqin.blecuktech10.SET_SCREEN_TIMEOUT"
         const val ACTION_SET_CHARGE_LIMIT = "com.cramqin.blecuktech10.SET_CHARGE_LIMIT"
         const val ACTION_SET_AUTO_CONNECT = "com.cramqin.blecuktech10.SET_AUTO_CONNECT"
+        const val ACTION_SET_PORT_LOGGING = "com.cramqin.blecuktech10.SET_PORT_LOGGING"
+        const val ACTION_SET_TELEMETRY_ENABLED = "com.cramqin.blecuktech10.SET_TELEMETRY_ENABLED"
+        const val ACTION_SET_LOG_ONLY_WHEN_CHARGING = "com.cramqin.blecuktech10.SET_LOG_ONLY_WHEN_CHARGING"
+        const val ACTION_SET_PAUSE_POLLING_WHEN_LOCKED = "com.cramqin.blecuktech10.SET_PAUSE_POLLING_WHEN_LOCKED"
         const val ACTION_QUERY_STATUS = "com.cramqin.blecuktech10.QUERY_STATUS"
     }
 }

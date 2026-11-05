@@ -101,6 +101,24 @@ class BleBridgeService : Service() {
         }
     }
 
+    private val screenStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_ON -> cuktechManager?.isScreenOn?.value = true
+                Intent.ACTION_SCREEN_OFF -> cuktechManager?.isScreenOn?.value = false
+            }
+        }
+    }
+
+    private val powerStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_POWER_CONNECTED -> cuktechManager?.isPhoneCharging?.value = true
+                Intent.ACTION_POWER_DISCONNECTED -> cuktechManager?.isPhoneCharging?.value = false
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -110,6 +128,33 @@ class BleBridgeService : Service() {
 
         try {
             registerReceiver(bluetoothStateReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
+        } catch (_: Exception) {}
+
+        // Listen for screen lock/unlock and phone charger plug/unplug to power telemetry policies
+        try {
+            val screenFilter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF)
+            }
+            registerReceiver(screenStateReceiver, screenFilter)
+
+            val powerFilter = IntentFilter().apply {
+                addAction(Intent.ACTION_POWER_CONNECTED)
+                addAction(Intent.ACTION_POWER_DISCONNECTED)
+            }
+            registerReceiver(powerStateReceiver, powerFilter)
+
+            // Initial power and screen state sync
+            val batteryStatus: Intent? = IntentFilter(Intent.ACTION_BATTERY_CHANGED).let { filter ->
+                applicationContext.registerReceiver(null, filter)
+            }
+            val status = batteryStatus?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val isCharging = status == android.os.BatteryManager.BATTERY_STATUS_CHARGING ||
+                    status == android.os.BatteryManager.BATTERY_STATUS_FULL
+            cuktechManager?.isPhoneCharging?.value = isCharging
+
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            cuktechManager?.isScreenOn?.value = powerManager?.isInteractive ?: true
         } catch (_: Exception) {}
 
         // Initialize state
@@ -229,6 +274,12 @@ class BleBridgeService : Service() {
         log(LogLevel.LEVEL2, "BLE Bridge Service destroying...")
         try {
             unregisterReceiver(bluetoothStateReceiver)
+        } catch (_: Exception) {}
+        try {
+            unregisterReceiver(screenStateReceiver)
+        } catch (_: Exception) {}
+        try {
+            unregisterReceiver(powerStateReceiver)
         } catch (_: Exception) {}
         releaseWakeLock()
         cleanupServer()
@@ -1742,7 +1793,7 @@ class BleBridgeService : Service() {
                             return@launch
                         }
 
-                        val currentVersion = "1.1.1"
+                        val currentVersion = "1.1.15"
                         if (tagName.isNotEmpty() && tagName != currentVersion && isNewerVersion(tagName, currentVersion)) {
                             _updateAvailable.value = true
                         } else {

@@ -19,6 +19,7 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
 - [12. Dual-Tab Terminal: Console Log & BLE Diagnostics](#12-dual-tab-terminal-console-log--ble-diagnostics)
 - [13. Automation Hub: Tasker Plugin, Webhooks & ADB](#13-automation-hub-tasker-plugin-webhooks--adb)
 - [14. Proximity Auto-Connect, Persistent Reconnect & Toast Alerts](#14-proximity-auto-connect-persistent-reconnect--toast-alerts)
+- [15. Telemetry Engine & Sleep Policies (Granular Power & Logging Controls)](#15-telemetry-engine--sleep-policies-granular-power--logging-controls)
 
 ---
 
@@ -222,4 +223,17 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
   - If the app was closed, killed by Android memory pressure, or force-stopped, reopening the app immediately re-initiates connection to the charger if Auto-Connect is configured.
 - **Native Toast Feedback:**
   - Displays a clean, debounced Android Toast on both connection (`⚡ CUKTECH 10 Ultra Connected`) and disconnection (`🔌 CUKTECH 10 Ultra Disconnected`) across all connection modes (manual, quick connect, proximity, or tasker).
+
+---
+
+## 15. Telemetry Engine & Sleep Policies (Granular Power & Logging Controls)
+- **Per-Port History & Wh Logging Switches:**
+  - Each port card on the **Ports tab** features an independent **"History & Wh Logging"** toggle.
+  - When disabled for a specific port (e.g., a 24/7 idle router or home server), live instantaneous voltage and wattage are still read and rendered on the faceplate graphic, but Wh accumulator updates, SQLite snapshot writes, and session history records are completely bypassed.
+- **Global Sleep & Power Policies (Setup Tab):**
+  - **Master Telemetry Switch:** Pauses active BLE background polling on demand while maintaining the connected BLE session.
+  - **Only Log When Host Phone is Charging:** Restricts continuous background polling and history writes to when the host phone itself is plugged in to AC power. When on battery, background telemetry pauses to preserve 0% phone drain.
+  - **Pause Polling When Screen Locked:** Automatically suspends BLE polling whenever the screen turns off, maximizing kernel Doze deep sleep. Instantly wakes and resumes telemetry upon unlocking the phone.
+- **Tasker & Broadcast Automation Support:**
+  - All sleep and logging policies are controllable via Tasker plugin actions and broadcast intents (`com.cramqin.blecuktech10.SET_PORT_LOGGING`, `SET_TELEMETRY_ENABLED`, `SET_LOG_ONLY_WHEN_CHARGING`, `SET_PAUSE_POLLING_WHEN_LOCKED`).
 

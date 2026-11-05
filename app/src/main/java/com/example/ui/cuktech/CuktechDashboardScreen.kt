@@ -804,6 +804,7 @@ fun CuktechDashboardScreen(
                                 isHighlighted = (highlightedPortId == portId),
                                 bringIntoViewRequester = portRequesters.getOrNull(portId - 1),
                                 isLoggingEnabled = isLoggingEn,
+                                isTelemetryMasterEnabled = telemetryMasterEnabled,
                                 onToggleEnabled = { enabled -> bleManager.setPortEnabled(portId, enabled) },
                                 onSelectCountdown = { code -> bleManager.setPortCountdown(portId, code) },
                                 onSetProtocol = { proto, en -> bleManager.setPortProtocol(portId, proto, en) },
@@ -1137,18 +1138,29 @@ fun CuktechDashboardScreen(
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
                             // B. Log Only When Phone Charging
+                            val phoneChargingSwitchEnabled = telemetryMasterEnabled
+                            val phoneChargingSubtitle = if (!telemetryMasterEnabled) {
+                                "Disabled · Requires Master Telemetry Engine to be active"
+                            } else if (logOnlyWhenPhoneCharging) {
+                                "Active · History & Wh are logged only while this phone is connected to AC power"
+                            } else {
+                                "Disabled · Logs sessions regardless of phone charging state"
+                            }
                             SettingSwitchRow(
                                 title = "Only Log When Host Phone is Charging",
-                                subtitle = if (logOnlyWhenPhoneCharging) "Active · History & Wh are logged only while this phone is connected to AC power" else "Disabled · Logs sessions regardless of phone charging state",
+                                subtitle = phoneChargingSubtitle,
                                 checked = logOnlyWhenPhoneCharging,
+                                enabled = phoneChargingSwitchEnabled,
                                 onCheckedChange = { bleManager.setLogOnlyWhenPhoneCharging(it) }
                             )
 
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
                             // C. Pause Polling When Screen Locked
-                            val screenLockSwitchEnabled = !logOnlyWhenPhoneCharging
-                            val screenLockSubtitle = if (logOnlyWhenPhoneCharging) {
+                            val screenLockSwitchEnabled = telemetryMasterEnabled && !logOnlyWhenPhoneCharging
+                            val screenLockSubtitle = if (!telemetryMasterEnabled) {
+                                "Disabled · Requires Master Telemetry Engine to be active"
+                            } else if (logOnlyWhenPhoneCharging) {
                                 "Overridden by AC Power policy (continuous logging while host phone is plugged in, even with screen locked)"
                             } else if (pausePollingWhenScreenLocked) {
                                 "Active · Suspends background polling while screen is off (maximizes Doze deep sleep)"
@@ -2411,6 +2423,7 @@ private fun PortTelemetryCard(
     isHighlighted: Boolean = false,
     bringIntoViewRequester: BringIntoViewRequester? = null,
     isLoggingEnabled: Boolean = true,
+    isTelemetryMasterEnabled: Boolean = true,
     onToggleEnabled: (Boolean) -> Unit,
     onSelectCountdown: (Int) -> Unit,
     onSetProtocol: (String, Boolean) -> Unit,
@@ -2676,8 +2689,8 @@ private fun PortTelemetryCard(
                 )
             }
 
-            // Charge Limit Progress Bar if enabled and logging is active
-            if (isLoggingEnabled && chargeLimit != null && chargeLimit.enabled) {
+            // Charge Limit Progress Bar if enabled and logging is active under master telemetry
+            if (isTelemetryMasterEnabled && isLoggingEnabled && chargeLimit != null && chargeLimit.enabled) {
                 val used = chargeLimit.currentUsedWh(port.cumulativeWh)
                 val progress = chargeLimit.progressFraction(port.cumulativeWh)
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -2708,6 +2721,15 @@ private fun PortTelemetryCard(
             }
 
             // History & Wh Logging Option Row
+            val loggingSwitchEnabled = isTelemetryMasterEnabled
+            val loggingSubtitle = if (!isTelemetryMasterEnabled) {
+                "Disabled · Master Telemetry Engine is paused"
+            } else if (isLoggingEnabled) {
+                "Records sessions & Wh to history (Live watts unaffected)"
+            } else {
+                "Live watts shown only (No history or session saved)"
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -2717,30 +2739,39 @@ private fun PortTelemetryCard(
                     Text(
                         text = "History & Wh Logging",
                         fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        color = if (loggingSwitchEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
                     Text(
-                        text = if (isLoggingEnabled) "Records sessions & Wh to history (Live watts unaffected)" else "Live watts shown only (No history or session saved)",
+                        text = loggingSubtitle,
                         fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (loggingSwitchEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                 }
                 Switch(
                     checked = isLoggingEnabled,
+                    enabled = loggingSwitchEnabled,
                     colors = cuktechSwitchColors(),
                     onCheckedChange = onToggleLogging
                 )
             }
 
-            // Wh Charge Limit button (Disabled if logging is turned off)
+            // Wh Charge Limit button (Disabled if master telemetry is off or logging is turned off)
+            val cutoffButtonEnabled = isTelemetryMasterEnabled && isLoggingEnabled
+            val cutoffHelperText = if (!isTelemetryMasterEnabled) {
+                "Wh cutoff disabled (Master Telemetry is paused)"
+            } else if (!isLoggingEnabled) {
+                "Wh cutoff requires History & Wh Logging"
+            } else null
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (!isLoggingEnabled) {
+                if (cutoffHelperText != null) {
                     Text(
-                        text = "Wh cutoff requires History & Wh Logging",
+                        text = cutoffHelperText,
                         fontSize = 10.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         modifier = Modifier.weight(1f).padding(end = 8.dp)
@@ -2750,11 +2781,11 @@ private fun PortTelemetryCard(
                 }
                 OutlinedButton(
                     onClick = onOpenChargeLimit,
-                    enabled = isLoggingEnabled,
+                    enabled = cutoffButtonEnabled,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = if (chargeLimit?.enabled == true && isLoggingEnabled) "Limit: ${"%.0f".format(chargeLimit.whTarget)}Wh Active" else "Set Wh Cutoff Limit",
+                        text = if (chargeLimit?.enabled == true && cutoffButtonEnabled) "Limit: ${"%.0f".format(chargeLimit.whTarget)}Wh Active" else "Set Wh Cutoff Limit",
                         fontSize = 11.sp
                     )
                 }

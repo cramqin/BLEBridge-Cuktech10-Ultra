@@ -147,11 +147,13 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
 ---
 
 ## 10. Persistent Live Notification & Foreground Keepalive
-- **Android Foreground Service Notification:**
-  - Keeps the BLE connection and local TCP bridge alive 24/7 even with aggressive OEM process killers and screen turned off.
+- **Android Foreground Service Notification (`CONNECTED_DEVICE`):**
+  - Keeps the BLE connection and local TCP bridge alive even with aggressive OEM process killers without holding continuous CPU wakelocks.
+  - **Zero 24/7 CPU Wakelocks (Doze & Deep Sleep Friendly):** The CPU wakelock is strictly released, allowing the phone's Application Processor (AP) to enter true deep sleep (Doze mode) overnight while the hardware Bluetooth controller manages BLE packets and GATT indications.
+  - **Notification Auto-Restoration & Sticky Ongoing Mode:** The notification uses `setOngoing(true)`, `setAutoCancel(false)`, and `FOREGROUND_SERVICE_IMMEDIATE`. If the notification is ever accidentally dismissed or cleared by the user or system, it self-heals and automatically restores on the next telemetry tick or whenever the app is opened (`onResume`).
   - Displays dynamic, live-updating charging metrics directly in the Android status bar and shade:
-    - **Header Status:** Active connection state (`BLE: CONNECTED` vs `DISCONNECTED`), battery whitelist status.
-    - **Total Power & Active Ports:** Live total wattage (`23.0W`) along with concise per-port breakdowns (`C1: 4.8W | C2: 18.2W`).
+    - **Header Status:** Active connection state (`⚡ CUKTECH 10 Ultra · XX.XW` or `Standby`).
+    - **Total Power & Active Ports:** Live total wattage along with concise per-port breakdowns (`C1: 4.8W | C2: 18.2W`).
     - **1-Tap Quick Action:** Instant tap to launch directly into the full Telemetry dashboard.
   - Automatically suppresses notification updates when idle (`0.0W`) to prevent unnecessary Android notification redraws.
 

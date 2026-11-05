@@ -113,6 +113,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // If the persistent notification was accidentally dismissed by the user or system,
+        // visiting the app immediately restores the telemetry / standby notification.
+        BleBridgeService.getInstance()?.forceRestoreNotification()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -574,7 +581,7 @@ fun BleBridgeDashboard(
                             border = BorderStroke(1.dp, appColors.primary.copy(alpha = 0.4f))
                         ) {
                             Text(
-                                text = "v1.1.0",
+                                text = "v1.1.1",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = appColors.primary,

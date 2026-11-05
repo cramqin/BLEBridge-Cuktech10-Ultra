@@ -104,7 +104,6 @@ class BleBridgeService : Service() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        acquireWakeLock()
         ensureCuktechManagersInitialized(applicationContext)
         bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
         bluetoothAdapter = bluetoothManager?.adapter
@@ -146,6 +145,8 @@ class BleBridgeService : Service() {
             cuktechManager?.startSearchForCuktechChargers(10000L)
         } else if (action == ACTION_ENSURE_SERVICE) {
             // Ensure service instance is initialized in memory for BLE scans/connections without showing notification yet
+        } else if (action == ACTION_RESTORE_NOTIFICATION) {
+            forceRestoreNotification()
         } else {
             dismissForegroundNotificationIfIdle()
         }
@@ -247,7 +248,6 @@ class BleBridgeService : Service() {
     private var notificationBuilderInstance: NotificationCompat.Builder? = null
 
     private fun createNotificationChannelAndStartForeground() {
-        acquireWakeLock()
         val channelId = "BleBridgeServiceChannel"
         val channelName = "CUKTECH 10 Ultra Live Telemetry"
 
@@ -280,6 +280,8 @@ class BleBridgeService : Service() {
             .setSmallIcon(R.drawable.ic_stat_cuktech)
             .setContentIntent(openPendingIntent)
             .setOngoing(true)
+            .setAutoCancel(false)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setOnlyAlertOnce(true)
             .setWhen(serviceStartTimeMs)
             .setShowWhen(true)
@@ -322,8 +324,18 @@ class BleBridgeService : Service() {
      * This performs in-place content updates like FDE.AI without resetting the notification post timestamp,
      * permanently preventing the notification from jumping or interchanging with other monitoring apps (e.g. Scene).
      */
-    fun updateNotificationTelemetry(title: String, content: String, bigText: String? = null, totalWatts: Double = -1.0) {
-        if (title == lastNotifTitle && content == lastNotifContent && bigText == lastNotifBigText) {
+     fun updateNotificationTelemetry(title: String, content: String, bigText: String? = null, totalWatts: Double = -1.0) {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        
+        // If the notification was somehow cleared or dismissed by user/system, we must re-post it
+        var isNotificationActive = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                isNotificationActive = nm.activeNotifications.any { it.id == NOTIFICATION_ID }
+            } catch (_: Exception) {}
+        }
+
+        if (isNotificationActive && title == lastNotifTitle && content == lastNotifContent && bigText == lastNotifBigText) {
             return
         }
 
@@ -332,7 +344,6 @@ class BleBridgeService : Service() {
         lastNotifBigText = bigText ?: content
 
         runCatching {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
             val openIntent = (packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java)).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("EXTRA_NAV_TAB", "LIVE")
@@ -353,6 +364,8 @@ class BleBridgeService : Service() {
                     .setSmallIcon(R.drawable.ic_stat_cuktech)
                     .setContentIntent(openPendingIntent)
                     .setOngoing(true)
+                    .setAutoCancel(false)
+                    .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
                     .setOnlyAlertOnce(true)
                     .setWhen(serviceStartTimeMs)
                     .setShowWhen(true)
@@ -363,6 +376,9 @@ class BleBridgeService : Service() {
                 notificationBuilderInstance = builder
             } else {
                 builder.setContentIntent(openPendingIntent)
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             }
 
             val style = NotificationCompat.BigTextStyle()
@@ -375,6 +391,48 @@ class BleBridgeService : Service() {
                 .setStyle(style)
                 .build()
             nm.notify(NOTIFICATION_ID, notif)
+        }
+    }
+
+    /**
+     * Resets cached notification state to force an immediate re-post/restoration
+     * in case the notification was cleared by the user or system.
+     */
+    fun forceRestoreNotification() {
+        lastNotifTitle = ""
+        lastNotifContent = ""
+        lastNotifBigText = ""
+        cuktechManager?.let { mgr ->
+            if (mgr.authState.value == CuktechAuthState.AUTHENTICATED) {
+                val ports = mgr.ports.value
+                val totalW = mgr.totalPowerWatts.value
+                val title = if (totalW > 0.05) {
+                    String.format(java.util.Locale.US, "⚡ CUKTECH 10 Ultra · %.1fW", totalW)
+                } else {
+                    "⚡ CUKTECH 10 Ultra · Standby"
+                }
+                val content = if (totalW > 0.05) {
+                    val activePorts = ports.values.filter { it.powerW > 0.05 }
+                    if (activePorts.isNotEmpty()) {
+                        activePorts.joinToString(", ") { p ->
+                            val label = when (p.portId) {
+                                1 -> "C1"
+                                2 -> "C2"
+                                3 -> "A"
+                                else -> "P${p.portId}"
+                            }
+                            String.format(java.util.Locale.US, "%s: %.1fW", label, p.powerW)
+                        }
+                    } else "0.0W active output"
+                } else "All ports idle"
+                updateNotificationTelemetry(title, content)
+            } else if (mgr.isAutoReconnectConfigured.value && !mgr.userManuallyDisconnected && !mgr.lastConnectedMac.isNullOrBlank()) {
+                updateNotificationTelemetry(
+                    title = "⚡ CUKTECH 10 Ultra · Standby",
+                    content = "Awaiting charger power-on... (Auto-Reconnect active)",
+                    bigText = "Charger unplugged or out of range. Auto-connect is active and will reconnect as soon as power is restored."
+                )
+            }
         }
     }
 
@@ -1464,6 +1522,7 @@ class BleBridgeService : Service() {
         const val ACTION_START_SERVER = "com.example.action.START_SERVER"
         const val ACTION_STOP_SERVER = "com.example.action.STOP_SERVER"
         const val ACTION_ENSURE_SERVICE = "com.example.action.ENSURE_SERVICE"
+        const val ACTION_RESTORE_NOTIFICATION = "com.cramqin.blecuktech10.RESTORE_NOTIFICATION"
         const val ACTION_CONNECT_CUKTECH = "com.cramqin.blecuktech10.CONNECT_CHARGER"
         const val ACTION_DISCONNECT_CUKTECH = "com.cramqin.blecuktech10.DISCONNECT_CHARGER"
         const val ACTION_SCAN_CUKTECH = "com.cramqin.blecuktech10.SCAN_CHARGER"
@@ -1683,7 +1742,7 @@ class BleBridgeService : Service() {
                             return@launch
                         }
 
-                        val currentVersion = "1.1.0"
+                        val currentVersion = "1.1.1"
                         if (tagName.isNotEmpty() && tagName != currentVersion && isNewerVersion(tagName, currentVersion)) {
                             _updateAvailable.value = true
                         } else {

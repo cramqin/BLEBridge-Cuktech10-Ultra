@@ -61,9 +61,10 @@ Huge thanks to the authors of both repositories for making this native Android p
 
 Unlike typical smart home bridges that hammer Bluetooth channels or drain your phone battery, BLEBridge was engineered specifically around the AD1204U hardware's exact BLE characteristics:
 
-- **0.0% CPU & Near-Zero Battery Drain on Idle:**
-  - When no device is drawing power, the background service uses negligible CPU (`< 0.1%`) and draws virtually no extra battery over an open BLE connection.
+- **0.0% CPU & True Deep Sleep (Doze Mode) Friendly:**
+  - When the screen is turned off or device is locked, the CPU partial wakelock is strictly released. The phone's Application Processor enters deep sleep (Doze mode) without overnight battery drain, while the hardware Bluetooth controller handles BLE packets and GATT notifications.
   - **Silent Idle Telemetry Filter:** When a poll returns unchanged `0.0V 0.0A (Idle)` values, the app **silently drops redundant state emissions**. It does not re-compose UI components, trigger launcher widget redraws, fire Home Assistant webhooks, or flood the console log.
+  - **Self-Healing Persistent Notification:** The foreground notification is sticky (`setOngoing(true)`) and automatically re-verifies its visibility. If accidentally cleared by the user or system, it immediately re-posts upon app resume or incoming telemetry.
 - **Smart Push + Adaptive Polling (Hardware-Aware):**
   - **USB-C1 & USB-C2:** The charger hardware automatically broadcasts spontaneous BLE push notifications (`b4 = 0x04`) the instant a cable is plugged in or wattage shifts. BLEBridge listens passively for C1/C2—only running a gentle `3s` backup poll when actively charging to catch unplugs, and **0 polls while idle**.
   - **USB-C3 & USB-A:** The charger firmware never broadcasts push notifications on C3/A. BLEBridge polls C3 and USB-A adaptively: every `5s` when all ports are idle (ensuring fast plug-in detection) and ramps up to `3s` whenever any port is active for smooth `Wh` energy integration.

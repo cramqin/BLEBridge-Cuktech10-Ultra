@@ -172,6 +172,20 @@ class ChargeSessionDetector(
         }
     }
 
+    /**
+     * Forces immediate finalization of the currently active session (e.g. when logging is paused,
+     * phone screen locks, or user toggles off port logging). Returns the completed session record if valid.
+     */
+    fun forceFinalizeActiveSession(timestampSec: Double = System.currentTimeMillis() / 1000.0): ChargeSessionRecord? {
+        val current = activeSession ?: return null
+        val finished = current.copy(
+            endTimeSec = timestampSec,
+            isActive = false
+        )
+        reset()
+        return if (finished.durationSeconds >= MIN_SESSION_DURATION_SEC) finished else null
+    }
+
     fun reset() {
         activeSession = null
         lowPowerStartSec = null

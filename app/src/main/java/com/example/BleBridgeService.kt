@@ -105,7 +105,12 @@ class BleBridgeService : Service() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 Intent.ACTION_SCREEN_ON -> cuktechManager?.isScreenOn?.value = true
-                Intent.ACTION_SCREEN_OFF -> cuktechManager?.isScreenOn?.value = false
+                Intent.ACTION_SCREEN_OFF -> {
+                    cuktechManager?.isScreenOn?.value = false
+                    if (cuktechManager?.pausePollingWhenScreenLocked?.value == true) {
+                        cuktechManager?.finalizeAllActiveSessions()
+                    }
+                }
             }
         }
     }
@@ -114,7 +119,12 @@ class BleBridgeService : Service() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 Intent.ACTION_POWER_CONNECTED -> cuktechManager?.isPhoneCharging?.value = true
-                Intent.ACTION_POWER_DISCONNECTED -> cuktechManager?.isPhoneCharging?.value = false
+                Intent.ACTION_POWER_DISCONNECTED -> {
+                    cuktechManager?.isPhoneCharging?.value = false
+                    if (cuktechManager?.logOnlyWhenPhoneCharging?.value == true) {
+                        cuktechManager?.finalizeAllActiveSessions()
+                    }
+                }
             }
         }
     }
@@ -1793,7 +1803,7 @@ class BleBridgeService : Service() {
                             return@launch
                         }
 
-                        val currentVersion = "1.1.15"
+                        val currentVersion = "1.1.2"
                         if (tagName.isNotEmpty() && tagName != currentVersion && isNewerVersion(tagName, currentVersion)) {
                             _updateAvailable.value = true
                         } else {

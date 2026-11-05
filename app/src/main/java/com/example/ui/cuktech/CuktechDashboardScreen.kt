@@ -1203,11 +1203,21 @@ fun CuktechDashboardScreen(
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.End,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                TextButton(onClick = { showTaskerDocs = !showTaskerDocs }) {
-                                    Text(if (showTaskerDocs) "Hide Broadcast Intent API" else "View Broadcast Intent API (Send & Receive Intents)", fontSize = 11.sp)
+                                FilledTonalButton(
+                                    onClick = { showTaskerDocs = !showTaskerDocs },
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (showTaskerDocs) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(if (showTaskerDocs) "Hide Intent API" else "View Broadcast Intent API", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                 }
                             }
 
@@ -2661,8 +2671,8 @@ private fun PortTelemetryCard(
                 )
             }
 
-            // Charge Limit Progress Bar if enabled
-            if (chargeLimit != null && chargeLimit.enabled) {
+            // Charge Limit Progress Bar if enabled and logging is active
+            if (isLoggingEnabled && chargeLimit != null && chargeLimit.enabled) {
                 val used = chargeLimit.currentUsedWh(port.cumulativeWh)
                 val progress = chargeLimit.progressFraction(port.cumulativeWh)
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -2717,18 +2727,29 @@ private fun PortTelemetryCard(
                 )
             }
 
-            // Wh Charge Limit button
+            // Wh Charge Limit button (Disabled if logging is turned off)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (!isLoggingEnabled) {
+                    Text(
+                        text = "Wh cutoff requires History & Wh Logging",
+                        fontSize = 10.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.weight(1f).padding(end = 8.dp)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
                 OutlinedButton(
                     onClick = onOpenChargeLimit,
+                    enabled = isLoggingEnabled,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = if (chargeLimit?.enabled == true) "Limit: ${"%.0f".format(chargeLimit.whTarget)}Wh Active" else "Set Wh Cutoff Limit",
+                        text = if (chargeLimit?.enabled == true && isLoggingEnabled) "Limit: ${"%.0f".format(chargeLimit.whTarget)}Wh Active" else "Set Wh Cutoff Limit",
                         fontSize = 11.sp
                     )
                 }

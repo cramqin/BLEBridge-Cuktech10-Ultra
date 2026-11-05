@@ -581,7 +581,7 @@ fun BleBridgeDashboard(
                             border = BorderStroke(1.dp, appColors.primary.copy(alpha = 0.4f))
                         ) {
                             Text(
-                                text = "v1.1.15-beta",
+                                text = "v1.1.2",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = appColors.primary,

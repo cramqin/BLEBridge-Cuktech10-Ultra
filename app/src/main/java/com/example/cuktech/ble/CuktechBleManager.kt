@@ -282,7 +282,26 @@ class CuktechBleManager(
         return _portLoggingMap.value[portId] ?: true
     }
 
+    fun finalizeActiveSessionForPort(portId: Int) {
+        val detector = sessionDetectors[portId] ?: return
+        val finished = detector.forceFinalizeActiveSession()
+        if (finished != null) {
+            persistence.insertCompletedSession(finished)
+            _completedSessions.value = persistence.getRecentSessions(300)
+        }
+        val updated = _activeSessions.value.toMutableMap()
+        updated.remove(portId)
+        _activeSessions.value = updated
+    }
+
+    fun finalizeAllActiveSessions() {
+        for (portId in 1..4) {
+            finalizeActiveSessionForPort(portId)
+        }
+    }
+
     fun setPortLoggingEnabled(portId: Int, enabled: Boolean) {
+        val wasEnabled = isPortLoggingEnabled(portId)
         val updated = _portLoggingMap.value.toMutableMap()
         updated[portId] = enabled
         _portLoggingMap.value = updated
@@ -290,30 +309,50 @@ class CuktechBleManager(
             .edit()
             .putBoolean("port_logging_$portId", enabled)
             .apply()
+
+        // If user turned logging off, immediately finalize and commit any ongoing active session for this port
+        if (wasEnabled && !enabled) {
+            finalizeActiveSessionForPort(portId)
+        }
     }
 
     fun setTelemetryMasterEnabled(enabled: Boolean) {
+        val wasEnabled = _telemetryMasterEnabled.value
         _telemetryMasterEnabled.value = enabled
         context.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
             .edit()
             .putBoolean("telemetry_master_enabled", enabled)
             .apply()
+
+        if (wasEnabled && !enabled) {
+            finalizeAllActiveSessions()
+        }
     }
 
     fun setLogOnlyWhenPhoneCharging(enabled: Boolean) {
+        val wasEnabled = _logOnlyWhenPhoneCharging.value
         _logOnlyWhenPhoneCharging.value = enabled
         context.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
             .edit()
             .putBoolean("log_only_when_phone_charging", enabled)
             .apply()
+
+        if (!wasEnabled && enabled && !isPhoneCharging.value) {
+            finalizeAllActiveSessions()
+        }
     }
 
     fun setPausePollingWhenScreenLocked(enabled: Boolean) {
+        val wasEnabled = _pausePollingWhenScreenLocked.value
         _pausePollingWhenScreenLocked.value = enabled
         context.getSharedPreferences("ble_cuktech_prefs", Context.MODE_PRIVATE)
             .edit()
             .putBoolean("pause_polling_when_screen_locked", enabled)
             .apply()
+
+        if (!wasEnabled && enabled && !isScreenOn.value) {
+            finalizeAllActiveSessions()
+        }
     }
 
     fun shouldPollNow(): Boolean {

@@ -1147,10 +1147,19 @@ fun CuktechDashboardScreen(
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
                             // C. Pause Polling When Screen Locked
+                            val screenLockSwitchEnabled = !logOnlyWhenPhoneCharging
+                            val screenLockSubtitle = if (logOnlyWhenPhoneCharging) {
+                                "Overridden by AC Power policy (continuous logging while host phone is plugged in, even with screen locked)"
+                            } else if (pausePollingWhenScreenLocked) {
+                                "Active · Suspends background polling while screen is off (maximizes Doze deep sleep)"
+                            } else {
+                                "Disabled · Continuous logging even with screen locked"
+                            }
                             SettingSwitchRow(
                                 title = "Pause Polling When Screen Locked",
-                                subtitle = if (pausePollingWhenScreenLocked) "Active · Suspends background polling while screen is off (maximizes Doze deep sleep)" else "Disabled · Continuous logging even with screen locked",
+                                subtitle = screenLockSubtitle,
                                 checked = pausePollingWhenScreenLocked,
+                                enabled = screenLockSwitchEnabled,
                                 onCheckedChange = { bleManager.setPausePollingWhenScreenLocked(it) }
                             )
                         }
@@ -2813,6 +2822,7 @@ private fun SettingSwitchRow(
     title: String,
     subtitle: String,
     checked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
@@ -2825,14 +2835,24 @@ private fun SettingSwitchRow(
                 .weight(1f)
                 .padding(end = 16.dp)
         ) {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            Text(
+                title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
             if (subtitle.isNotBlank()) {
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    subtitle,
+                    fontSize = 11.sp,
+                    color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
             }
         }
         Switch(
             checked = checked,
+            enabled = enabled,
             colors = cuktechSwitchColors(),
             onCheckedChange = onCheckedChange
         )

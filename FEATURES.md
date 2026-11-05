@@ -232,8 +232,8 @@ Comprehensive reference of all features, hardware registers, protocols, and auto
   - When disabled for a specific port (e.g., a 24/7 idle router or home server), live instantaneous voltage and wattage are still read and rendered on the faceplate graphic, but Wh accumulator updates, SQLite snapshot writes, and session history records are completely bypassed.
 - **Global Sleep & Power Policies (Setup Tab):**
   - **Master Telemetry Switch:** Pauses active BLE background polling on demand while maintaining the connected BLE session.
-  - **Only Log When Host Phone is Charging:** Restricts continuous background polling and history writes to when the host phone itself is plugged in to AC power. When on battery, background telemetry pauses to preserve 0% phone drain.
-  - **Pause Polling When Screen Locked:** Automatically suspends BLE polling whenever the screen turns off, maximizing kernel Doze deep sleep. Instantly wakes and resumes telemetry upon unlocking the phone.
+  - **Only Log When Host Phone is Charging:** Restricts continuous background polling and history writes to when the host phone itself is plugged into AC power. Takes priority over screen lock: when phone is charging, telemetry logging continues even with the screen off/locked. When on battery, background telemetry pauses to preserve 0% phone drain.
+  - **Pause Polling When Screen Locked:** Automatically suspends BLE polling whenever the screen turns off (maximizing kernel Doze deep sleep when running on battery). Disabled/overridden when "Only Log When Host Phone is Charging" is active and the phone is charging. Instantly resumes telemetry upon unlocking the phone.
 - **Tasker & Broadcast Automation Support:**
   - All sleep and logging policies are controllable via Tasker plugin actions and broadcast intents (`com.cramqin.blecuktech10.SET_PORT_LOGGING`, `SET_TELEMETRY_ENABLED`, `SET_LOG_ONLY_WHEN_CHARGING`, `SET_PAUSE_POLLING_WHEN_LOCKED`).
 

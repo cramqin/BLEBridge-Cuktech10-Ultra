@@ -107,7 +107,8 @@ class BleBridgeService : Service() {
                 Intent.ACTION_SCREEN_ON -> cuktechManager?.isScreenOn?.value = true
                 Intent.ACTION_SCREEN_OFF -> {
                     cuktechManager?.isScreenOn?.value = false
-                    if (cuktechManager?.pausePollingWhenScreenLocked?.value == true) {
+                    val isChargingPriority = cuktechManager?.logOnlyWhenPhoneCharging?.value == true && cuktechManager?.isPhoneCharging?.value == true
+                    if (!isChargingPriority && cuktechManager?.pausePollingWhenScreenLocked?.value == true) {
                         cuktechManager?.finalizeAllActiveSessions()
                     }
                 }

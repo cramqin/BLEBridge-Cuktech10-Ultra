@@ -357,7 +357,13 @@ class CuktechBleManager(
 
     fun shouldPollNow(): Boolean {
         if (!_telemetryMasterEnabled.value) return false
-        if (_logOnlyWhenPhoneCharging.value && !isPhoneCharging.value) return false
+        if (_logOnlyWhenPhoneCharging.value) {
+            // When "Only Log When Host Phone is Charging" is enabled, AC power takes priority:
+            // if the phone is plugged in, we poll even if the screen is locked/off.
+            // If the phone is unplugged, we do not poll.
+            return isPhoneCharging.value
+        }
+        // When not restricted to phone charging, check screen lock policy
         if (_pausePollingWhenScreenLocked.value && !isScreenOn.value) return false
         return true
     }

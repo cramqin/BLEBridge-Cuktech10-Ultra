@@ -919,6 +919,39 @@ fun CuktechDashboardScreen(
                                 }
                             }
 
+                            // Notice Banner if Master Telemetry is OFF or All Ports Logging is OFF
+                            val allPortsLoggingOff = (1..4).none { portLoggingMap[it] ?: true }
+                            if (!telemetryMasterEnabled || allPortsLoggingOff) {
+                                val bannerMsg = if (!telemetryMasterEnabled) {
+                                    "⚠️ Telemetry Logging Paused: Master Telemetry Engine is turned off in Setup. Live polling and session history recording are paused."
+                                } else {
+                                    "⚠️ Wh Logging Disabled: 'History & Wh Logging' is turned off for all ports. Turn on logging in the Ports tab to record sessions."
+                                }
+                                Surface(
+                                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = bannerMsg,
+                                            fontSize = 11.5.sp,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+                                }
+                            }
+
                             if (activeSessions.isEmpty() && completedSessions.isEmpty()) {
                                 Text(
                                     text = "No charging sessions recorded yet. Trapezoidal Wh integration begins automatically whenever port output ≥ 0.5W.",

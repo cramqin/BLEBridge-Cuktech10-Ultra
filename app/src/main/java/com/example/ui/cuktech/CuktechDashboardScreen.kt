@@ -1596,8 +1596,18 @@ fun CuktechDashboardScreen(
                                     }
                                 }
                             }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                            // D. Charger Orientation Lock (PIID 20)
+                            SettingSwitchRow(
+                                title = "Orientation Lock",
+                                subtitle = "Locks the charger's LCD orientation to the current position",
+                                checked = settings.orientationLock,
+                                onCheckedChange = { bleManager.setOrientationLock(it) }
+                            )
                         }
-                    }
+
 
                     // 6. Force Soft Port Reset Card
                     Card(

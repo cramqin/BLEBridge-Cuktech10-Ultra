@@ -119,6 +119,7 @@ class CuktechBleManager(
 
     private var authJob: Job? = null
     private var pollingJob: Job? = null
+    private var wasPolling = false
     private var keepaliveJob: Job? = null
     private var reconnectJob: Job? = null
     private var connectionTimeoutJob: Job? = null
@@ -2134,7 +2135,15 @@ class CuktechBleManager(
                 if (_authState.value != CuktechAuthState.AUTHENTICATED) break
 
                 // If user policy disables polling (e.g. phone not charging or screen locked), sleep without waking CPU/radio
-                if (!shouldPollNow()) {
+                val shouldPoll = shouldPollNow()
+                if (shouldPoll && !wasPolling) {
+                    BleBridgeService.getInstance()?.acquireWakeLock()
+                    wasPolling = true
+                } else if (!shouldPoll && wasPolling) {
+                    BleBridgeService.getInstance()?.releaseWakeLock()
+                    wasPolling = false
+                }
+                if (!shouldPoll) {
                     continue
                 }
 
@@ -2161,6 +2170,11 @@ class CuktechBleManager(
                 }
                 cycle++
             }
+            // Clean up wake lock when polling loop exits
+            if (wasPolling) {
+                BleBridgeService.getInstance()?.releaseWakeLock()
+                wasPolling = false
+            }
         }
 
         // Loop 2: 10-second Keepalive (`[00 00 00 00]` on `CHAR_CMD_RECV`)
@@ -2183,6 +2197,10 @@ class CuktechBleManager(
         pollingJob = null
         keepaliveJob?.cancel()
         keepaliveJob = null
+        if (wasPolling) {
+            BleBridgeService.getInstance()?.releaseWakeLock()
+            wasPolling = false
+        }
     }
 
     // =========================================================================

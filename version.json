@@ -1,5 +1,5 @@
 {
-  "versionCode": 1,
-  "versionName": "1.0.0",
-  "notes": "Initial release with TUI and auto-update support."
+  "versionCode": 2,
+  "versionName": "1.2.0-beta",
+  "notes": "Conditional WakeLock: CPU wake lock held only during active telemetry polling, released when screen is off / not charging / disconnected. Zero-WakeLock by default for TCP gateway idle."
 }

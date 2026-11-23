@@ -254,9 +254,9 @@ class BleBridgeService : Service() {
         }
     }
 
-    private var wakeLock: PowerManager.WakeLock? = null
+    internal var wakeLock: PowerManager.WakeLock? = null
 
-    private fun acquireWakeLock() {
+    internal fun acquireWakeLock() {
         try {
             if (wakeLock == null) {
                 val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -272,7 +272,7 @@ class BleBridgeService : Service() {
         }
     }
 
-    private fun releaseWakeLock() {
+    internal fun releaseWakeLock() {
         try {
             if (wakeLock?.isHeld == true) {
                 wakeLock?.release()

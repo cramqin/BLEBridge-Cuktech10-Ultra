@@ -1607,7 +1607,7 @@ fun CuktechDashboardScreen(
                                 onCheckedChange = { bleManager.setOrientationLock(it) }
                             )
                         }
-
+                    }
 
                     // 6. Force Soft Port Reset Card
                     Card(

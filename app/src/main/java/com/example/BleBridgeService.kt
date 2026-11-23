@@ -34,6 +34,7 @@ import java.net.Socket
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
+import com.example.BuildConfig
 import com.example.cuktech.ble.CuktechAuthState
 import com.example.cuktech.ble.CuktechBleManager
 import com.example.cuktech.cloud.XiaomiCloudClient
@@ -1804,7 +1805,7 @@ class BleBridgeService : Service() {
                             return@launch
                         }
 
-                        val currentVersion = "1.1.2"
+                        val currentVersion = BuildConfig.VERSION_NAME
                         if (tagName.isNotEmpty() && tagName != currentVersion && isNewerVersion(tagName, currentVersion)) {
                             _updateAvailable.value = true
                         } else {

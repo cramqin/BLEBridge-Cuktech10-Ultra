@@ -1,5 +1,8 @@
 {
   "versionCode": 2,
-  "versionName": "1.2.0-beta",
-  "notes": "Conditional WakeLock: CPU wake lock held only during active telemetry polling, released when screen is off / not charging / disconnected. Zero-WakeLock by default for TCP gateway idle."
+  "versionName": "1.2.0",
+  "notes": "Release 1.2.0
+- Fix(wakelock): Conditional wake lock now acquired only during active telemetry polling (when phone is charging). Released when screen off, not charging, or disconnected.
+- Fix(ui): Re-added Orientation Lock toggle in Charger Screen & Display Settings card (PIID 20). Allows locking/unlocking charger LCD orientation.
+- Fix(update): Version check now uses BuildConfig.VERSION_NAME instead of hardcoded value."
 }
